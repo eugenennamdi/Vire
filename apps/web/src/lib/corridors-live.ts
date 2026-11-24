@@ -11,7 +11,7 @@ import {
 import { getTextileClient } from "./runtime";
 
 const SAMPLE_BUY_HUMAN: Record<CorridorSymbol, string> = {
-  cNGN: "3000",
+  cNGN: "2500",
   wARS: "2500",
   wBRL: "12",
   wMXN: "40",

@@ -10,7 +10,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TokenIcon } from "@/components/ui/token-icon";
+import { TokenIcon, TokenStack } from "@/components/ui/token-icon";
 import { cn } from "@/lib/utils";
 
 interface CampaignStageView {
@@ -78,7 +78,11 @@ function CampaignsInner() {
     (c) => corridorFilter === "ALL" || c.corridor === corridorFilter
   );
 
-  const tabOptions = CORRIDOR_KEYS.map((key) => ({
+  const activeCorridorKeys = CORRIDOR_KEYS.filter(
+    (key) => key === "ALL" || key === corridorFilter || allCampaigns.some((c) => c.corridor === key)
+  );
+
+  const tabOptions = activeCorridorKeys.map((key) => ({
     value: key,
     label: key === "ALL" ? "All" : key,
     icon: key === "ALL" ? undefined : <TokenIcon symbol={key} size={16} />,
@@ -230,8 +234,13 @@ function CampaignsInner() {
                   </div>
                 </div>
 
-                {/* Hairline 3-column stage divider row */}
-                <div className="grid grid-cols-1 divide-y divide-black/[0.06] border-t border-black/[0.06] md:grid-cols-3 md:divide-x md:divide-y-0">
+                {/* Hairline multi-stage divider row */}
+                <div
+                  className={cn(
+                    "grid grid-cols-1 divide-y divide-black/[0.06] border-t border-black/[0.06] md:divide-x md:divide-y-0",
+                    camp.stages.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"
+                  )}
+                >
                   {camp.stages.map((st) => (
                     <Link
                       key={st.stageIndex}
@@ -274,6 +283,27 @@ function CampaignsInner() {
               </Card>
             );
           })}
+
+          {/* Permissionless multi-corridor x402 onboarding strip */}
+          <Card className="flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2.5">
+                <TokenStack symbols={["wBRL", "IDRX", "wMXN"]} size={20} />
+                <h2 className="text-[14.5px] font-medium text-[#0A0A0C]">
+                  Launch in any Textile FX corridor
+                </h2>
+              </div>
+              <p className="max-w-[56ch] text-[13px] text-[#71717A]">
+                Merchants and protocols can spin up verified local-currency campaigns across{" "}
+                <span className="font-mono text-[#0A0A0C]">cNGN, wARS, wBRL, IDRX, wMXN</span> via{" "}
+                <code className="font-mono text-[#0A0A0C]">POST /api/x402/campaigns</code>.
+              </p>
+            </div>
+            <Link href="/console" className={buttonVariants({ variant: "secondary", size: "md" })}>
+              Open x402 Console
+              <ArrowRight weight="bold" className="h-3.5 w-3.5" />
+            </Link>
+          </Card>
         </div>
       )}
     </div>

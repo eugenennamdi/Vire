@@ -56,11 +56,11 @@ const SCENARIOS: ScenarioConfig[] = [
     slug: "launch-partner-blackfriday-cngn",
     corridor: "cNGN",
     tokenName: "Compliant Naira",
-    deliverableLabel: "Promo post with verified store tag, pricing, and referral link",
-    deliverableUrl: "https://x.com/promoter/status/launch-deal-thread",
+    deliverableLabel: "Original Black Friday X promo tagging SWOT Gadgets with live swotgadgets.com product link",
+    deliverableUrl: "https://x.com/promoter/status/swot-black-friday-iphone",
     aiScore: 92,
-    localAmount: "3,000",
-    fallbackUsdt: "2.07",
+    localAmount: "2,500",
+    fallbackUsdt: "1.73",
     offrampRail: "Busha · Quidax · Yellow Card",
   },
   {
@@ -68,8 +68,8 @@ const SCENARIOS: ScenarioConfig[] = [
     slug: "latam-qa-regression-wars",
     corridor: "wARS",
     tokenName: "Argentine Peso",
-    deliverableLabel: "Reproducible MiniPay checkout QA issue with logs and fix notes",
-    deliverableUrl: "https://github.com/org/checkout/issues/148",
+    deliverableLabel: "Reproducible GitHub QA issue on eugenennamdi/Vire with logs and fix notes",
+    deliverableUrl: "https://github.com/eugenennamdi/Vire/issues/12",
     aiScore: 89,
     localAmount: "2,500",
     fallbackUsdt: "1.43",
@@ -80,8 +80,8 @@ const SCENARIOS: ScenarioConfig[] = [
     slug: "brazil-ptbr-localization-wbrl",
     corridor: "wBRL",
     tokenName: "Brazilian Real",
-    deliverableLabel: "Native PT-BR checkout localization PR preserving decimal notices",
-    deliverableUrl: "https://github.com/org/docs/pull/91",
+    deliverableLabel: "Simulated x402 PT-BR localization mandate settling exact 18-decimal wBRL",
+    deliverableUrl: "https://github.com/eugenennamdi/Vire/pull/18",
     aiScore: 94,
     localAmount: "12",
     fallbackUsdt: "2.04",
@@ -92,8 +92,8 @@ const SCENARIOS: ScenarioConfig[] = [
     slug: "indonesia-bahasa-qa-idrx",
     corridor: "IDRX",
     tokenName: "Indonesian Rupiah",
-    deliverableLabel: "Bahasa localization diff & 2-decimal IDRX rounding verification",
-    deliverableUrl: "https://github.com/org/docs/pull/64",
+    deliverableLabel: "Simulated x402 Bahasa QA mandate verifying 2-decimal IDRX precision",
+    deliverableUrl: "https://github.com/eugenennamdi/Vire/pull/21",
     aiScore: 91,
     localAmount: "35,000",
     fallbackUsdt: "1.91",
@@ -216,8 +216,7 @@ export function ClearingInspector({
   const scenario = SCENARIOS.find((s) => s.id === selectedId) ?? SCENARIOS[0]!;
   const matchedCampaign =
     campaigns.find((c) => c.slug === scenario.slug) ??
-    campaigns.find((c) => c.corridor === scenario.corridor) ??
-    campaigns[0];
+    campaigns.find((c) => c.corridor === scenario.corridor);
   const liveQuote = liveBySymbol.get(scenario.corridor);
 
   const isBlocked = mode === "blocked";
@@ -239,16 +238,16 @@ export function ClearingInspector({
         { label: "External wallet guard", passed: false },
         { label: `Score >= ${matchedCampaign?.minPassScore ?? 75}/100`, passed: false },
         { label: `Spread <= ${matchedCampaign?.maxSpreadBps ?? 250} bps`, passed: true },
-        { label: `Per-payout <= $${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "15"}`, passed: true },
-        { label: `24h cap <= $${matchedCampaign?.dailyLimitUsdtFormatted ?? "100"}`, passed: true },
+        { label: `Per-payout <= $${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"}`, passed: true },
+        { label: `24h cap <= $${matchedCampaign?.dailyLimitUsdtFormatted ?? "20"}`, passed: true },
       ]
     : [
         { label: "Deliverable replay hash", passed: true },
         { label: "External wallet guard", passed: true },
         { label: `Score >= ${matchedCampaign?.minPassScore ?? 75}/100`, passed: true },
         { label: `Spread <= ${matchedCampaign?.maxSpreadBps ?? 250} bps`, passed: true },
-        { label: `Per-payout <= $${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "15"}`, passed: true },
-        { label: `24h cap <= $${matchedCampaign?.dailyLimitUsdtFormatted ?? "100"}`, passed: true },
+        { label: `Per-payout <= $${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"}`, passed: true },
+        { label: `24h cap <= $${matchedCampaign?.dailyLimitUsdtFormatted ?? "20"}`, passed: true },
       ];
 
   const probeCurl = `curl -i -X POST https://usevire.xyz/api/x402/verify \\
@@ -541,7 +540,7 @@ export function ClearingInspector({
                   <div className="flex items-center justify-between gap-3 py-2.5">
                     <dt className="text-[#71717A]">Partner</dt>
                     <dd className="truncate font-medium text-[#0A0A0C]">
-                      {matchedCampaign?.partnerName ?? "Launch Partner"}
+                      {matchedCampaign?.partnerName ?? "Textile FX Rail (x402 API)"}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-2.5">
@@ -559,7 +558,7 @@ export function ClearingInspector({
                   <div className="flex items-center justify-between gap-3 py-2.5">
                     <dt className="text-[#71717A]">Vault limits</dt>
                     <dd className="font-mono text-[#0A0A0C] tabular-nums">
-                      &lt;= ${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "15"}/tx · &lt;={" "}
+                      &lt;= ${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"}/tx · &lt;={" "}
                       {matchedCampaign?.maxSpreadBps ?? 250} bps
                     </dd>
                   </div>
@@ -579,12 +578,20 @@ export function ClearingInspector({
                     Inspect rejected ledger
                     <ArrowRight weight="bold" className="h-4 w-4" />
                   </Link>
-                ) : (
+                ) : matchedCampaign ? (
                   <Link
-                    href={`/claim?campaign=${encodeURIComponent(matchedCampaign?.slug ?? scenario.slug)}`}
+                    href={`/claim?campaign=${encodeURIComponent(matchedCampaign.slug)}`}
                     className={buttonVariants({ variant: "primary", size: "lg", className: "w-full" })}
                   >
                     Submit {scenario.corridor} claim
+                    <ArrowRight weight="bold" className="h-4 w-4" />
+                  </Link>
+                ) : (
+                  <Link
+                    href="/console"
+                    className={buttonVariants({ variant: "primary", size: "lg", className: "w-full" })}
+                  >
+                    Launch {scenario.corridor} campaign via x402
                     <ArrowRight weight="bold" className="h-4 w-4" />
                   </Link>
                 )}

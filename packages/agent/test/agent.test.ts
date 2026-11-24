@@ -5,7 +5,9 @@ import { TextileClient } from "@vire/textile";
 import {
   assertSafePublicUrl,
   evaluatePolicyGate,
+  fetchDeliverableArtifact,
   isPrivateOrReservedIp,
+  normalizeDeliverableUrl,
   parseVerificationVerdict,
   SettlementOrchestrator,
   type OrchestratorCampaignRecord,
@@ -153,6 +155,46 @@ describe("SSRF & prompt-injection fail-closed guards", () => {
     const v = parseVerificationVerdict("I cannot comply with JSON");
     expect(v.verdict).toBe("reject");
     expect(v.score).toBe(0);
+  });
+
+  it("canonicalizes twitter.com and x.com status URLs identically and extracts live tweet text + links", async () => {
+    expect(normalizeDeliverableUrl("https://twitter.com/PromoUser/status/123456789?s=20&t=abc")).toBe(
+      "https://x.com/promouser/status/123456789"
+    );
+    expect(normalizeDeliverableUrl("https://x.com/promouser/status/123456789/")).toBe(
+      "https://x.com/promouser/status/123456789"
+    );
+
+    const mockFetch: typeof fetch = vi.fn(async (url) => {
+      if (String(url).startsWith("https://api.fxtwitter.com/")) {
+        return new Response(
+          JSON.stringify({
+            code: 200,
+            tweet: {
+              text: "Black Friday iPhone 15 deal at @swotgadgets https://swotgadgets.com/product/iphone-15 #SWOTBlackFriday",
+              author: { screen_name: "promouser" },
+              likes: 14,
+              views: 620,
+              raw_text: {
+                facets: [{ type: "url", replacement: "https://swotgadgets.com/product/iphone-15" }],
+              },
+            },
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    const artifact = await fetchDeliverableArtifact({
+      deliverableUrl: "https://x.com/promouser/status/123456789",
+      fetchImpl: mockFetch,
+    });
+    expect(artifact.sourceKind).toBe("x_post");
+    expect(artifact.reachable).toBe(true);
+    expect(artifact.authorHandle).toBe("promouser");
+    expect(artifact.excerpt).toContain("swotgadgets.com/product/iphone-15");
+    expect(artifact.excerpt).toContain("#SWOTBlackFriday");
   });
 });
 

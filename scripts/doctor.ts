@@ -433,11 +433,17 @@ async function main() {
     if (/^0x[0-9a-fA-F]{64}$/.test(trimmed)) txHashes.add(trimmed as Hash);
   }
 
-  const dbPath = process.env.DATABASE_URL?.trim() || "file:./apps/web/data/vire.db";
+  const dbPath =
+    process.env.DATABASE_URL?.trim() ||
+    process.env.TURSO_DATABASE_URL?.trim() ||
+    "file:./apps/web/data/vire.db";
   try {
     const client = createClient({
       url: dbPath,
-      authToken: process.env.DATABASE_AUTH_TOKEN?.trim() || undefined,
+      authToken:
+        process.env.DATABASE_AUTH_TOKEN?.trim() ||
+        process.env.TURSO_AUTH_TOKEN?.trim() ||
+        undefined,
     });
     const rows = await client
       .execute("SELECT vault_release_tx_hash, textile_swap_tx_hash, payout_tx_hash FROM settlements ORDER BY settled_at DESC LIMIT 3")

@@ -4,7 +4,7 @@ import { encodeAbiParameters, keccak256, type Hex } from "viem";
 
 export interface FetchedArtifact {
   normalizedUrl: string;
-  sourceKind: "github_pr" | "github_issue" | "web_post";
+  sourceKind: "github_pr" | "github_issue" | "x_post" | "web_post";
   title: string;
   authorHandle: string | null;
   excerpt: string;
@@ -77,12 +77,26 @@ export async function assertSafePublicUrl(rawUrl: string): Promise<URL> {
   return parsed;
 }
 
-/** Normalize URL for deterministic anti-duplicate hashing (lowercase host, strip hash & tracking params). */
+const X_HOSTS = new Set(["x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"]);
+
+/** Parse canonical X/Twitter status handle + tweet ID when URL points to a public post. */
+export function parseXStatusUrl(url: URL): { handle: string; tweetId: string } | null {
+  if (!X_HOSTS.has(url.hostname.toLowerCase())) return null;
+  const match = url.pathname.match(/^\/([A-Za-z0-9_]{1,32})\/status\/(\d+)/i);
+  if (!match) return null;
+  return { handle: match[1]!, tweetId: match[2]! };
+}
+
+/** Normalize URL for deterministic anti-duplicate hashing (lowercase host, canonicalize x.com/twitter.com, strip tracking params). */
 export function normalizeDeliverableUrl(rawUrl: string): string {
   const u = new URL(rawUrl.trim());
   u.hash = "";
   for (const key of ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "ref", "s", "t"]) {
     u.searchParams.delete(key);
+  }
+  const xStatus = parseXStatusUrl(u);
+  if (xStatus) {
+    return `https://x.com/${xStatus.handle.toLowerCase()}/status/${xStatus.tweetId}`;
   }
   u.searchParams.sort();
   return `${u.protocol}//${u.hostname.toLowerCase()}${u.pathname.replace(/\/+$/, "") || "/"}${u.search}`;
@@ -190,6 +204,97 @@ export async function fetchDeliverableArtifact(params: {
       excerpt: `[${metaLine}] ${(data.body ?? "").slice(0, 3_500)}`,
       httpStatus: res.status,
       reachable: true,
+    };
+  }
+
+  // Dedicated X (Twitter) public post extraction — X blocks raw fetch with a JS shell,
+  // so we resolve full tweet text, author handle, and expanded URLs via FxTwitter + official oEmbed fallback.
+  const xStatus = parseXStatusUrl(safeUrl);
+  if (xStatus) {
+    try {
+      const fxRes = await fetchFn(
+        `https://api.fxtwitter.com/${encodeURIComponent(xStatus.handle)}/status/${xStatus.tweetId}`,
+        {
+          headers: { Accept: "application/json", "User-Agent": "Vire-Settlement-Agent/1.0" },
+          signal: AbortSignal.timeout(10_000),
+        }
+      );
+      if (fxRes.ok) {
+        const fx = (await fxRes.json()) as {
+          code?: number;
+          tweet?: {
+            text?: string;
+            created_at?: string;
+            likes?: number;
+            retweets?: number;
+            views?: number;
+            author?: { screen_name?: string; name?: string };
+            raw_text?: { facets?: Array<{ type?: string; replacement?: string; original?: string }> };
+          };
+        };
+        if (fx.tweet?.text) {
+          const authorScreen = fx.tweet.author?.screen_name ?? xStatus.handle;
+          const expandedUrls = (fx.tweet.raw_text?.facets ?? [])
+            .filter((f) => f.type === "url" && f.replacement)
+            .map((f) => f.replacement!);
+          const metaParts = [
+            `author=@${authorScreen}`,
+            fx.tweet.created_at ? `created_at=${fx.tweet.created_at}` : null,
+            fx.tweet.likes !== undefined ? `likes=${fx.tweet.likes}` : null,
+            fx.tweet.views !== undefined ? `views=${fx.tweet.views}` : null,
+            expandedUrls.length > 0 ? `links=[${expandedUrls.join(", ")}]` : null,
+          ]
+            .filter(Boolean)
+            .join(", ");
+
+          return {
+            normalizedUrl,
+            sourceKind: "x_post",
+            title: `X post by @${authorScreen}`,
+            authorHandle: authorScreen,
+            excerpt: `[${metaParts}] ${fx.tweet.text}`.slice(0, 3_800),
+            httpStatus: 200,
+            reachable: true,
+          };
+        }
+      }
+    } catch {
+      // Fall through to official oEmbed below
+    }
+
+    try {
+      const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(`https://twitter.com/${xStatus.handle}/status/${xStatus.tweetId}`)}&omit_script=true`;
+      const oeRes = await fetchFn(oembedUrl, {
+        headers: { Accept: "application/json", "User-Agent": "Vire-Settlement-Agent/1.0" },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (oeRes.ok) {
+        const oe = (await oeRes.json()) as { author_name?: string; html?: string };
+        const { excerpt } = stripHtmlToExcerpt(oe.html ?? "");
+        if (excerpt) {
+          return {
+            normalizedUrl,
+            sourceKind: "x_post",
+            title: `X post by @${xStatus.handle}`,
+            authorHandle: xStatus.handle,
+            excerpt: `[author=@${xStatus.handle}, source=oembed] ${excerpt}`.slice(0, 3_800),
+            httpStatus: 200,
+            reachable: true,
+          };
+        }
+      }
+    } catch {
+      // Fall through to fail-closed unreachable result below
+    }
+
+    return {
+      normalizedUrl,
+      sourceKind: "x_post",
+      title: `X post by @${xStatus.handle}`,
+      authorHandle: xStatus.handle,
+      excerpt: "Unable to verify public X post content (post may be deleted, private, or unreachable).",
+      httpStatus: 404,
+      reachable: false,
     };
   }
 

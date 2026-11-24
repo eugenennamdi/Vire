@@ -9,19 +9,19 @@ export interface LaunchPartnerConfig {
 }
 
 /**
- * Configurable Named Launch Partner workspace (Pilot Client #1: Nigerian Gadget Retail Store).
+ * Configurable Named Launch Partner workspace (Pilot Client #1: SWOT Gadgets — swotgadgets.com).
  * Override any field via NEXT_PUBLIC_PARTNER_* environment variables with zero code changes.
  */
 export function getLaunchPartnerConfig(env: Record<string, string | undefined> = process.env): LaunchPartnerConfig {
   return {
-    name: env.NEXT_PUBLIC_PARTNER_NAME?.trim() || "Kano & Lagos Tech Hub (Pilot Partner)",
+    name: env.NEXT_PUBLIC_PARTNER_NAME?.trim() || "SWOT Gadgets",
     tagline:
       env.NEXT_PUBLIC_PARTNER_TAGLINE?.trim() ||
-      "Verified Black Friday & December Smartphone Micro-Affiliate Clearing",
+      "Black Friday Gadget Promo Clearing on Celo Mainnet",
     logoUrl: env.NEXT_PUBLIC_PARTNER_LOGO_URL?.trim() || "",
-    handle: env.NEXT_PUBLIC_PARTNER_HANDLE?.trim() || "@techhubng",
-    location: env.NEXT_PUBLIC_PARTNER_LOCATION?.trim() || "Lagos, Nigeria",
-    campaignBudgetUsdt: env.NEXT_PUBLIC_PARTNER_CAMPAIGN_BUDGET_USDT?.trim() || "500",
-    storeUrl: env.NEXT_PUBLIC_PARTNER_STORE_URL?.trim() || "https://example.com",
+    handle: env.NEXT_PUBLIC_PARTNER_HANDLE?.trim() || "@swotgadgets",
+    location: env.NEXT_PUBLIC_PARTNER_LOCATION?.trim() || "Abeokuta, Nigeria",
+    campaignBudgetUsdt: env.NEXT_PUBLIC_PARTNER_CAMPAIGN_BUDGET_USDT?.trim() || "35",
+    storeUrl: env.NEXT_PUBLIC_PARTNER_STORE_URL?.trim() || "https://swotgadgets.com",
   };
 }

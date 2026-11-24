@@ -9,7 +9,10 @@ let _db: LibSQLDatabase<typeof schema> | null = null;
 let _initPromise: Promise<void> | null = null;
 
 function resolveDbUrl(): string {
-  const raw = process.env.DATABASE_URL?.trim() || "file:./data/vire.db";
+  const raw =
+    process.env.DATABASE_URL?.trim() ||
+    process.env.TURSO_DATABASE_URL?.trim() ||
+    "file:./data/vire.db";
   if (raw.startsWith("file:")) {
     const filePart = raw.slice(5);
     // Vercel serverless filesystem (/var/task) is read-only; fall back safely to /tmp if no remote libsql:// URL is set.
@@ -27,7 +30,10 @@ export function getLibsqlClient(): Client {
   if (!_client) {
     _client = createClient({
       url: resolveDbUrl(),
-      authToken: process.env.DATABASE_AUTH_TOKEN?.trim() || undefined,
+      authToken:
+        process.env.DATABASE_AUTH_TOKEN?.trim() ||
+        process.env.TURSO_AUTH_TOKEN?.trim() ||
+        undefined,
     });
   }
   return _client;
