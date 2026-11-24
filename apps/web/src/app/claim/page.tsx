@@ -659,9 +659,13 @@ function ClaimFlowInner({
                       <span>STATUS · {result.status}</span>
                       {result.verdict && <span>SCORE {result.verdict.score}/100</span>}
                     </div>
-                    {result.error && <p className="mt-1.5 leading-relaxed">{result.error}</p>}
+                    {result.error && (
+                      <p className="mt-1.5 break-words leading-relaxed [overflow-wrap:anywhere]">
+                        {result.error}
+                      </p>
+                    )}
                     {result.policyDecision?.failedReason && (
-                      <p className="mt-1.5 font-medium text-[#B91C1C]">
+                      <p className="mt-1.5 break-words font-medium text-[#B91C1C] [overflow-wrap:anywhere]">
                         {result.policyDecision.failedRule}: {result.policyDecision.failedReason}
                       </p>
                     )}

@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CELO_CONTRACTS, CELO_TOKENS, DEFAULT_ATTRIBUTION_CODE } from "@vire/shared";
 import {
   appendAttributionSuffixSafe,
   buildAgentCardManifest,
   buildGiveFeedbackCall,
+  CeloBuyClient,
   decodeAttributionSuffix,
   parseX402PaymentResponseHeader,
   resolveSafeFeeCurrency,
@@ -66,5 +67,91 @@ describe("packages/celo-infra security & protocol guards", () => {
     const parsed = parseX402PaymentResponseHeader(encoded);
     expect(parsed.txHash).toBe("0xabc123");
     expect(parsed.network).toBe("eip155:42220");
+  });
+
+  it("selects configured USDT (not default USDC) when usebuy.ai offers [USDC, USDT]", async () => {
+    const paymentRequiredV2 = {
+      x402Version: 2,
+      error: "payment_required",
+      resource: {
+        url: "https://gateway.usebuy.ai/cencori/v1/chat/completions",
+        description: "Chat completion, maximo-atlas-1.3",
+        mimeType: "application/json",
+      },
+      accepts: [
+        {
+          scheme: "exact",
+          network: "eip155:42220",
+          amount: "10000",
+          asset: CELO_TOKENS.USDC.address,
+          payTo: "0x20faAca5F980E29639A0FCC6dcA6988E18ed333B",
+          maxTimeoutSeconds: 60,
+          extra: { name: "USDC", version: "2" },
+        },
+        {
+          scheme: "exact",
+          network: "eip155:42220",
+          amount: "10000",
+          asset: CELO_TOKENS.USDT.address,
+          payTo: "0x20faAca5F980E29639A0FCC6dcA6988E18ed333B",
+          maxTimeoutSeconds: 60,
+          extra: { name: "Tether USD", version: "1" },
+        },
+      ],
+    };
+
+    let selectedAsset: string | null = null;
+    let callCount = 0;
+    const mockFetch: typeof fetch = vi.fn(async (input) => {
+      callCount += 1;
+      const req = input instanceof Request ? input : new Request(String(input));
+      if (callCount === 1) {
+        return new Response(JSON.stringify({ error: "payment_required" }), {
+          status: 402,
+          headers: {
+            "Content-Type": "application/json",
+            "payment-required": Buffer.from(JSON.stringify(paymentRequiredV2), "utf8").toString("base64"),
+          },
+        });
+      }
+      const sigHeader = req.headers.get("payment-signature") ?? req.headers.get("PAYMENT-SIGNATURE");
+      expect(sigHeader).toBeTruthy();
+      const decoded = JSON.parse(Buffer.from(sigHeader!, "base64").toString("utf8")) as {
+        accepted?: { asset?: string };
+      };
+      selectedAsset = decoded.accepted?.asset ?? null;
+      return new Response(
+        JSON.stringify({
+          model: "maximo-atlas-1.3",
+          choices: [{ message: { content: '{"verdict":"pass","score":92,"confidence":0.95,"reason":"ok","evidenceSummary":"ok"}' } }],
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "payment-response": Buffer.from(
+              JSON.stringify({ transaction: "0x9999", network: "eip155:42220" }),
+              "utf8"
+            ).toString("base64"),
+          },
+        }
+      );
+    });
+
+    const buyClient = new CeloBuyClient({
+      agentPrivateKey: "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      paymentToken: "USDT",
+      maxAmountUsd: "0.05",
+      fetchImpl: mockFetch,
+    });
+
+    const res = await buyClient.callCencoriInference({
+      messages: [{ role: "user", content: "verify test" }],
+      maxTokens: 256,
+    });
+
+    expect(callCount).toBe(2);
+    expect(selectedAsset?.toLowerCase()).toBe(CELO_TOKENS.USDT.address.toLowerCase());
+    expect(res.receipt.paymentTxHash).toBe("0x9999");
   });
 });

@@ -5,7 +5,7 @@ import {
   DEFAULT_CELO_RPC_URL,
   type BuyPaymentReceipt,
 } from "@vire/shared";
-import { ExactEvmScheme } from "@x402/evm/exact/client";
+import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment, x402Client } from "@x402/fetch";
 import type { Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -21,6 +21,8 @@ export interface BuyClientConfig {
   maxAmountUsd?: string;
   /** Explicit offline dry-run mode (for local unit tests without spending mainnet stablecoins). */
   dryRun?: boolean;
+  /** Optional custom fetch implementation (used in unit tests). */
+  fetchImpl?: typeof fetch;
 }
 
 export interface CencoriMessage {
@@ -106,6 +108,7 @@ export class CeloBuyClient {
       const account = privateKeyToAccount(config.agentPrivateKey);
       const token = CELO_TOKENS[this.paymentToken];
       const maxAtomic = BigInt(Math.ceil(Number(cleanedMax) * 10 ** token.decimals)).toString();
+      const targetAssetLower = token.address.toLowerCase();
       const client = new x402Client();
       // Always set spendControls via setSpendControls() (constructor ignores config).
       client.setSpendControls({
@@ -118,10 +121,22 @@ export class CeloBuyClient {
         ],
         maxAmountPerPayment: this.maxAmountUsd,
       });
-      // ExactEvmScheme supports rpcUrl for Permit2/chain reads; cast avoids strict version skew across viem minor types.
-      const scheme = new ExactEvmScheme(account as unknown as ConstructorParameters<typeof ExactEvmScheme>[0]);
-      client.register("eip155:*", scheme);
-      this.paidFetch = wrapFetchWithPayment(fetch, client);
+      // Register BOTH x402 v2 (eip155:*) and v1 schemes, plus a strict policy selecting
+      // our configured paymentToken (e.g. USDT) — otherwise @x402/core keeps USDC as a
+      // built-in default asset and picks accepts[0] (USDC) even when the agent holds USDT!
+      registerExactEvmScheme(client, {
+        signer: account as unknown as Parameters<typeof registerExactEvmScheme>[1]["signer"],
+        schemeOptions: { rpcUrl: this.rpcUrl },
+        policies: [
+          (_version, requirements) => {
+            const preferred = requirements.filter(
+              (r) => r.asset.toLowerCase() === targetAssetLower
+            );
+            return preferred.length > 0 ? preferred : requirements;
+          },
+        ],
+      });
+      this.paidFetch = wrapFetchWithPayment(config.fetchImpl ?? fetch, client);
     } else {
       this.paidFetch = null;
     }
