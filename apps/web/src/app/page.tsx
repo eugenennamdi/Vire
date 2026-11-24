@@ -21,8 +21,6 @@ import { truncateMiddle } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-const HERO_CORRIDOR_SYMBOLS: CorridorSymbol[] = ["cNGN", "wARS", "wBRL", "IDRX", "wMXN"];
-
 export default async function HomePage() {
   await ensureDatabaseReady();
   await ensureDefaultCampaignsSeeded();
@@ -129,11 +127,8 @@ export default async function HomePage() {
         <div className="relative z-10 grid gap-10 lg:grid-cols-12 lg:items-end">
           {/* Left: Ultra-light Editorial Display + Button-in-Button CTA */}
           <div className="min-w-0 lg:col-span-7">
-            <div className="inline-flex items-center gap-2 text-[12.5px] text-[#6E6E78]">
-              <TokenIcon symbol="CELO" size={16} />
-              <span className="font-medium text-[#18181B]">Celo Mainnet</span>
-              <span className="text-black/20">·</span>
-              <span className="font-mono text-[12px]">Autonomous FX Clearing</span>
+            <div className="font-mono text-[12px] tracking-[0.02em] text-[#6E6E78]">
+              Autonomous FX Clearing
             </div>
 
             <h1 className="mt-5 max-w-[15ch] text-[36px] font-light leading-[1.04] tracking-[-0.04em] text-[#0A0A0C] sm:text-[48px] lg:text-[54px]">
@@ -176,9 +171,8 @@ export default async function HomePage() {
             </div>
 
             <div className="flex flex-col lg:items-end">
-              <div className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-[#7A7A86] lg:justify-end">
-                <span className="vire-live-dot h-1.5 w-1.5 rounded-full bg-[#16A34A]" />
-                <span>Active Payout Pool</span>
+              <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#7A7A86]">
+                Active Payout Pool
               </div>
               <div className="mt-2 flex items-center gap-2.5 lg:justify-end">
                 <TokenIcon symbol={featuredCorridor} size={24} />
@@ -191,21 +185,6 @@ export default async function HomePage() {
                   </span>
                 </div>
               </div>
-            </div>
-
-            <div
-              className="flex items-center gap-2 lg:justify-end"
-              aria-label="Supported local settlement rails"
-            >
-              {HERO_CORRIDOR_SYMBOLS.map((sym) => (
-                <span
-                  key={sym}
-                  title={sym}
-                  className="inline-flex rounded-full transition-transform duration-200 ease-[var(--ease-out)] hover:-translate-y-0.5"
-                >
-                  <TokenIcon symbol={sym} size={22} />
-                </span>
-              ))}
             </div>
           </div>
         </div>

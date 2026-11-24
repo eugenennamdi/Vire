@@ -116,10 +116,6 @@
   );
 }
 
-.vire-live-dot {
-  animation: vire-pulse 2.6s var(--ease-in-out) infinite;
-}
-
 /* Tactile press feedback (Emil Kowalski) — explicit properties only */
 .vire-pressable {
   transition-property: transform, background-color, border-color, box-shadow, color, opacity;
