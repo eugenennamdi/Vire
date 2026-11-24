@@ -139,7 +139,7 @@ export function buildAgentCardManifest(params: {
     name: "Vire — Autonomous Proof-of-Work & Multi-Corridor FX Settlement Agent",
     description:
       "Autonomous proof-of-work and commission clearing agent on Celo Mainnet. Verifies off-chain deliverables via Celo buy, converts exact-output USD₮ into cNGN, wARS, wBRL, wMXN, and IDRX on Textile FX, and settles directly to external contributors.",
-    image: `${base}/icon.svg`,
+    image: `${base}/icon-512.png`,
     services: [
       { name: "web", endpoint: base },
       { name: "x402-verify", endpoint: `${base}/api/x402/verify`, version: "2.0" },

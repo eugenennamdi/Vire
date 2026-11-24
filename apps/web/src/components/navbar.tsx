@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { celo } from "wagmi/chains";
+import { VireLogo } from "@/components/brand/vire-mark";
 import { Button } from "@/components/ui/button";
 import { cn, truncateMiddle } from "@/lib/utils";
 
@@ -46,29 +47,10 @@ export function Navbar() {
         <div className="flex items-center gap-6">
           <Link
             href="/"
-            className="vire-pressable flex items-center gap-2 rounded-md py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/25"
+            aria-label="Vire — Overview"
+            className="vire-pressable flex items-center rounded-md py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/25"
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded bg-[#111111]">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M4.5 6.5L12 19L19.5 6.5"
-                  stroke="#FFFFFF"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M9 6.5L12 11.5L15 6.5"
-                  stroke="#A3A3A3"
-                  strokeWidth="1.9"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            <span className="text-[15px] font-semibold tracking-[-0.02em] text-[#111111]">
-              Vire
-            </span>
+            <VireLogo size={26} />
           </Link>
 
           <nav aria-label="Main navigation" className="hidden items-center gap-1 md:flex">
