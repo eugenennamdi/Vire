@@ -1,9 +1,16 @@
 "use client";
 
+import { ArrowRight, ShieldCheck, SlidersHorizontal } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Shield, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface CampaignStageView {
   stageIndex: number;
@@ -26,6 +33,8 @@ interface CampaignView {
   corridor: string;
   localTokenDecimals: number;
   stages: CampaignStageView[];
+  budgetUsdtAtomic: string;
+  remainingUsdtAtomic: string;
   budgetUsdtFormatted: string;
   remainingUsdtFormatted: string;
   maxPerPayoutUsdtFormatted: string;
@@ -36,10 +45,23 @@ interface CampaignView {
   active: boolean;
 }
 
-const FILTER_TABS = ["ALL", "cNGN", "wARS", "wBRL", "IDRX", "wMXN"];
+const CORRIDOR_KEYS = ["ALL", "cNGN", "wARS", "wBRL", "IDRX", "wMXN"] as const;
+type CorridorFilter = (typeof CORRIDOR_KEYS)[number];
 
-export default function CampaignsPage() {
-  const [corridorFilter, setCorridorFilter] = useState("ALL");
+function CampaignsInner() {
+  const searchParams = useSearchParams();
+  const initialCorridor = searchParams.get("corridor");
+  const [corridorFilter, setCorridorFilter] = useState<CorridorFilter>(
+    CORRIDOR_KEYS.includes(initialCorridor as CorridorFilter)
+      ? (initialCorridor as CorridorFilter)
+      : "ALL"
+  );
+
+  useEffect(() => {
+    if (initialCorridor && CORRIDOR_KEYS.includes(initialCorridor as CorridorFilter)) {
+      setCorridorFilter(initialCorridor as CorridorFilter);
+    }
+  }, [initialCorridor]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["campaigns-list"],
@@ -50,146 +72,226 @@ export default function CampaignsPage() {
     },
   });
 
-  const campaigns = (data?.campaigns ?? []).filter(
+  const allCampaigns = data?.campaigns ?? [];
+  const filtered = allCampaigns.filter(
     (c) => corridorFilter === "ALL" || c.corridor === corridorFilter
   );
 
+  const tabOptions = CORRIDOR_KEYS.map((key) => ({
+    value: key,
+    label: key === "ALL" ? "All corridors" : key,
+    count:
+      key === "ALL"
+        ? allCampaigns.length
+        : allCampaigns.filter((c) => c.corridor === key).length,
+  }));
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+    <div className="space-y-8">
+      <div className="vire-enter flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div>
-          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-emerald-700">
-            Multi-Stage Proof-of-Work Missions
-          </span>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950">
-            Active Clearing Campaigns
+          <h1 className="text-3xl font-semibold tracking-[-0.035em] text-[#F4F5F6]">
+            Active clearing campaigns
           </h1>
-          <p className="mt-1 text-sm text-zinc-600">
-            Every mission guarantees exact local-currency output via Textile FX{" "}
-            <code className="font-mono text-xs">buyAmount</code> quoting and enforces onchain{" "}
-            <code className="font-mono text-xs">VireVault</code> spending caps.
+          <p className="mt-1.5 max-w-[60ch] text-sm text-[#8A8F98]">
+            Multi-stage missions settled with exact local-currency output via Textile FX{" "}
+            <code className="font-mono text-xs text-[#D5D8DE]">buyAmount</code> and bounded onchain
+            by <code className="font-mono text-xs text-[#D5D8DE]">VireVault</code>.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setCorridorFilter(tab)}
-              className={`rounded-md px-3 py-1.5 font-mono text-xs font-medium transition-colors ${
-                corridorFilter === tab
-                  ? "bg-zinc-950 text-white"
-                  : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          options={tabOptions}
+          value={corridorFilter}
+          onChange={setCorridorFilter}
+        />
       </div>
 
       {isLoading ? (
-        <div className="grid gap-5">
+        <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-56 animate-pulse rounded-2xl border border-zinc-200 bg-white p-6" />
+            <Card key={i} className="space-y-4 p-6">
+              <div className="flex justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-6 w-80" />
+                </div>
+                <Skeleton className="h-9 w-36" />
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <Skeleton className="h-28 w-full" />
+                <Skeleton className="h-28 w-full" />
+                <Skeleton className="h-28 w-full" />
+              </div>
+            </Card>
           ))}
         </div>
+      ) : filtered.length === 0 ? (
+        <Card className="p-10 text-center">
+          <p className="text-sm font-medium text-[#E5E7EB]">
+            No campaigns configured for {corridorFilter}.
+          </p>
+          <p className="mt-1 text-xs text-[#8A8F98]">
+            Launch a new corridor mission permissionlessly via{" "}
+            <code className="font-mono">POST /api/x402/campaigns</code>.
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCorridorFilter("ALL")}
+              className={buttonVariants({ variant: "secondary", size: "sm" })}
+            >
+              Show all corridors
+            </button>
+            <Link href="/console" className={buttonVariants({ variant: "primary", size: "sm" })}>
+              Open x402 Console
+            </Link>
+          </div>
+        </Card>
       ) : (
         <div className="space-y-5">
-          {campaigns.map((camp) => (
-            <article
-              key={camp.id}
-              className={`rounded-2xl border bg-white p-6 ${
-                camp.isLaunchPartner ? "border-emerald-300 ring-1 ring-emerald-100" : "border-zinc-200/90"
-              }`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {camp.isLaunchPartner && (
-                      <span className="rounded bg-zinc-950 px-2 py-0.5 font-mono text-[10px] font-semibold text-white">
-                        NAMED LAUNCH PARTNER
-                      </span>
-                    )}
-                    <span className="rounded bg-emerald-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-800">
-                      {camp.corridor} · {camp.localTokenDecimals}dp
-                    </span>
-                    <span className="rounded bg-zinc-100 px-2 py-0.5 font-mono text-[11px] text-zinc-700">
-                      {camp.deliverableType}
-                    </span>
-                    <span className="font-mono text-xs text-zinc-500">
-                      {camp.partnerName} · {camp.partnerLocation}
-                    </span>
+          {filtered.map((camp, idx) => {
+            const totalBig = BigInt(camp.budgetUsdtAtomic || "1");
+            const remBig = BigInt(camp.remainingUsdtAtomic || "0");
+            const remainingPct =
+              totalBig > 0n ? Math.min(100, Math.max(0, Number((remBig * 100n) / totalBig))) : 0;
+
+            return (
+              <Card
+                key={camp.id}
+                interactive
+                className={cn(
+                  "vire-enter overflow-hidden",
+                  idx === 1 && "vire-delay-1",
+                  idx === 2 && "vire-delay-2",
+                  idx >= 3 && "vire-delay-3",
+                  camp.isLaunchPartner && "border-emerald-500/30"
+                )}
+              >
+                <div className="p-6">
+                  <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {camp.isLaunchPartner && <Badge tone="solid">Launch Partner</Badge>}
+                        <Badge tone="emerald">
+                          {camp.corridor} · {camp.localTokenDecimals}dp
+                        </Badge>
+                        <Badge tone="neutral">{camp.deliverableType.replace("_", " ")}</Badge>
+                        <span className="font-mono text-[11px] text-[#6B7280]">
+                          {camp.partnerName} · {camp.partnerLocation}
+                        </span>
+                      </div>
+
+                      <h2 className="mt-3 text-lg font-semibold tracking-[-0.02em] text-[#F4F5F6]">
+                        {camp.title}
+                      </h2>
+                      <p className="mt-1.5 max-w-[68ch] text-sm leading-relaxed text-[#9DA3AE]">
+                        {camp.description}
+                      </p>
+                    </div>
+
+                    {/* Morpho-style Budget Column + Action */}
+                    <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center lg:w-64 lg:flex-col lg:items-stretch">
+                      <div className="rounded-lg border border-white/[0.07] bg-[#0B0D10] p-3">
+                        <div className="flex items-center justify-between font-mono text-[11px] text-[#8A8F98]">
+                          <span>Remaining USD₮</span>
+                          <span className="tabular-nums">{remainingPct}%</span>
+                        </div>
+                        <div className="mt-1 font-mono text-base font-semibold text-[#F4F5F6] tabular-nums">
+                          ${camp.remainingUsdtFormatted}
+                          <span className="ml-1 text-xs font-normal text-[#5C626D]">
+                            / ${camp.budgetUsdtFormatted}
+                          </span>
+                        </div>
+                        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                          <div
+                            className="h-full rounded-full bg-emerald-400/80"
+                            style={{ width: `${remainingPct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <Link
+                        href={`/claim?campaign=${encodeURIComponent(camp.slug)}`}
+                        className={buttonVariants({
+                          variant: camp.isLaunchPartner ? "primary" : "secondary",
+                          size: "md",
+                          className: "w-full",
+                        })}
+                      >
+                        Submit deliverable
+                        <ArrowRight weight="bold" className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
                   </div>
 
-                  <h2 className="mt-2.5 text-lg font-semibold text-zinc-950">{camp.title}</h2>
-                  <p className="mt-1 max-w-3xl text-sm text-zinc-600">{camp.description}</p>
+                  {/* Multi-Stage Progression Row */}
+                  <div className="mt-6 grid gap-3 md:grid-cols-3">
+                    {camp.stages.map((st) => (
+                      <div
+                        key={st.stageIndex}
+                        className="flex flex-col justify-between rounded-lg border border-white/[0.07] bg-[#0B0D10] p-4"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2 font-mono text-[11px]">
+                            <span className="text-[#6B7280]">STAGE 0{st.stageIndex}</span>
+                            <span className="font-semibold text-emerald-400 tabular-nums">
+                              {st.rewardLocalFormatted} {camp.corridor}
+                            </span>
+                          </div>
+                          <h3 className="mt-2 text-[13px] font-medium text-[#E5E7EB]">
+                            {st.title.replace(/^Stage \d+\s*[—-]\s*/i, "")}
+                          </h3>
+                          <p className="mt-1 text-xs leading-relaxed text-[#8A8F98]">
+                            {st.instructions}
+                          </p>
+                        </div>
+                        <div className="mt-3 border-t border-white/[0.05] pt-2.5 font-mono text-[10px] text-[#5C626D]">
+                          Cooldown:{" "}
+                          {st.cooldownHours === 0
+                            ? "Immediate entry"
+                            : `${st.cooldownHours}h after Stage ${st.stageIndex - 1}`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
-                  <div className="text-right">
-                    <div className="font-mono text-[11px] uppercase text-zinc-500">Vault Remaining</div>
-                    <div className="font-mono text-lg font-semibold text-zinc-950 tabular-nums">
-                      ${camp.remainingUsdtFormatted}{" "}
-                      <span className="text-xs font-normal text-zinc-400">
-                        / ${camp.budgetUsdtFormatted} USD₮
-                      </span>
-                    </div>
-                  </div>
-                  <Link
-                    href={`/claim?campaign=${encodeURIComponent(camp.slug)}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3.5 py-2 text-xs font-medium text-white hover:bg-zinc-800"
-                  >
-                    Submit Deliverable
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
+                {/* Guardrails Hairline Footer */}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/[0.07] bg-[#0B0D10] px-6 py-3 font-mono text-[11px] text-[#8A8F98] tabular-nums">
+                  <span className="inline-flex items-center gap-1.5 font-medium text-[#D5D8DE]">
+                    <ShieldCheck weight="fill" className="h-3.5 w-3.5 text-emerald-400" />
+                    Policy Guardrails
+                  </span>
+                  <span>maxSpread {camp.maxSpreadBps} bps</span>
+                  <span>maxPerPayout ${camp.maxPerPayoutUsdtFormatted}</span>
+                  <span>dailyCap ${camp.dailyLimitUsdtFormatted}/24h</span>
+                  <span>repeatCap {camp.maxPayoutsPerRecipient}x</span>
+                  <span className="inline-flex items-center gap-1">
+                    <SlidersHorizontal className="h-3 w-3 text-[#6B7280]" />
+                    minScore {camp.minPassScore}/100
+                  </span>
                 </div>
-              </div>
-
-              {/* Multi-Stage Progression Grid */}
-              <div className="mt-5 grid gap-3 md:grid-cols-3">
-                {camp.stages.map((st) => (
-                  <div
-                    key={st.stageIndex}
-                    className="rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3.5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-[11px] font-semibold text-zinc-500">
-                        STAGE {st.stageIndex}
-                      </span>
-                      <span className="font-mono text-xs font-semibold text-emerald-700 tabular-nums">
-                        {st.rewardLocalFormatted} {camp.corridor}
-                      </span>
-                    </div>
-                    <div className="mt-1 text-xs font-semibold text-zinc-900">{st.title}</div>
-                    <p className="mt-1 text-xs leading-relaxed text-zinc-600">{st.instructions}</p>
-                    <div className="mt-2 font-mono text-[10px] text-zinc-400">
-                      Cooldown: {st.cooldownHours === 0 ? "Immediate" : `${st.cooldownHours}h after prior stage`}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Policy Gate Guardrails Bar */}
-              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-zinc-100 pt-3.5 font-mono text-[11px] text-zinc-600">
-                <span className="inline-flex items-center gap-1 font-semibold text-zinc-800">
-                  <Shield className="h-3.5 w-3.5 text-emerald-700" />
-                  Policy Guardrails:
-                </span>
-                <span>maxSpread: {camp.maxSpreadBps} bps</span>
-                <span>maxPerPayout: ${camp.maxPerPayoutUsdtFormatted}</span>
-                <span>dailyLimit: ${camp.dailyLimitUsdtFormatted}/24h</span>
-                <span>maxStages/Wallet: {camp.maxPayoutsPerRecipient}</span>
-                <span className="inline-flex items-center gap-1">
-                  <SlidersHorizontal className="h-3 w-3" />
-                  minPassScore: {camp.minPassScore}/100
-                </span>
-              </div>
-            </article>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
+  );
+}
+
+export default function CampaignsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-56 w-full" />
+        </div>
+      }
+    >
+      <CampaignsInner />
+    </Suspense>
   );
 }

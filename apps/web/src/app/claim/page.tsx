@@ -1,5 +1,17 @@
 "use client";
 
+import {
+  ArrowRight,
+  ArrowUpRight,
+  CheckCircle,
+  CircleNotch,
+  GithubLogo,
+  ShieldCheck,
+  Signature,
+  Star,
+  WarningCircle,
+  XCircle,
+} from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   CELO_CONTRACTS,
@@ -9,22 +21,19 @@ import {
   type PolicyGateDecision,
   type VerificationVerdict,
 } from "@vire/shared";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Copy,
-  ExternalLink,
-  Github,
-  Loader2,
-  ShieldCheck,
-  Star,
-  XCircle,
-} from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { zeroHash } from "viem";
 import { useAccount, useSignMessage, useWriteContract } from "wagmi";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/copy-button";
+import { FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
+import { Skeleton } from "@/components/ui/skeleton";
 import { buildIdentityBindMessage } from "@/lib/session-client";
+import { cn, truncateMiddle } from "@/lib/utils";
 
 const ERC8004_GIVE_FEEDBACK_ABI = [
   {
@@ -90,13 +99,12 @@ function ClaimFlowInner() {
   const [deliverableUrl, setDeliverableUrl] = useState("");
   const [deliverableNotes, setDeliverableNotes] = useState("");
   const [referralCode, setReferralCode] = useState("");
-  const [bindStatus, setBindStatus] = useState<string | null>(null);
+  const [bindError, setBindError] = useState<string | null>(null);
   const [isBinding, setIsBinding] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<SubmissionResponse | null>(null);
   const [ratingTxHash, setRatingTxHash] = useState<string | null>(null);
   const [ratingScore, setRatingScore] = useState(95);
-  const [copiedAddr, setCopiedAddr] = useState(false);
 
   const { data: campData } = useQuery({
     queryKey: ["campaigns-claim"],
@@ -152,11 +160,11 @@ function ClaimFlowInner() {
     if (!address) return;
     const cleanHandle = handle.trim();
     if (!cleanHandle) {
-      setBindStatus("Enter your GitHub or X handle before signing.");
+      setBindError("Enter your GitHub or X handle before signing.");
       return;
     }
     setIsBinding(true);
-    setBindStatus(null);
+    setBindError(null);
     try {
       const message = buildIdentityBindMessage({
         walletAddress: address,
@@ -176,13 +184,17 @@ function ClaimFlowInner() {
       });
       const json = (await res.json()) as { verified?: boolean; error?: string; handle?: string };
       if (!res.ok) {
-        setBindStatus(json.error ?? "Identity verification failed.");
+        const msg = json.error ?? "Identity verification failed.";
+        setBindError(msg);
+        toast.error(msg);
       } else {
-        setBindStatus(`Verified @${json.handle} bound to ${address.slice(0, 8)}…`);
+        toast.success(`Identity @${json.handle} bound to ${truncateMiddle(address, 6, 4)}`);
         await refetchIdentity();
       }
     } catch (err) {
-      setBindStatus(err instanceof Error ? err.message : "Signature cancelled");
+      const msg = err instanceof Error ? err.message : "Wallet signature cancelled.";
+      setBindError(msg);
+      toast.error(msg);
     } finally {
       setIsBinding(false);
     }
@@ -210,11 +222,17 @@ function ClaimFlowInner() {
       });
       const json = (await res.json()) as SubmissionResponse;
       setResult(json);
+      if (json.status === "COMPLETED") {
+        toast.success(`Exact ${activeCampaign?.corridor ?? "FX"} payout settled on Celo Mainnet`);
+      } else if (json.status === "REJECTED") {
+        toast.error(`Claim rejected by Policy Gate: ${json.policyDecision?.failedRule ?? "rule triggered"}`);
+      } else if (json.error) {
+        toast.message(json.error);
+      }
     } catch (err) {
-      setResult({
-        status: "FAILED",
-        error: err instanceof Error ? err.message : "Network error submitting deliverable",
-      });
+      const msg = err instanceof Error ? err.message : "Network error submitting deliverable.";
+      setResult({ status: "FAILED", error: msg });
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -239,6 +257,7 @@ function ClaimFlowInner() {
         ],
       });
       setRatingTxHash(hash);
+      toast.success("ERC-8004 reputation feedback recorded on Celo Mainnet");
       if (result?.submissionId) {
         await fetch("/api/reputation/record", {
           method: "POST",
@@ -247,447 +266,523 @@ function ClaimFlowInner() {
         });
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "ERC-8004 giveFeedback cancelled or reverted");
+      toast.error(err instanceof Error ? err.message : "ERC-8004 feedback transaction rejected");
     }
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-12">
-      {/* Left Column: Contributor Form */}
-      <div className="space-y-5 lg:col-span-7">
-        <div>
-          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-emerald-700">
-            Autonomous Contributor Settlement
-          </span>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950">
-            Submit Deliverable &amp; Claim Local FX
-          </h1>
-          <p className="mt-1 text-sm text-zinc-600">
-            Connect an external Celo wallet (MetaMask, Rabby, or MiniPay), bind your identity, and submit
-            your proof of work for instant exact-output local stablecoin clearing.
-          </p>
-        </div>
-
-        {/* Step 1: Identity Binding */}
-        <section className="rounded-2xl border border-zinc-200/90 bg-white p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-zinc-950">
-              1. External Identity Binding (Anti-Sybil)
-            </h2>
-            {identityData?.contributor ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-xs font-medium text-emerald-800">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {identityData.contributor.identityProvider}: @{identityData.contributor.identityHandle}
-              </span>
-            ) : (
-              <span className="font-mono text-xs text-amber-700">Not linked yet</span>
-            )}
-          </div>
-
-          {!isConnected ? (
-            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              Connect your Celo Mainnet wallet from the top-right navigation bar first.
-            </p>
-          ) : (
-            <div className="mt-3 space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                {identityData?.githubOAuthConfigured && (
-                  <a
-                    href="/api/auth/github"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-100"
-                  >
-                    <Github className="h-3.5 w-3.5" />
-                    Sign in with GitHub OAuth
-                  </a>
-                )}
-                <select
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value as "github" | "x" | "signed_proof")}
-                  className="rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-900"
-                >
-                  <option value="github">GitHub Handle</option>
-                  <option value="x">X (Twitter) Handle</option>
-                  <option value="signed_proof">Wallet Handle Proof</option>
-                </select>
-                <input
-                  type="text"
-                  value={handle}
-                  onChange={(e) => setHandle(e.target.value)}
-                  placeholder="@yourhandle"
-                  className="min-w-[160px] flex-1 rounded-lg border border-zinc-300 px-3 py-1.5 font-mono text-xs text-zinc-950 focus:border-zinc-900 focus:outline-none"
-                />
-                <button
-                  type="button"
-                  disabled={isBinding}
-                  onClick={handleBindIdentity}
-                  className="rounded-lg bg-zinc-950 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-                >
-                  {isBinding ? "Signing…" : "Sign EIP-191 Proof"}
-                </button>
-              </div>
-              {bindStatus && <p className="font-mono text-xs text-zinc-600">{bindStatus}</p>}
-            </div>
-          )}
-        </section>
-
-        {/* Step 2: Deliverable Submission */}
-        <form
-          onSubmit={handleSubmitDeliverable}
-          className="space-y-4 rounded-2xl border border-zinc-200/90 bg-white p-5"
-        >
-          <h2 className="text-sm font-semibold text-zinc-950">2. Deliverable Proof &amp; Corridor</h2>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-medium text-zinc-700">Campaign</label>
-              <select
-                value={selectedSlug}
-                onChange={(e) => {
-                  setSelectedSlug(e.target.value);
-                  setStageIndex(1);
-                }}
-                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-950"
-              >
-                {(campData?.campaigns ?? []).map((c) => (
-                  <option key={c.slug} value={c.slug}>
-                    [{c.corridor}] {c.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-zinc-700">Mission Stage</label>
-              <select
-                value={stageIndex}
-                onChange={(e) => setStageIndex(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-950"
-              >
-                {(activeCampaign?.stages ?? []).map((s) => (
-                  <option key={s.stageIndex} value={s.stageIndex}>
-                    Stage {s.stageIndex} — {s.rewardLocalFormatted} {activeCampaign?.corridor}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {activeStage && (
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-700">
-              <div className="flex items-center justify-between font-medium text-zinc-950">
-                <span>{activeStage.title}</span>
-                <span className="font-mono text-emerald-700">
-                  Exact Payout: {activeStage.rewardLocalFormatted} {activeCampaign?.corridor}
-                </span>
-              </div>
-              <p className="mt-1 text-zinc-600">{activeStage.instructions}</p>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-medium text-zinc-700">
-              Deliverable Proof URL (Public Promo Post, GitHub PR/Issue, or Referral Proof)
-            </label>
-            <input
-              type="url"
-              required
-              value={deliverableUrl}
-              onChange={(e) => setDeliverableUrl(e.target.value)}
-              placeholder="https://github.com/org/repo/pull/42 or https://x.com/handle/status/..."
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs text-zinc-950 focus:border-zinc-900 focus:outline-none"
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-medium text-zinc-700">
-                Referral / Affiliate Code (Optional)
-              </label>
-              <input
-                type="text"
-                value={referralCode}
-                onChange={(e) => setReferralCode(e.target.value)}
-                placeholder="e.g. TECHHUB-BF26"
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs text-zinc-950"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-zinc-700">
-                Recipient Wallet (Celo Mainnet)
-              </label>
-              <input
-                type="text"
-                readOnly
-                value={address ?? "Connect wallet above"}
-                className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs text-zinc-600"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-zinc-700">
-              Evidence Notes (Optional)
-            </label>
-            <textarea
-              rows={2}
-              value={deliverableNotes}
-              onChange={(e) => setDeliverableNotes(e.target.value)}
-              placeholder="Brief summary of the deliverable or reproduction steps..."
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs text-zinc-950"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={!isConnected || isSubmitting}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Running Paid Celo buy Verification &amp; FX Clearing…
-              </>
-            ) : (
-              "Verify & Settle Exact Local FX"
-            )}
-          </button>
-        </form>
+    <div className="space-y-8">
+      <div className="vire-enter">
+        <h1 className="text-3xl font-semibold tracking-[-0.035em] text-[#F4F5F6]">
+          Submit deliverable &amp; claim local FX
+        </h1>
+        <p className="mt-1.5 max-w-[62ch] text-sm text-[#8A8F98]">
+          Connect an external Celo wallet (MetaMask, Rabby, or MiniPay), bind your social or dev
+          handle, and submit proof of work for exact-output clearing.
+        </p>
       </div>
 
-      {/* Right Column: Real-Time 5-Step Pipeline & Off-Ramp Receipt */}
-      <div className="space-y-5 lg:col-span-5">
-        <section className="rounded-2xl border border-zinc-200/90 bg-white p-5">
-          <h2 className="text-sm font-semibold text-zinc-950">Autonomous Settlement Pipeline</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            Live status across Celo <code className="font-mono">buy</code>, the 7-rule Policy Gate,
-            Textile FX v2 exact-output RFQ, and Celo Mainnet clearing.
-          </p>
-
-          {!result && !isSubmitting && (
-            <div className="mt-4 rounded-xl border border-dashed border-zinc-200 p-6 text-center text-xs text-zinc-500">
-              Submit a deliverable on the left to watch real-time verification, Policy Gate rule checks,
-              and onchain settlement receipts appear here.
-            </div>
-          )}
-
-          {isSubmitting && (
-            <div className="mt-4 space-y-2.5 text-xs text-zinc-700">
-              <div className="flex items-center gap-2 rounded-lg bg-zinc-50 p-3">
-                <Loader2 className="h-4 w-4 animate-spin text-emerald-700" />
-                <span>Executing paid Celo buy inference + live Textile FX preview + Policy Gate…</span>
+      <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+        {/* Left Action Column */}
+        <div className="space-y-5 lg:col-span-7">
+          {/* Step 1: Identity Binding */}
+          <Card className="vire-enter vire-delay-1 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/[0.1] bg-[#15181D] font-mono text-xs text-[#E5E7EB]">
+                  1
+                </span>
+                <h2 className="text-sm font-medium text-[#F4F5F6]">
+                  External identity binding
+                </h2>
               </div>
-            </div>
-          )}
 
-          {result && (
-            <div className="mt-4 space-y-4">
-              {/* Top Outcome Banner */}
-              <div
-                className={`rounded-xl border p-3.5 text-xs ${
-                  result.status === "COMPLETED"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-                    : result.status === "REJECTED"
-                      ? "border-rose-200 bg-rose-50 text-rose-950"
-                      : "border-amber-200 bg-amber-50 text-amber-950"
-                }`}
-              >
-                <div className="flex items-center justify-between font-mono font-semibold">
-                  <span>STATUS: {result.status}</span>
-                  {result.verdict && <span>AI SCORE: {result.verdict.score}/100</span>}
+              {identityData?.contributor ? (
+                <Badge tone="emerald">
+                  <CheckCircle weight="fill" className="h-3.5 w-3.5" />
+                  {identityData.contributor.identityProvider}: @
+                  {identityData.contributor.identityHandle}
+                </Badge>
+              ) : (
+                <Badge tone="amber">Unlinked</Badge>
+              )}
+            </div>
+
+            {!isConnected ? (
+              <div className="mt-4 flex items-center gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3.5 py-3 text-xs text-amber-200">
+                <WarningCircle weight="regular" className="h-4 w-4 shrink-0 text-amber-400" />
+                <span>Connect an external Celo Mainnet wallet in the top navigation bar first.</span>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <div className="grid gap-2.5 sm:grid-cols-12">
+                  <div className="sm:col-span-4">
+                    <FieldLabel htmlFor="identity-provider" className="mb-1.5">
+                      Provider
+                    </FieldLabel>
+                    <Select
+                      id="identity-provider"
+                      value={provider}
+                      onChange={(e) => setProvider(e.target.value as "github" | "x" | "signed_proof")}
+                    >
+                      <option value="github">GitHub</option>
+                      <option value="x">X (Twitter)</option>
+                      <option value="signed_proof">Wallet Proof</option>
+                    </Select>
+                  </div>
+
+                  <div className="sm:col-span-5">
+                    <FieldLabel htmlFor="identity-handle" className="mb-1.5">
+                      Public handle
+                    </FieldLabel>
+                    <Input
+                      id="identity-handle"
+                      type="text"
+                      value={handle}
+                      onChange={(e) => setHandle(e.target.value)}
+                      placeholder="@yourhandle"
+                      className="font-mono"
+                    />
+                  </div>
+
+                  <div className="flex items-end sm:col-span-3">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={isBinding}
+                      onClick={handleBindIdentity}
+                      className="w-full"
+                    >
+                      <Signature weight="regular" className="h-3.5 w-3.5" />
+                      {isBinding ? "Signing…" : "Sign EIP-191"}
+                    </Button>
+                  </div>
                 </div>
-                {result.error && <p className="mt-1.5 leading-relaxed">{result.error}</p>}
-                {result.policyDecision?.failedReason && (
-                  <p className="mt-1.5 font-medium">
-                    Rule Triggered ({result.policyDecision.failedRule}):{" "}
-                    {result.policyDecision.failedReason}
+
+                {identityData?.githubOAuthConfigured && (
+                  <div>
+                    <a
+                      href="/api/auth/github"
+                      className={buttonVariants({ variant: "ghost", size: "sm" })}
+                    >
+                      <GithubLogo weight="regular" className="h-3.5 w-3.5" />
+                      Authenticate with GitHub OAuth
+                    </a>
+                  </div>
+                )}
+
+                {bindError && (
+                  <p className="text-xs text-rose-400" role="alert">
+                    {bindError}
                   </p>
                 )}
               </div>
+            )}
+          </Card>
 
-              {/* Paid buy Receipts */}
-              {result.buyReceipts && result.buyReceipts.length > 0 && (
-                <div className="rounded-xl border border-zinc-200 p-3.5 text-xs">
-                  <div className="font-mono text-[11px] font-semibold uppercase text-zinc-500">
-                    Step 1 · Paid Celo buy Receipts
-                  </div>
-                  <div className="mt-2 space-y-1.5">
-                    {result.buyReceipts.map((r, i) => (
-                      <div key={i} className="flex items-center justify-between font-mono text-[11px]">
-                        <span className="text-zinc-800">{r.capabilityId}</span>
-                        {r.paymentTxHash ? (
-                          <a
-                            href={celoscanTxUrl(r.paymentTxHash)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-emerald-700 underline"
-                          >
-                            {r.paymentTxHash.slice(0, 10)}…
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        ) : (
-                          <span className="text-zinc-500">{r.dryRun ? "dry-run" : "settled"}</span>
-                        )}
-                      </div>
+          {/* Step 2: Deliverable Form */}
+          <Card className="vire-enter vire-delay-2 p-5">
+            <form onSubmit={handleSubmitDeliverable} className="space-y-4">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/[0.1] bg-[#15181D] font-mono text-xs text-[#E5E7EB]">
+                  2
+                </span>
+                <h2 className="text-sm font-medium text-[#F4F5F6]">
+                  Deliverable proof &amp; mission stage
+                </h2>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <FieldLabel htmlFor="claim-campaign">Campaign</FieldLabel>
+                  <Select
+                    id="claim-campaign"
+                    value={selectedSlug}
+                    onChange={(e) => {
+                      setSelectedSlug(e.target.value);
+                      setStageIndex(1);
+                    }}
+                  >
+                    {(campData?.campaigns ?? []).map((c) => (
+                      <option key={c.slug} value={c.slug}>
+                        [{c.corridor}] {c.title}
+                      </option>
                     ))}
-                  </div>
+                  </Select>
                 </div>
-              )}
 
-              {/* 7-Rule Deterministic Policy Gate Breakdown */}
-              {result.policyDecision && (
-                <div className="rounded-xl border border-zinc-200 p-3.5 text-xs">
-                  <div className="font-mono text-[11px] font-semibold uppercase text-zinc-500">
-                    Step 2 · Deterministic 7-Rule Policy Gate
-                  </div>
-                  <ul className="mt-2 space-y-1.5">
-                    {result.policyDecision.checks.map((chk) => (
-                      <li key={chk.rule} className="flex items-start gap-2 text-[11px]">
-                        {chk.passed ? (
-                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                        ) : (
-                          <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" />
-                        )}
-                        <div>
-                          <span className="font-mono font-semibold text-zinc-900">{chk.rule}</span>
-                          <p className="text-zinc-600">{chk.detail}</p>
-                        </div>
-                      </li>
+                <div className="space-y-1.5">
+                  <FieldLabel htmlFor="claim-stage">Mission stage</FieldLabel>
+                  <Select
+                    id="claim-stage"
+                    value={stageIndex}
+                    onChange={(e) => setStageIndex(Number(e.target.value))}
+                  >
+                    {(activeCampaign?.stages ?? []).map((s) => (
+                      <option key={s.stageIndex} value={s.stageIndex}>
+                        Stage {s.stageIndex} — {s.rewardLocalFormatted} {activeCampaign?.corridor}
+                      </option>
                     ))}
-                  </ul>
+                  </Select>
                 </div>
-              )}
+              </div>
 
-              {/* Onchain Settlement Transaction Links */}
-              {result.txHashes && (
-                <div className="rounded-xl border border-emerald-200 bg-white p-3.5 text-xs">
-                  <div className="font-mono text-[11px] font-semibold uppercase text-emerald-800">
-                    Steps 3 &amp; 4 · Mainnet Settlement Hashes
-                  </div>
-                  <div className="mt-2 space-y-1.5 font-mono text-[11px]">
-                    {[
-                      ["VireVault Release (ERC-8021)", result.txHashes.vaultRelease],
-                      ["Textile FX Swap (Native Tag)", result.txHashes.textileSwap],
-                      ["Local Token Payout (ERC-8021)", result.txHashes.localPayout],
-                      ["Onchain Audit Receipt (ERC-8021)", result.txHashes.vaultReceipt],
-                    ].map(([label, hash]) => (
-                      <div key={label} className="flex items-center justify-between">
-                        <span className="text-zinc-600">{label}</span>
-                        <a
-                          href={celoscanTxUrl(hash!)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-emerald-700 underline"
-                        >
-                          {hash!.slice(0, 10)}…
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 5: Last-Mile Off-Ramp Card + 1-Click ERC-8004 Onchain Rating */}
-              {result.offramp && (
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-xs">
-                  <div className="font-mono text-[11px] font-semibold uppercase text-zinc-500">
-                    Step 5 · Local Cash-Out Off-Ramp
-                  </div>
-                  <h3 className="mt-1 text-sm font-semibold text-zinc-950">
-                    {result.offramp.headline}
-                  </h3>
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-zinc-600">
-                    {result.offramp.instructions.map((line, idx) => (
-                      <li key={idx}>{line}</li>
-                    ))}
-                  </ul>
-
-                  <div className="mt-3 flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 font-mono text-[11px]">
-                    <span className="truncate text-zinc-700">
-                      Token ({result.offramp.tokenDecimals}dp): {result.offramp.tokenAddress}
+              {activeStage && (
+                <div className="rounded-lg border border-white/[0.07] bg-[#0B0D10] p-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="font-medium text-[#F4F5F6]">{activeStage.title}</span>
+                    <span className="font-mono font-semibold text-emerald-400 tabular-nums">
+                      Exact output: {activeStage.rewardLocalFormatted} {activeCampaign?.corridor}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(result.offramp!.tokenAddress);
-                        setCopiedAddr(true);
-                        setTimeout(() => setCopiedAddr(false), 1500);
-                      }}
-                      className="ml-2 inline-flex items-center gap-1 text-zinc-900 hover:text-emerald-700"
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-[#8A8F98]">
+                    {activeStage.instructions}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <FieldLabel htmlFor="deliverable-url">
+                  Deliverable proof URL (public promo post, GitHub PR/issue, or referral proof)
+                </FieldLabel>
+                <Input
+                  id="deliverable-url"
+                  type="url"
+                  required
+                  value={deliverableUrl}
+                  onChange={(e) => setDeliverableUrl(e.target.value)}
+                  placeholder="https://github.com/org/repo/pull/42 or https://x.com/handle/status/..."
+                  className="font-mono"
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <FieldLabel htmlFor="referral-code">Referral / affiliate code (optional)</FieldLabel>
+                  <Input
+                    id="referral-code"
+                    type="text"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value)}
+                    placeholder="TECHHUB-BF26"
+                    className="font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <FieldLabel htmlFor="recipient-wallet">Recipient wallet (Celo 42220)</FieldLabel>
+                  <Input
+                    id="recipient-wallet"
+                    type="text"
+                    readOnly
+                    value={address ?? "Connect wallet above"}
+                    className="font-mono text-[#8A8F98]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <FieldLabel htmlFor="deliverable-notes">Evidence notes (optional)</FieldLabel>
+                <Textarea
+                  id="deliverable-notes"
+                  rows={2}
+                  value={deliverableNotes}
+                  onChange={(e) => setDeliverableNotes(e.target.value)}
+                  placeholder="Short summary of deliverable, store handle tagged, or QA reproduction notes..."
+                />
+              </div>
+
+              <Button
+                type="submit"
+                size="lg"
+                variant="primary"
+                disabled={!isConnected || isSubmitting}
+                className="w-full"
+              >
+                {isSubmitting ? (
+                  <>
+                    <CircleNotch className="h-4 w-4 animate-spin" />
+                    Verifying via Celo buy &amp; clearing FX…
+                  </>
+                ) : (
+                  <>
+                    Verify &amp; settle exact local FX
+                    <ArrowRight weight="bold" className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </form>
+          </Card>
+        </div>
+
+        {/* Right Sticky Execution Inspector */}
+        <div className="lg:sticky lg:top-20 lg:col-span-5">
+          <Card elevated className="vire-enter vire-delay-2 overflow-hidden">
+            <div className="border-b border-white/[0.07] bg-[#0C0E11] px-5 py-3.5">
+              <h2 className="text-xs font-medium text-[#F4F5F6]">
+                Autonomous settlement pipeline
+              </h2>
+              <p className="mt-0.5 text-[11px] text-[#6B7280]">
+                Live execution trace across Celo buy, Policy Gate, Textile FX v2, and Celo mainnet.
+              </p>
+            </div>
+
+            <div className="p-5">
+              {!result && !isSubmitting && (
+                <div className="space-y-3 py-3">
+                  {[
+                    ["01", "Paid Celo buy verification", "Cencori LLM + Chainstack RPC ($0.01)"],
+                    ["02", "7-rule Policy Gate", "Replay, non-team wallet, spread, $1 floor"],
+                    ["03", "Textile FX exact-output swap", "buyAmount RFQ + ERC-8021 builderCodes"],
+                    ["04", "Direct local stablecoin transfer", "cNGN / wARS / wBRL / wMXN / IDRX"],
+                    ["05", "Off-ramp & ERC-8004 feedback", "Ripio / Busha / IDRX + giveFeedback()"],
+                  ].map(([num, title, desc]) => (
+                    <div
+                      key={num}
+                      className="flex items-start gap-3 rounded-lg border border-white/[0.05] bg-[#0B0D10]/70 px-3.5 py-2.5"
                     >
-                      <Copy className="h-3 w-3" />
-                      {copiedAddr ? "Copied" : "Copy"}
-                    </button>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {result.offramp.venues.map((v) => (
-                      <a
-                        key={v.name}
-                        href={v.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-800"
-                      >
-                        {v.name}
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ))}
-                  </div>
-
-                  {/* 1-Click ERC-8004 Reputation Feedback */}
-                  <div className="mt-4 border-t border-zinc-200 pt-3">
-                    <div className="flex items-center justify-between">
-                      <span className="inline-flex items-center gap-1 font-semibold text-zinc-900">
-                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-700" />
-                        Rate Vire Onchain (ERC-8004)
-                      </span>
-                      <span className="font-mono text-[11px] text-zinc-500">tag: settlement</span>
-                    </div>
-
-                    {ratingTxHash ? (
-                      <a
-                        href={celoscanTxUrl(ratingTxHash)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-2 inline-flex items-center gap-1 font-mono text-xs text-emerald-700 underline"
-                      >
-                        Onchain ERC-8004 feedback mined: {ratingTxHash.slice(0, 12)}…
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : repData?.registered && repData.agentId ? (
-                      <div className="mt-2 flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={ratingScore}
-                          onChange={(e) => setRatingScore(Number(e.target.value))}
-                          className="w-16 rounded border border-zinc-300 bg-white px-2 py-1 font-mono text-xs"
-                        />
-                        <button
-                          type="button"
-                          disabled={isRatingTxPending}
-                          onClick={handleRateOnchain}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-                        >
-                          <Star className="h-3.5 w-3.5 text-amber-400" />
-                          {isRatingTxPending ? "Confirm in Wallet…" : "Submit giveFeedback()"}
-                        </button>
+                      <span className="mt-0.5 font-mono text-[11px] text-[#5C626D]">{num}</span>
+                      <div>
+                        <div className="text-xs font-medium text-[#D5D8DE]">{title}</div>
+                        <div className="text-[11px] text-[#6B7280]">{desc}</div>
                       </div>
-                    ) : (
-                      <p className="mt-1.5 flex items-center gap-1 text-[11px] text-zinc-500">
-                        <AlertTriangle className="h-3 w-3" />
-                        Set VIRE_AGENT_ID after running scripts/register-agent.ts to enable onchain
-                        rating.
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {isSubmitting && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-3.5 text-xs text-emerald-200">
+                    <CircleNotch className="h-4 w-4 animate-spin text-emerald-400" />
+                    <span>Running Celo buy verification, live Textile preview, and Policy Gate…</span>
+                  </div>
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              )}
+
+              {result && (
+                <div className="space-y-4">
+                  {/* Status Banner */}
+                  <div
+                    className={cn(
+                      "rounded-lg border p-3.5 text-xs",
+                      result.status === "COMPLETED"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                        : result.status === "REJECTED"
+                          ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                          : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                    )}
+                  >
+                    <div className="flex items-center justify-between font-mono text-[11px] font-semibold">
+                      <span>STATUS · {result.status}</span>
+                      {result.verdict && <span>SCORE {result.verdict.score}/100</span>}
+                    </div>
+                    {result.error && <p className="mt-1.5 leading-relaxed">{result.error}</p>}
+                    {result.policyDecision?.failedReason && (
+                      <p className="mt-1.5 font-medium">
+                        {result.policyDecision.failedRule}: {result.policyDecision.failedReason}
                       </p>
                     )}
                   </div>
+
+                  {/* Step 1: buy Receipts */}
+                  {result.buyReceipts && result.buyReceipts.length > 0 && (
+                    <div className="rounded-lg border border-white/[0.07] bg-[#0B0D10] p-3.5 text-xs">
+                      <div className="font-mono text-[11px] font-medium text-[#8A8F98]">
+                        01 · Celo buy receipts
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        {result.buyReceipts.map((r, i) => (
+                          <div key={i} className="flex items-center justify-between font-mono text-[11px]">
+                            <span className="text-[#D5D8DE]">{r.capabilityId}</span>
+                            {r.paymentTxHash ? (
+                              <a
+                                href={celoscanTxUrl(r.paymentTxHash)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-emerald-400 hover:underline"
+                              >
+                                {truncateMiddle(r.paymentTxHash, 8, 6)}
+                                <ArrowUpRight className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              <span className="text-[#6B7280]">{r.dryRun ? "dry-run" : "settled"}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: 7-Rule Policy Gate */}
+                  {result.policyDecision && (
+                    <div className="rounded-lg border border-white/[0.07] bg-[#0B0D10] p-3.5 text-xs">
+                      <div className="font-mono text-[11px] font-medium text-[#8A8F98]">
+                        02 · 7-rule deterministic Policy Gate
+                      </div>
+                      <ul className="mt-2.5 space-y-2">
+                        {result.policyDecision.checks.map((chk) => (
+                          <li key={chk.rule} className="flex items-start gap-2 text-[11px]">
+                            {chk.passed ? (
+                              <CheckCircle
+                                weight="fill"
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400"
+                              />
+                            ) : (
+                              <XCircle
+                                weight="fill"
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400"
+                              />
+                            )}
+                            <div className="min-w-0">
+                              <span className="font-mono font-medium text-[#E5E7EB]">{chk.rule}</span>
+                              <p className="text-[#8A8F98]">{chk.detail}</p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Steps 3 & 4: Settlement Hashes */}
+                  {result.txHashes && (
+                    <div className="rounded-lg border border-emerald-500/25 bg-[#0B0D10] p-3.5 text-xs">
+                      <div className="font-mono text-[11px] font-medium text-emerald-400">
+                        03 &amp; 04 · Mainnet settlement proofs
+                      </div>
+                      <div className="mt-2.5 space-y-2 font-mono text-[11px]">
+                        {[
+                          ["Vault Release", result.txHashes.vaultRelease],
+                          ["Textile Swap", result.txHashes.textileSwap],
+                          ["Local Payout", result.txHashes.localPayout],
+                          ["Audit Receipt", result.txHashes.vaultReceipt],
+                        ].map(([label, hash]) => (
+                          <div key={label} className="flex items-center justify-between gap-2">
+                            <span className="text-[#8A8F98]">{label}</span>
+                            <div className="flex items-center gap-1.5">
+                              <a
+                                href={celoscanTxUrl(hash!)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-0.5 text-emerald-300 hover:underline"
+                              >
+                                {truncateMiddle(hash!, 8, 6)}
+                                <ArrowUpRight className="h-3 w-3" />
+                              </a>
+                              <CopyButton value={hash!} toastMessage={`${label} hash copied`} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 5: Off-Ramp & ERC-8004 Rating */}
+                  {result.offramp && (
+                    <div className="rounded-lg border border-white/[0.09] bg-[#12151A] p-4 text-xs">
+                      <div className="font-mono text-[11px] text-[#8A8F98]">
+                        05 · Last-mile off-ramp
+                      </div>
+                      <h3 className="mt-1 text-sm font-medium text-[#F4F5F6]">
+                        {result.offramp.headline}
+                      </h3>
+                      <ul className="mt-2 space-y-1 text-[#9DA3AE]">
+                        {result.offramp.instructions.map((line, idx) => (
+                          <li key={idx}>• {line}</li>
+                        ))}
+                      </ul>
+
+                      <div className="mt-3 flex items-center justify-between gap-2 rounded-md border border-white/[0.08] bg-[#0B0D10] px-2.5 py-1.5 font-mono text-[11px]">
+                        <span className="truncate text-[#B4BAC5]">
+                          {result.offramp.tokenDecimals}dp · {result.offramp.tokenAddress}
+                        </span>
+                        <CopyButton
+                          value={result.offramp.tokenAddress}
+                          label="Copy"
+                          toastMessage="Token contract address copied"
+                        />
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {result.offramp.venues.map((v) => (
+                          <a
+                            key={v.name}
+                            href={v.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={buttonVariants({ variant: "emerald", size: "sm" })}
+                          >
+                            {v.name}
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                          </a>
+                        ))}
+                      </div>
+
+                      {/* 1-Click ERC-8004 Reputation Feedback */}
+                      <div className="mt-4 border-t border-white/[0.08] pt-3.5">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center gap-1.5 font-medium text-[#F4F5F6]">
+                            <ShieldCheck weight="fill" className="h-3.5 w-3.5 text-emerald-400" />
+                            Rate Vire onchain (ERC-8004)
+                          </span>
+                          <span className="font-mono text-[10px] text-[#6B7280]">tag: settlement</span>
+                        </div>
+
+                        {ratingTxHash ? (
+                          <a
+                            href={celoscanTxUrl(ratingTxHash)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-flex items-center gap-1 font-mono text-xs text-emerald-400 hover:underline"
+                          >
+                            Feedback confirmed: {truncateMiddle(ratingTxHash, 10, 6)}
+                            <ArrowUpRight className="h-3 w-3" />
+                          </a>
+                        ) : repData?.registered && repData.agentId ? (
+                          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                            <div className="flex items-center gap-1 rounded-md border border-white/[0.08] bg-[#0B0D10] p-0.5">
+                              {[80, 90, 95, 100].map((val) => (
+                                <button
+                                  key={val}
+                                  type="button"
+                                  onClick={() => setRatingScore(val)}
+                                  className={cn(
+                                    "vire-pressable rounded px-2 py-1 font-mono text-[11px]",
+                                    ratingScore === val
+                                      ? "bg-white/[0.12] text-[#F4F5F6]"
+                                      : "text-[#8A8F98] hover:text-[#F4F5F6]"
+                                  )}
+                                >
+                                  {val}
+                                </button>
+                              ))}
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="primary"
+                              disabled={isRatingTxPending}
+                              onClick={handleRateOnchain}
+                            >
+                              <Star weight="fill" className="h-3.5 w-3.5 text-amber-500" />
+                              {isRatingTxPending ? "Confirm in wallet…" : "Submit giveFeedback()"}
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="mt-1.5 text-[11px] text-[#6B7280]">
+                            Agent registration ID pending configuration.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </section>
+          </Card>
+        </div>
       </div>
     </div>
   );
@@ -695,7 +790,14 @@ function ClaimFlowInner() {
 
 export default function ClaimPage() {
   return (
-    <Suspense fallback={<div className="p-8 font-mono text-xs text-zinc-500">Loading claim flow…</div>}>
+    <Suspense
+      fallback={
+        <div className="grid gap-6 lg:grid-cols-12">
+          <Skeleton className="h-96 lg:col-span-7" />
+          <Skeleton className="h-96 lg:col-span-5" />
+        </div>
+      }
+    >
       <ClaimFlowInner />
     </Suspense>
   );

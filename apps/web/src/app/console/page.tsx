@@ -1,11 +1,25 @@
 "use client";
 
+import {
+  ArrowUpRight,
+  LockKey,
+  PaperPlaneTilt,
+  Pause,
+  Play,
+  TerminalWindow,
+} from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { CELO_TOKENS, VIRE_VAULT_ABI } from "@vire/shared";
-import { ExternalLink, Pause, Play, Send, Shield } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import type { Address } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/copy-button";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { cn, truncateMiddle } from "@/lib/utils";
 
 interface VaultApiResponse {
   deployed: boolean;
@@ -25,6 +39,7 @@ export default function ConsolePage() {
 
   const [x402AssetMode, setX402AssetMode] = useState<"default" | "cngn">("default");
   const [x402Status, setX402Status] = useState<number | null>(null);
+  const [x402LatencyMs, setX402LatencyMs] = useState<number | null>(null);
   const [x402DecodedHeader, setX402DecodedHeader] = useState<string | null>(null);
   const [x402Body, setX402Body] = useState<string | null>(null);
   const [isTestingX402, setIsTestingX402] = useState(false);
@@ -49,18 +64,21 @@ export default function ConsolePage() {
         abi: VIRE_VAULT_ABI,
         functionName: vault.paused ? "unpause" : "pause",
       });
+      toast.success(vault.paused ? "VireVault resumed" : "VireVault emergency pause triggered");
       await refetchVault();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Vault transaction cancelled");
+      toast.error(err instanceof Error ? err.message : "Vault transaction cancelled");
     }
   }
 
   async function handleProbeX402() {
     setIsTestingX402(true);
     setX402Status(null);
+    setX402LatencyMs(null);
     setX402DecodedHeader(null);
     setX402Body(null);
 
+    const start = performance.now();
     try {
       const url = x402AssetMode === "cngn" ? "/api/x402/verify?asset=cngn" : "/api/x402/verify";
       const res = await fetch(url, {
@@ -74,6 +92,7 @@ export default function ConsolePage() {
           rewardLocalHuman: "3000",
         }),
       });
+      setX402LatencyMs(Math.round(performance.now() - start));
       setX402Status(res.status);
       const reqHeader = res.headers.get("payment-required");
       if (reqHeader) {
@@ -86,202 +105,20 @@ export default function ConsolePage() {
       }
       const text = await res.text();
       setX402Body(text || "{}");
+      if (res.status === 402) {
+        toast.success("HTTP 402 Payment Required challenge verified");
+      }
     } catch (err) {
-      setX402Body(err instanceof Error ? err.message : "Request failed");
+      const msg = err instanceof Error ? err.message : "Probe request failed";
+      setX402Body(msg);
+      toast.error(msg);
     } finally {
       setIsTestingX402(false);
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-emerald-700">
-          Merchant Treasury &amp; Paid API Surface
-        </span>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950">
-          Client Console &amp; Live x402 Playground
-        </h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Inspect <code className="font-mono text-xs">VireVault</code> custody guardrails, verify token
-          decimals, and probe live HTTP 402 payment challenges settled via{" "}
-          <code className="font-mono text-xs">https://api.x402.celo.org</code>.
-        </p>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-12">
-        {/* VireVault Inspector & Controls */}
-        <section className="rounded-2xl border border-zinc-200/90 bg-white p-6 lg:col-span-5">
-          <div className="flex items-center justify-between">
-            <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-950">
-              <Shield className="h-4 w-4 text-emerald-700" />
-              VireVault Onchain Custody
-            </h2>
-            <span
-              className={`rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold ${
-                vault?.deployed
-                  ? vault.paused
-                    ? "bg-amber-100 text-amber-900"
-                    : "bg-emerald-100 text-emerald-800"
-                  : "bg-zinc-100 text-zinc-600"
-              }`}
-            >
-              {vault?.deployed ? (vault.paused ? "PAUSED" : "LIVE · 42220") : "NOT DEPLOYED"}
-            </span>
-          </div>
-
-          <dl className="mt-4 space-y-2.5 font-mono text-xs">
-            {[
-              ["Vault Address", vault?.address ?? "Set VIRE_VAULT_ADDRESS in .env"],
-              ["Admin Owner", vault?.owner ?? "—"],
-              ["Settlement Agent", vault?.settlementAgent ?? "—"],
-              ["USD₮ Balance", vault?.usdtBalanceFormatted ? `$${vault.usdtBalanceFormatted} USD₮` : "—"],
-              [
-                "Committed Budgets",
-                vault?.totalCommittedBudgetFormatted ? `$${vault.totalCommittedBudgetFormatted} USD₮` : "—",
-              ],
-              ["ERC-8021 Tag", vault?.attributionCode ?? "celo_55a64f75ba4a"],
-            ].map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between gap-2 border-b border-zinc-100 pb-2">
-                <dt className="text-zinc-500">{k}</dt>
-                <dd className="truncate font-medium text-zinc-950">{v}</dd>
-              </div>
-            ))}
-          </dl>
-
-          {vault?.deployed && (
-            <div className="mt-4 flex items-center justify-between gap-2">
-              <a
-                href={`https://celoscan.io/address/${vault.address}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 font-mono text-xs text-emerald-700 underline"
-              >
-                View on Celoscan <ExternalLink className="h-3 w-3" />
-              </a>
-
-              <button
-                type="button"
-                disabled={!isVaultOwner || isVaultActionPending}
-                onClick={handleTogglePause}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-40"
-              >
-                {vault.paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-                {vault.paused ? "Unpause Vault" : "Emergency Pause"}
-              </button>
-            </div>
-          )}
-
-          {/* Canonical Verified Decimals Reference */}
-          <div className="mt-6">
-            <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-              Verified Celo Mainnet Token Registry
-            </h3>
-            <div className="mt-2 divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-zinc-50/60 font-mono text-[11px]">
-              {Object.values(CELO_TOKENS).map((t) => (
-                <div key={t.symbol} className="flex items-center justify-between px-3 py-1.5">
-                  <span className="font-semibold text-zinc-900">{t.displaySymbol}</span>
-                  <span className="text-zinc-500">
-                    {t.address.slice(0, 8)}…{t.address.slice(-4)}
-                  </span>
-                  <span
-                    className={`rounded px-1.5 py-0.5 font-semibold ${
-                      t.decimals === 2
-                        ? "bg-amber-100 text-amber-900"
-                        : "bg-zinc-200/70 text-zinc-800"
-                    }`}
-                  >
-                    {t.decimals} dec
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Interactive x402 Playground */}
-        <section className="rounded-2xl border border-zinc-200/90 bg-white p-6 lg:col-span-7">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-zinc-950">
-                Live x402 API Playground (<code className="font-mono">POST /api/x402/verify</code>)
-              </h2>
-              <p className="mt-0.5 text-xs text-zinc-500">
-                Tests Vire&apos;s live x402 v2 payment gate settling into <code className="font-mono">VIRE_X402_PAY_TO</code>.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <select
-                value={x402AssetMode}
-                onChange={(e) => setX402AssetMode(e.target.value as "default" | "cngn")}
-                className="rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 font-mono text-xs"
-              >
-                <option value="default">USD₮ / USDC / wFIAT (Gasless)</option>
-                <option value="cngn">cNGN Route (?asset=cngn)</option>
-              </select>
-              <button
-                type="button"
-                disabled={isTestingX402}
-                onClick={handleProbeX402}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-              >
-                <Send className="h-3.5 w-3.5" />
-                {isTestingX402 ? "Probing…" : "Send Unpaid Probe"}
-              </button>
-            </div>
-          </div>
-
-          {x402Status !== null && (
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center gap-2 font-mono text-xs">
-                <span
-                  className={`rounded px-2 py-0.5 font-semibold ${
-                    x402Status === 402
-                      ? "bg-emerald-100 text-emerald-900"
-                      : x402Status === 503
-                        ? "bg-amber-100 text-amber-900"
-                        : "bg-zinc-100 text-zinc-900"
-                  }`}
-                >
-                  HTTP {x402Status}
-                </span>
-                <span className="text-zinc-600">
-                  {x402Status === 402
-                    ? "Valid x402 v2 Payment Required challenge emitted!"
-                    : "Response received"}
-                </span>
-              </div>
-
-              {x402DecodedHeader && (
-                <div>
-                  <div className="font-mono text-[11px] font-semibold text-zinc-500">
-                    Decoded payment-required Header (Exact Celo Mainnet Asset Specs)
-                  </div>
-                  <pre className="mt-1 max-h-72 overflow-auto rounded-xl bg-zinc-950 p-3.5 font-mono text-[11px] text-emerald-300">
-                    {x402DecodedHeader}
-                  </pre>
-                </div>
-              )}
-
-              {x402Body && (
-                <div>
-                  <div className="font-mono text-[11px] font-semibold text-zinc-500">Response Body</div>
-                  <pre className="mt-1 max-h-40 overflow-auto rounded-xl border border-zinc-200 bg-zinc-50 p-3 font-mono text-[11px] text-zinc-800">
-                    {x402Body}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Copyable Buyer SDK Snippet */}
-          <div className="mt-6">
-            <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-              Pay &amp; Call Programmatically with @x402/fetch (Celo Mainnet)
-            </div>
-            <pre className="mt-2 overflow-x-auto rounded-xl bg-zinc-950 p-4 font-mono text-[11px] leading-relaxed text-zinc-200">
-{`import { x402Client, wrapFetchWithPayment } from "@x402/fetch";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://usevire.xyz";
+  const sdkSnippet = `import { x402Client, wrapFetchWithPayment } from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -290,7 +127,7 @@ client.setSpendControls({ maxAmountPerPayment: "$1" });
 client.register("eip155:*", new ExactEvmScheme(privateKeyToAccount(process.env.BUYER_KEY)));
 
 const payFetch = wrapFetchWithPayment(fetch, client);
-const res = await payFetch("${typeof window !== "undefined" ? window.location.origin : "https://your-vire-domain"}/api/x402/verify", {
+const res = await payFetch("${origin}/api/x402/verify", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
@@ -301,10 +138,244 @@ const res = await payFetch("${typeof window !== "undefined" ? window.location.or
     rewardLocalHuman: "3000"
   })
 });
-console.log(await res.json());`}
-            </pre>
+console.log(await res.json());`;
+
+  return (
+    <div className="space-y-8">
+      <div className="vire-enter">
+        <h1 className="text-3xl font-semibold tracking-[-0.035em] text-[#F4F5F6]">
+          Merchant console &amp; x402 playground
+        </h1>
+        <p className="mt-1.5 max-w-[64ch] text-sm text-[#8A8F98]">
+          Inspect live <code className="font-mono text-xs text-[#D5D8DE]">VireVault</code> custody
+          parameters, verify canonical Celo Mainnet token decimals, and probe live HTTP 402
+          challenges routed through{" "}
+          <code className="font-mono text-xs text-[#D5D8DE]">api.x402.celo.org</code>.
+        </p>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+        {/* Left: VireVault Onchain Custody + Verified Token Registry */}
+        <div className="space-y-5 lg:col-span-5">
+          <Card className="vire-enter vire-delay-1 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/[0.07] bg-[#0C0E11] px-5 py-3.5">
+              <div className="flex items-center gap-2">
+                <LockKey weight="regular" className="h-4 w-4 text-emerald-400" />
+                <h2 className="text-xs font-medium text-[#F4F5F6]">VireVault custody</h2>
+              </div>
+              <Badge
+                tone={
+                  vault?.deployed ? (vault.paused ? "amber" : "emerald") : "neutral"
+                }
+              >
+                {vault?.deployed ? (vault.paused ? "PAUSED" : "LIVE · 42220") : "UNCONFIGURED"}
+              </Badge>
+            </div>
+
+            <dl className="divide-y divide-white/[0.06] px-5 font-mono text-xs">
+              {[
+                { label: "Vault", value: vault?.address, copy: true },
+                { label: "Admin owner", value: vault?.owner, copy: true },
+                { label: "Settlement agent", value: vault?.settlementAgent, copy: true },
+                {
+                  label: "USD₮ balance",
+                  value: vault?.usdtBalanceFormatted ? `$${vault.usdtBalanceFormatted} USD₮` : "—",
+                  copy: false,
+                },
+                {
+                  label: "Committed budget",
+                  value: vault?.totalCommittedBudgetFormatted
+                    ? `$${vault.totalCommittedBudgetFormatted} USD₮`
+                    : "—",
+                  copy: false,
+                },
+                {
+                  label: "ERC-8021 tag",
+                  value: vault?.attributionCode ?? "celo_55a64f75ba4a",
+                  copy: true,
+                },
+              ].map((row) => (
+                <div
+                  key={row.label}
+                  className="flex items-center justify-between gap-3 py-3"
+                >
+                  <dt className="text-[#8A8F98]">{row.label}</dt>
+                  <dd className="flex min-w-0 items-center gap-1.5 text-[#F4F5F6] tabular-nums">
+                    <span className="truncate">
+                      {row.value && row.value.startsWith("0x")
+                        ? truncateMiddle(row.value, 8, 6)
+                        : row.value ?? "—"}
+                    </span>
+                    {row.copy && row.value && (
+                      <CopyButton value={row.value} toastMessage={`${row.label} copied`} />
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+
+            {vault?.deployed && vault.address && (
+              <div className="flex items-center justify-between gap-2 border-t border-white/[0.07] bg-[#0B0D10] px-5 py-3">
+                <a
+                  href={`https://celoscan.io/address/${vault.address}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-mono text-xs text-emerald-400 hover:underline"
+                >
+                  Celoscan <ArrowUpRight className="h-3.5 w-3.5" />
+                </a>
+
+                <Button
+                  size="sm"
+                  variant={vault.paused ? "emerald" : "danger"}
+                  disabled={!isVaultOwner || isVaultActionPending}
+                  onClick={handleTogglePause}
+                  title={
+                    isVaultOwner
+                      ? "Owner emergency control"
+                      : "Connect the VireVault owner wallet to pause/unpause"
+                  }
+                >
+                  {vault.paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                  {vault.paused ? "Resume vault" : "Emergency pause"}
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          {/* Verified Celo Token Registry */}
+          <Card className="vire-enter vire-delay-2 overflow-hidden">
+            <div className="border-b border-white/[0.07] bg-[#0C0E11] px-5 py-3">
+              <h3 className="text-xs font-medium text-[#E5E7EB]">
+                Canonical Celo Mainnet token decimals
+              </h3>
+            </div>
+            <div className="divide-y divide-white/[0.05] font-mono text-[11px]">
+              {Object.values(CELO_TOKENS).map((t) => (
+                <div key={t.symbol} className="flex items-center justify-between px-5 py-2.5">
+                  <span className="font-medium text-[#F4F5F6]">{t.displaySymbol}</span>
+                  <span className="text-[#6B7280]">{truncateMiddle(t.address, 8, 5)}</span>
+                  <Badge tone={t.decimals === 2 ? "amber" : "neutral"}>{t.decimals} dec</Badge>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* Right: Live x402 API Playground */}
+        <Card elevated className="vire-enter vire-delay-1 overflow-hidden lg:col-span-7">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] bg-[#0C0E11] px-5 py-3.5">
+            <div className="flex items-center gap-2">
+              <TerminalWindow weight="regular" className="h-4 w-4 text-emerald-400" />
+              <h2 className="font-mono text-xs font-medium text-[#F4F5F6]">
+                POST /api/x402/verify
+              </h2>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <SegmentedTabs
+                value={x402AssetMode}
+                onChange={setX402AssetMode}
+                options={[
+                  { value: "default", label: "USD₮ / wFIAT" },
+                  { value: "cngn", label: "cNGN route" },
+                ]}
+              />
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={isTestingX402}
+                onClick={handleProbeX402}
+              >
+                <PaperPlaneTilt weight="fill" className="h-3.5 w-3.5" />
+                {isTestingX402 ? "Probing…" : "Send unpaid probe"}
+              </Button>
+            </div>
           </div>
-        </section>
+
+          <div className="space-y-5 p-5">
+            {x402Status !== null ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-[#0B0D10] px-3.5 py-2.5 font-mono text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <Badge tone={x402Status === 402 ? "emerald" : "amber"}>
+                      HTTP {x402Status}
+                    </Badge>
+                    <span className="text-[#D5D8DE]">
+                      {x402Status === 402
+                        ? "Valid x402 v2 Payment Required challenge"
+                        : "Server response received"}
+                    </span>
+                  </div>
+                  {x402LatencyMs !== null && (
+                    <span className="text-[11px] text-[#6B7280] tabular-nums">
+                      {x402LatencyMs}ms
+                    </span>
+                  )}
+                </div>
+
+                {x402DecodedHeader && (
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="font-mono text-[11px] text-[#8A8F98]">
+                        Decoded payment-required header
+                      </span>
+                      <CopyButton
+                        value={x402DecodedHeader}
+                        label="Copy JSON"
+                        toastMessage="Decoded x402 challenge copied"
+                      />
+                    </div>
+                    <pre className="max-h-80 overflow-auto rounded-lg border border-white/[0.07] bg-[#08090A] p-4 font-mono text-[11px] leading-relaxed text-emerald-300">
+                      {x402DecodedHeader}
+                    </pre>
+                  </div>
+                )}
+
+                {x402Body && (
+                  <div>
+                    <div className="mb-1.5 font-mono text-[11px] text-[#8A8F98]">Response body</div>
+                    <pre className="max-h-32 overflow-auto rounded-lg border border-white/[0.07] bg-[#08090A] p-3 font-mono text-[11px] text-[#B4BAC5]">
+                      {x402Body}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-white/[0.1] bg-[#0B0D10]/60 px-5 py-8 text-center">
+                <p className="text-xs font-medium text-[#D5D8DE]">
+                  Inspect the live Celo Mainnet HTTP 402 wire challenge
+                </p>
+                <p className="mt-1 text-xs text-[#6B7280]">
+                  Click <span className="font-medium text-[#E5E7EB]">Send unpaid probe</span> above
+                  to decode live EIP-3009 + Permit2 payment requirements returned by{" "}
+                  <code className="font-mono">POST /api/x402/verify</code>.
+                </p>
+              </div>
+            )}
+
+            {/* Programmatic Buyer SDK Snippet */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-mono text-[11px] text-[#8A8F98]">
+                  Pay programmatically via @x402/fetch (Celo Mainnet)
+                </span>
+                <CopyButton
+                  value={sdkSnippet}
+                  label="Copy snippet"
+                  toastMessage="TypeScript @x402/fetch snippet copied"
+                />
+              </div>
+              <pre
+                className={cn(
+                  "overflow-x-auto rounded-lg border border-white/[0.07] bg-[#08090A] p-4 font-mono text-[11px] leading-relaxed text-[#C9CED6]"
+                )}
+              >
+                {sdkSnippet}
+              </pre>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );

@@ -1,8 +1,22 @@
 "use client";
 
+import {
+  ArrowClockwise,
+  ArrowUpRight,
+  ShieldCheck,
+  ShieldWarning,
+} from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/copy-button";
+import { Select } from "@/components/ui/field";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn, truncateMiddle } from "@/lib/utils";
 
 interface LedgerData {
   metrics: {
@@ -95,303 +109,365 @@ export default function LedgerPage() {
   const m = data?.metrics;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="space-y-8">
+      <div className="vire-enter flex flex-wrap items-end justify-between gap-4">
         <div>
-          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-emerald-700">
-            Transparent Onchain Explorer · Judge Dashboard
-          </span>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950">
-            Public Live Settlement &amp; Audit Ledger
+          <h1 className="text-3xl font-semibold tracking-[-0.035em] text-[#F4F5F6]">
+            Public settlement &amp; audit ledger
           </h1>
-          <p className="mt-1 text-sm text-zinc-600">
-            Every Textile FX swap, VireVault release, local stablecoin payout, Policy Gate rejection,
-            paid Celo <code className="font-mono text-xs">buy</code> receipt, and x402 PayTo inflow is
-            indexed with direct Celoscan links. Zero synthetic entries.
+          <p className="mt-1.5 max-w-[66ch] text-sm text-[#8A8F98]">
+            Every Textile FX swap, VireVault release, local payout, Policy Gate rejection, Celo{" "}
+            <code className="font-mono text-xs text-[#D5D8DE]">buy</code> call, and x402 PayTo
+            inflow is indexed with direct Celoscan links. Zero synthetic entries.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
-          Refresh Ledger
-        </button>
+        <Button variant="secondary" size="sm" onClick={() => refetch()}>
+          <ArrowClockwise className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+          Refresh ledger
+        </Button>
       </div>
 
-      {/* 6-KPI Judge Metrics Strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {[
-          { label: "External Recipients", value: m?.totalExternalRecipients ?? 0, sub: "non-team wallets" },
-          { label: "Repeat Contributors", value: m?.repeatContributorsCount ?? 0, sub: "2+ stages cleared" },
-          {
-            label: "Tagged Textile Swaps",
-            value: m?.totalCompletedSettlements ?? 0,
-            sub: `$${m?.totalUsdtSettledFormatted ?? "0"} USD₮`,
-          },
-          {
-            label: "Corridors Cleared",
-            value: m?.corridorsClearedCount ?? 0,
-            sub: m?.corridorsCleared.join(", ") || "ready",
-          },
-          {
-            label: "Paid buy Calls",
-            value: m?.totalPaidBuyCalls ?? 0,
-            sub: `${m?.totalBuyCallsRecorded ?? 0} total logged`,
-          },
-          { label: "x402 PayTo Inflows", value: m?.totalX402Inflows ?? 0, sub: "settled via x402" },
-        ].map((kpi) => (
-          <div key={kpi.label} className="rounded-xl border border-zinc-200/90 bg-white p-4">
-            <div className="text-[11px] font-medium text-zinc-500">{kpi.label}</div>
-            <div className="mt-1 font-mono text-2xl font-semibold text-zinc-950 tabular-nums">
-              {kpi.value}
+      {/* Unified Hairline 6-KPI Analytics Band (Morpho / Vercel Analytics style) */}
+      <Card className="vire-enter vire-delay-1 overflow-hidden">
+        <div className="grid grid-cols-2 divide-x divide-y divide-white/[0.06] sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+          {[
+            { label: "External recipients", value: m?.totalExternalRecipients ?? 0, sub: "non-team wallets" },
+            { label: "Repeat contributors", value: m?.repeatContributorsCount ?? 0, sub: "2+ stages cleared" },
+            {
+              label: "Tagged Textile swaps",
+              value: m?.totalCompletedSettlements ?? 0,
+              sub: `$${m?.totalUsdtSettledFormatted ?? "0"} USD₮`,
+            },
+            {
+              label: "Corridors cleared",
+              value: m?.corridorsClearedCount ?? 0,
+              sub: m?.corridorsCleared.join(", ") || "ready",
+            },
+            {
+              label: "Paid Celo buy",
+              value: m?.totalPaidBuyCalls ?? 0,
+              sub: `${m?.totalBuyCallsRecorded ?? 0} total logged`,
+            },
+            {
+              label: "x402 inflows",
+              value: m?.totalX402Inflows ?? 0,
+              sub: "settled via x402",
+              highlight: true,
+            },
+          ].map((kpi) => (
+            <div key={kpi.label} className="p-4 sm:p-5">
+              <div className="text-[11px] font-medium text-[#8A8F98]">{kpi.label}</div>
+              <div
+                className={cn(
+                  "mt-2 font-mono text-2xl font-semibold tracking-[-0.03em] tabular-nums",
+                  kpi.highlight ? "text-emerald-400" : "text-[#F4F5F6]"
+                )}
+              >
+                {kpi.value}
+              </div>
+              <div className="mt-1 truncate font-mono text-[10px] text-[#5C626D]">{kpi.sub}</div>
             </div>
-            <div className="mt-0.5 truncate font-mono text-[10px] text-zinc-400">{kpi.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Tabs + Corridor Filter */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 pb-3">
-        <div className="flex flex-wrap gap-1.5">
-          {(
-            [
-              ["settled", `Completed Settlements (${data?.completedSettlements.length ?? 0})`],
-              ["rejected", `Rejected Claims (${data?.rejectedClaims.length ?? 0})`],
-              ["buy", `Paid Celo buy Receipts (${data?.buyPayments.length ?? 0})`],
-              ["x402", `x402 PayTo Inflows (${data?.x402Inflows.length ?? 0})`],
-            ] as Array<[TabKey, string]>
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                tab === key
-                  ? "bg-zinc-950 text-white"
-                  : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-              }`}
-            >
-              {label}
-            </button>
           ))}
         </div>
+      </Card>
+
+      {/* Tabs + Filter */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SegmentedTabs
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "settled", label: "Completed settlements", count: data?.completedSettlements.length ?? 0 },
+            { value: "rejected", label: "Rejected claims", count: data?.rejectedClaims.length ?? 0 },
+            { value: "buy", label: "Paid buy receipts", count: data?.buyPayments.length ?? 0 },
+            { value: "x402", label: "x402 inflows", count: data?.x402Inflows.length ?? 0 },
+          ]}
+        />
 
         {(tab === "settled" || tab === "rejected") && (
-          <select
-            value={corridor}
-            onChange={(e) => setCorridor(e.target.value)}
-            className="rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 font-mono text-xs text-zinc-900"
-          >
-            <option value="">All Corridors</option>
-            <option value="cNGN">cNGN (Nigeria)</option>
-            <option value="wARS">wARS (Argentina)</option>
-            <option value="wBRL">wBRL (Brazil)</option>
-            <option value="wMXN">wMXN (Mexico)</option>
-            <option value="IDRX">IDRX (Indonesia)</option>
-          </select>
-        )}
-      </div>
-
-      {/* Table Panels */}
-      <div className="overflow-x-auto rounded-2xl border border-zinc-200/90 bg-white">
-        {isLoading ? (
-          <div className="p-8 font-mono text-xs text-zinc-500">Loading live audit records…</div>
-        ) : tab === "settled" ? (
-          data?.completedSettlements.length ? (
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-zinc-200 bg-zinc-50 font-mono text-[11px] uppercase text-zinc-500">
-                <tr>
-                  <th className="px-4 py-3">Time</th>
-                  <th className="px-4 py-3">Campaign / Recipient</th>
-                  <th className="px-4 py-3">Local Output</th>
-                  <th className="px-4 py-3">USD₮ Spent</th>
-                  <th className="px-4 py-3">Onchain Proof (Celoscan)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {data.completedSettlements.map((s) => (
-                  <tr key={s.id} className="hover:bg-zinc-50/70">
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-[11px] text-zinc-500">
-                      {new Date(s.settledAt).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-zinc-950">{s.campaignTitle}</div>
-                      <div className="font-mono text-[11px] text-zinc-500">
-                        {s.recipientWallet.slice(0, 8)}…{s.recipientWallet.slice(-6)}
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono font-semibold text-emerald-700 tabular-nums">
-                      {s.localAmountFormatted} {s.corridor}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-zinc-700 tabular-nums">
-                      ${s.usdtSpentFormatted}
-                      {s.usdtRefundedFormatted !== "0" && (
-                        <span className="block text-[10px] text-zinc-400">
-                          +${s.usdtRefundedFormatted} refunded
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1.5 font-mono text-[11px]">
-                        <a href={s.vaultReleaseUrl} target="_blank" rel="noreferrer" className="rounded bg-zinc-100 px-2 py-0.5 text-zinc-800 hover:bg-zinc-200">
-                          Vault <ExternalLink className="inline h-2.5 w-2.5" />
-                        </a>
-                        <a href={s.textileSwapUrl} target="_blank" rel="noreferrer" className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-800 hover:bg-emerald-100">
-                          Textile Swap <ExternalLink className="inline h-2.5 w-2.5" />
-                        </a>
-                        <a href={s.payoutUrl} target="_blank" rel="noreferrer" className="rounded bg-zinc-100 px-2 py-0.5 text-zinc-800 hover:bg-zinc-200">
-                          Payout <ExternalLink className="inline h-2.5 w-2.5" />
-                        </a>
-                        {s.buyPaymentUrl && (
-                          <a href={s.buyPaymentUrl} target="_blank" rel="noreferrer" className="rounded bg-amber-50 px-2 py-0.5 text-amber-900 hover:bg-amber-100">
-                            buy <ExternalLink className="inline h-2.5 w-2.5" />
-                          </a>
-                        )}
-                        {s.erc8004Rated && (
-                          <span className="inline-flex items-center gap-0.5 rounded bg-emerald-100 px-2 py-0.5 text-emerald-900">
-                            <ShieldCheck className="h-3 w-3" /> Rated
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="p-8 text-center text-xs text-zinc-500">
-              No completed Celo Mainnet settlements recorded yet. Submit a verified claim on{" "}
-              <code className="font-mono">/claim</code> once <code className="font-mono">VireVault</code>{" "}
-              is deployed and funded.
-            </div>
-          )
-        ) : tab === "rejected" ? (
-          data?.rejectedClaims.length ? (
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-zinc-200 bg-zinc-50 font-mono text-[11px] uppercase text-zinc-500">
-                <tr>
-                  <th className="px-4 py-3">Time</th>
-                  <th className="px-4 py-3">Claim / Wallet</th>
-                  <th className="px-4 py-3">Triggered Policy Rule</th>
-                  <th className="px-4 py-3">AI Verdict &amp; Reason</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {data.rejectedClaims.map((r) => (
-                  <tr key={r.id}>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-[11px] text-zinc-500">
-                      {new Date(r.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-zinc-900">{r.campaignTitle}</div>
-                      <div className="font-mono text-[11px] text-zinc-500">
-                        {r.contributorWallet.slice(0, 8)}… · {r.corridor}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800">
-                        <ShieldAlert className="h-3 w-3" />
-                        {r.failedPolicyRule ?? "POLICY_REJECTED"}
-                      </span>
-                    </td>
-                    <td className="max-w-md px-4 py-3 text-zinc-600">
-                      <span className="font-mono font-semibold text-zinc-900">
-                        {r.aiScore ?? 0}/100 ({r.aiVerdict ?? "n/a"})
-                      </span>{" "}
-                      — {r.aiReason ?? "Blocked by deterministic guardrail before vault release."}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="p-8 text-center text-xs text-zinc-500">
-              No rejected claims recorded yet. Every claim rejected by any of the 7 Policy Gate rules is
-              logged publicly here to prove real agentic enforcement.
-            </div>
-          )
-        ) : tab === "buy" ? (
-          data?.buyPayments.length ? (
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-zinc-200 bg-zinc-50 font-mono text-[11px] uppercase text-zinc-500">
-                <tr>
-                  <th className="px-4 py-3">Time</th>
-                  <th className="px-4 py-3">Capability</th>
-                  <th className="px-4 py-3">Amount</th>
-                  <th className="px-4 py-3">Payment Receipt</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {data.buyPayments.map((b) => (
-                  <tr key={b.id}>
-                    <td className="px-4 py-3 font-mono text-[11px] text-zinc-500">
-                      {new Date(b.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 font-mono font-medium text-zinc-900">{b.capabilityId}</td>
-                    <td className="px-4 py-3 font-mono tabular-nums text-zinc-800">
-                      {b.paymentAmountFormatted} {b.paymentToken}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-[11px]">
-                      {b.txUrl && b.paymentTxHash ? (
-                        <a href={b.txUrl} target="_blank" rel="noreferrer" className="text-emerald-700 underline">
-                          {b.paymentTxHash.slice(0, 14)}… <ExternalLink className="inline h-3 w-3" />
-                        </a>
-                      ) : (
-                        <span className="text-zinc-500">{b.dryRun ? "dry-run (offline)" : "recorded"}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="p-8 text-center text-xs text-zinc-500">
-              No Celo <code className="font-mono">buy</code> gateway calls logged yet.
-            </div>
-          )
-        ) : data?.x402Inflows.length ? (
-          <table className="w-full text-left text-xs">
-            <thead className="border-b border-zinc-200 bg-zinc-50 font-mono text-[11px] uppercase text-zinc-500">
-              <tr>
-                <th className="px-4 py-3">Time</th>
-                <th className="px-4 py-3">Endpoint</th>
-                <th className="px-4 py-3">Payer → PayTo</th>
-                <th className="px-4 py-3">Asset / Atomic</th>
-                <th className="px-4 py-3">Settlement Tx</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {data.x402Inflows.map((x) => (
-                <tr key={x.id}>
-                  <td className="px-4 py-3 font-mono text-[11px] text-zinc-500">
-                    {new Date(x.createdAt).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 font-mono font-medium text-zinc-900">{x.endpoint}</td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-zinc-600">
-                    {x.payerWallet.slice(0, 8)}… → {x.payToWallet.slice(0, 8)}…
-                  </td>
-                  <td className="px-4 py-3 font-mono text-zinc-800">
-                    {x.amountAtomic} {x.assetSymbol}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-[11px]">
-                    <a href={x.txUrl} target="_blank" rel="noreferrer" className="text-emerald-700 underline">
-                      {x.settlementTxHash.slice(0, 14)}… <ExternalLink className="inline h-3 w-3" />
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="p-8 text-center text-xs text-zinc-500">
-            No x402 API inflows settled yet. Test <code className="font-mono">POST /api/x402/verify</code>{" "}
-            from <code className="font-mono">/console</code>.
+          <div className="w-48">
+            <Select
+              aria-label="Filter by corridor"
+              value={corridor}
+              onChange={(e) => setCorridor(e.target.value)}
+              className="font-mono text-xs"
+            >
+              <option value="">All corridors</option>
+              <option value="cNGN">cNGN · Nigeria</option>
+              <option value="wARS">wARS · Argentina</option>
+              <option value="wBRL">wBRL · Brazil</option>
+              <option value="wMXN">wMXN · Mexico</option>
+              <option value="IDRX">IDRX · Indonesia</option>
+            </Select>
           </div>
         )}
       </div>
+
+      {/* Data Table Surface */}
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          {isLoading ? (
+            <div className="space-y-3 p-6">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : tab === "settled" ? (
+            data?.completedSettlements.length ? (
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-white/[0.07] bg-[#0B0D10] font-mono text-[11px] text-[#6B7280]">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Timestamp</th>
+                    <th className="px-5 py-3 font-medium">Campaign / Recipient</th>
+                    <th className="px-5 py-3 font-medium">Local Output</th>
+                    <th className="px-5 py-3 font-medium">USD₮ Spent</th>
+                    <th className="px-5 py-3 font-medium">Onchain Proofs</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.05]">
+                  {data.completedSettlements.map((s) => (
+                    <tr
+                      key={s.id}
+                      className="transition-colors duration-150 hover:bg-white/[0.02]"
+                    >
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-[#8A8F98] tabular-nums">
+                        {new Date(s.settledAt).toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="font-medium text-[#F4F5F6]">{s.campaignTitle}</div>
+                        <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-[#6B7280]">
+                          <span>{truncateMiddle(s.recipientWallet, 8, 6)}</span>
+                          <CopyButton value={s.recipientWallet} toastMessage="Recipient copied" />
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono font-semibold text-emerald-400 tabular-nums">
+                        {s.localAmountFormatted} {s.corridor}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[#D5D8DE] tabular-nums">
+                        ${s.usdtSpentFormatted}
+                        {s.usdtRefundedFormatted !== "0" && (
+                          <span className="block text-[10px] text-[#6B7280]">
+                            +${s.usdtRefundedFormatted} refunded
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
+                          <a
+                            href={s.vaultReleaseUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[#D5D8DE] hover:border-white/[0.16] hover:text-white"
+                          >
+                            Vault <ArrowUpRight className="h-3 w-3" />
+                          </a>
+                          <a
+                            href={s.textileSwapUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-emerald-300 hover:bg-emerald-500/20"
+                          >
+                            Textile Swap <ArrowUpRight className="h-3 w-3" />
+                          </a>
+                          <a
+                            href={s.payoutUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[#D5D8DE] hover:border-white/[0.16] hover:text-white"
+                          >
+                            Payout <ArrowUpRight className="h-3 w-3" />
+                          </a>
+                          {s.buyPaymentUrl && (
+                            <a
+                              href={s.buyPaymentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-amber-300 hover:bg-amber-500/20"
+                            >
+                              buy <ArrowUpRight className="h-3 w-3" />
+                            </a>
+                          )}
+                          {s.erc8004Rated && (
+                            <Badge tone="emerald">
+                              <ShieldCheck weight="fill" className="h-3 w-3" /> Rated
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="px-6 py-14 text-center">
+                <p className="text-sm font-medium text-[#E5E7EB]">No settled mainnet payouts yet</p>
+                <p className="mx-auto mt-1.5 max-w-md text-xs text-[#8A8F98]">
+                  Live Celo Mainnet settlements appear here with 4 Celoscan proofs once a verified
+                  deliverable clears <code className="font-mono">VireVault</code> and Textile FX v2.
+                </p>
+                <div className="mt-5 flex justify-center gap-2">
+                  <Link href="/claim" className={buttonVariants({ variant: "primary", size: "sm" })}>
+                    Submit deliverable
+                  </Link>
+                  <Link href="/console" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                    Inspect VireVault
+                  </Link>
+                </div>
+              </div>
+            )
+          ) : tab === "rejected" ? (
+            data?.rejectedClaims.length ? (
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-white/[0.07] bg-[#0B0D10] font-mono text-[11px] text-[#6B7280]">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Timestamp</th>
+                    <th className="px-5 py-3 font-medium">Claim / Wallet</th>
+                    <th className="px-5 py-3 font-medium">Triggered Policy Rule</th>
+                    <th className="px-5 py-3 font-medium">AI Verdict &amp; Reason</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.05]">
+                  {data.rejectedClaims.map((r) => (
+                    <tr key={r.id} className="hover:bg-white/[0.02]">
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-[#8A8F98] tabular-nums">
+                        {new Date(r.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="font-medium text-[#F4F5F6]">{r.campaignTitle}</div>
+                        <div className="mt-0.5 font-mono text-[11px] text-[#6B7280]">
+                          {truncateMiddle(r.contributorWallet, 8, 6)} · {r.corridor}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Badge tone="rose">
+                          <ShieldWarning weight="fill" className="h-3.5 w-3.5" />
+                          {r.failedPolicyRule ?? "POLICY_REJECTED"}
+                        </Badge>
+                      </td>
+                      <td className="max-w-md px-5 py-3.5 text-[#9DA3AE]">
+                        <span className="font-mono font-medium text-[#F4F5F6]">
+                          {r.aiScore ?? 0}/100 ({r.aiVerdict ?? "n/a"})
+                        </span>{" "}
+                        — {r.aiReason ?? "Blocked by deterministic guardrail before vault release."}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="px-6 py-14 text-center">
+                <p className="text-sm font-medium text-[#E5E7EB]">No rejected claims logged yet</p>
+                <p className="mx-auto mt-1.5 max-w-md text-xs text-[#8A8F98]">
+                  Every submission blocked by any of the 7 Policy Gate rules is persisted publicly
+                  here as verifiable proof of autonomous guardrail enforcement.
+                </p>
+              </div>
+            )
+          ) : tab === "buy" ? (
+            data?.buyPayments.length ? (
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-white/[0.07] bg-[#0B0D10] font-mono text-[11px] text-[#6B7280]">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Timestamp</th>
+                    <th className="px-5 py-3 font-medium">Capability</th>
+                    <th className="px-5 py-3 font-medium">Spend</th>
+                    <th className="px-5 py-3 font-medium">Payment Receipt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.05]">
+                  {data.buyPayments.map((b) => (
+                    <tr key={b.id} className="hover:bg-white/[0.02]">
+                      <td className="px-5 py-3.5 font-mono text-[11px] text-[#8A8F98] tabular-nums">
+                        {new Date(b.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3.5 font-mono text-[#F4F5F6]">{b.capabilityId}</td>
+                      <td className="px-5 py-3.5 font-mono text-[#D5D8DE] tabular-nums">
+                        {b.paymentAmountFormatted} {b.paymentToken}
+                      </td>
+                      <td className="px-5 py-3.5 font-mono text-[11px]">
+                        {b.txUrl && b.paymentTxHash ? (
+                          <a
+                            href={b.txUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-emerald-400 hover:underline"
+                          >
+                            {truncateMiddle(b.paymentTxHash, 10, 6)}
+                            <ArrowUpRight className="h-3 w-3" />
+                          </a>
+                        ) : (
+                          <span className="text-[#6B7280]">{b.dryRun ? "dry-run" : "recorded"}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="px-6 py-14 text-center">
+                <p className="text-sm font-medium text-[#E5E7EB]">No Celo buy receipts yet</p>
+                <p className="mx-auto mt-1.5 max-w-md text-xs text-[#8A8F98]">
+                  Paid per-call receipts to Cencori LLM and Chainstack RPC on{" "}
+                  <code className="font-mono">gateway.usebuy.ai</code> appear here automatically.
+                </p>
+              </div>
+            )
+          ) : data?.x402Inflows.length ? (
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-white/[0.07] bg-[#0B0D10] font-mono text-[11px] text-[#6B7280]">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Timestamp</th>
+                  <th className="px-5 py-3 font-medium">Endpoint</th>
+                  <th className="px-5 py-3 font-medium">Payer → PayTo</th>
+                  <th className="px-5 py-3 font-medium">Amount</th>
+                  <th className="px-5 py-3 font-medium">Settlement Tx</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.05]">
+                {data.x402Inflows.map((x) => (
+                  <tr key={x.id} className="hover:bg-white/[0.02]">
+                    <td className="px-5 py-3.5 font-mono text-[11px] text-[#8A8F98] tabular-nums">
+                      {new Date(x.createdAt).toLocaleString()}
+                    </td>
+                    <td className="px-5 py-3.5 font-mono text-[#F4F5F6]">{x.endpoint}</td>
+                    <td className="px-5 py-3.5 font-mono text-[11px] text-[#8A8F98]">
+                      {truncateMiddle(x.payerWallet, 6, 4)} → {truncateMiddle(x.payToWallet, 6, 4)}
+                    </td>
+                    <td className="px-5 py-3.5 font-mono text-[#D5D8DE] tabular-nums">
+                      {x.amountAtomic} {x.assetSymbol}
+                    </td>
+                    <td className="px-5 py-3.5 font-mono text-[11px]">
+                      <a
+                        href={x.txUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-emerald-400 hover:underline"
+                      >
+                        {truncateMiddle(x.settlementTxHash, 10, 6)}
+                        <ArrowUpRight className="h-3 w-3" />
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="px-6 py-14 text-center">
+              <p className="text-sm font-medium text-[#E5E7EB]">No x402 API inflows settled yet</p>
+              <p className="mx-auto mt-1.5 max-w-md text-xs text-[#8A8F98]">
+                External agents and merchants paying <code className="font-mono">/api/x402/verify</code>{" "}
+                or <code className="font-mono">/api/x402/campaigns</code> appear here in real time.
+              </p>
+              <div className="mt-5">
+                <Link href="/console" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                  Open x402 Playground
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }

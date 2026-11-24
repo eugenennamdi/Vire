@@ -1,17 +1,160 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --color-canvas: #08090a;
+  --color-surface: #0f1114;
+  --color-surface-elevated: #15181d;
+  --color-surface-subtle: #0c0e11;
+  --color-ink: #f4f5f6;
+  --color-ink-muted: #8a8f98;
+  --color-ink-subtle: #5c626d;
+  --color-accent: #10b981;
+  --color-accent-bright: #34d399;
+}
+
+:root {
+  color-scheme: dark;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --surface-hairline: rgba(255, 255, 255, 0.08);
+  --surface-hairline-strong: rgba(255, 255, 255, 0.14);
+  --surface-specular: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: #08090a;
 }
 
 body {
-  background-color: #f8f9fa;
-  color: #09090b;
+  background-color: #08090a;
+  color: #f4f5f6;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Subtle top architectural lighting (Linear / Morpho / Vercel discipline — zero neon purple) */
+.vire-ambient-backdrop {
+  background-image:
+    radial-gradient(ellipse 72% 38% at 50% -14%, rgba(255, 255, 255, 0.06), transparent 68%),
+    radial-gradient(ellipse 40% 24% at 78% -6%, rgba(16, 185, 129, 0.07), transparent 65%);
+}
+
+/* Micro architectural dot-grid for hero & vault telemetry depth */
+.vire-dot-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.085) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* Layered obsidian surface with top-edge specular hairline */
+.vire-surface {
+  background-color: #0f1114;
+  border: 1px solid var(--surface-hairline);
+  box-shadow: var(--surface-specular);
+}
+
+.vire-surface-elevated {
+  background-color: #14171c;
+  border: 1px solid var(--surface-hairline);
+  box-shadow: var(--surface-specular), 0 12px 32px -12px rgba(0, 0, 0, 0.65);
+}
+
+/* Emil Kowalski tactile button press — fast ease-out, subtle physical scale(0.97) */
+.vire-pressable {
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.vire-pressable:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Gate hover border highlights behind true pointer devices (no sticky mobile tap hover) */
+@media (hover: hover) and (pointer: fine) {
+  .vire-interactive-card {
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease,
+      transform 180ms var(--ease-out);
+  }
+  .vire-interactive-card:hover {
+    border-color: var(--surface-hairline-strong);
+    background-color: #13161b;
+  }
+}
+
+/* Emil entrance animation: never starts from scale(0) — begins at scale(0.985) + 6px */
+@keyframes vireFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.vire-enter {
+  opacity: 0;
+  animation: vireFadeUp 260ms var(--ease-out) forwards;
+}
+
+.vire-delay-1 { animation-delay: 40ms; }
+.vire-delay-2 { animation-delay: 80ms; }
+.vire-delay-3 { animation-delay: 120ms; }
+.vire-delay-4 { animation-delay: 160ms; }
+
+/* Subtle shimmer for layout-matched skeletons */
+@keyframes vireShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.vire-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.075) 50%,
+    rgba(255, 255, 255, 0.03) 75%
+  );
+  background-size: 200% 100%;
+  animation: vireShimmer 1.6s linear infinite;
+}
+
+/* Accessibility: respect reduced-motion while keeping gentle opacity comprehension */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .vire-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .vire-pressable:active:not(:disabled) {
+    transform: none;
+  }
+  .vire-skeleton {
+    animation: none;
+  }
+}
+
+/* Clean dark selection & subtle scrollbars */
+::selection {
+  background-color: rgba(16, 185, 129, 0.28);
+  color: #f4f5f6;
 }
