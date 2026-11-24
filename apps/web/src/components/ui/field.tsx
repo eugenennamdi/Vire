@@ -27,10 +27,30 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
 
 export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select
-      className={cn(FIELD_BASE, "h-9 cursor-pointer appearance-none pr-8", className)}
-      {...props}
-    />
+    <div className="relative w-full">
+      <select
+        className={cn(
+          FIELD_BASE,
+          "h-9 cursor-pointer appearance-none truncate whitespace-nowrap py-0 pr-8 leading-[34px]",
+          className
+        )}
+        {...props}
+      />
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        fill="none"
+        className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#6B7280]"
+      >
+        <path
+          d="M4.5 6.5L8 10L11.5 6.5"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
   );
 }
 

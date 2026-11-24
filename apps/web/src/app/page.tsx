@@ -72,7 +72,7 @@ export default async function HomePage() {
           <p className="max-w-[60ch] text-[15px] leading-relaxed text-[#9DA3AE] text-pretty">
             Vire verifies off-chain deliverables for{" "}
             <span className="font-medium text-[#E5E7EB]">{partner.name}</span> and remote teams via
-            paid Celo <code className="font-mono text-[13px] text-[#E5E7EB]">buy</code> calls,
+            paid x402 <code className="font-mono text-[13px] text-[#E5E7EB]">usebuy.ai</code> calls,
             converts exact-output USD₮ into local stablecoins (cNGN, wARS, wBRL, wMXN, IDRX) on
             Textile FX, and settles directly to contributors on Celo mainnet. It replaces manual
             checking and 4–8% FX fees with one auditable USD₮ vault.
@@ -268,11 +268,11 @@ export default async function HomePage() {
             </div>
 
             <div className="p-5">
-              <div className="text-xs text-[#8A8F98]">Paid Celo buy</div>
+              <div className="text-xs text-[#8A8F98]">Paid x402 calls</div>
               <div className="mt-2 font-mono text-3xl font-semibold tracking-[-0.03em] text-[#F4F5F6] tabular-nums">
                 {paidBuyCount}
               </div>
-              <div className="mt-1 font-mono text-[11px] text-[#6B7280]">Cencori + Chainstack</div>
+              <div className="mt-1 font-mono text-[11px] text-[#6B7280]">usebuy.ai · Cencori</div>
             </div>
 
             <div className="p-5">
@@ -313,8 +313,8 @@ export default async function HomePage() {
             {
               icon: Lightning,
               step: "01",
-              title: "Paid Celo buy audit",
-              body: "SSRF-guarded artifact fetch scored via Cencori LLM & Chainstack RPC paid over x402 ($0.01/call).",
+              title: "Paid x402 verification",
+              body: "SSRF-guarded artifact fetch scored via usebuy.ai (Cencori LLM & Chainstack RPC at $0.01/call).",
             },
             {
               icon: LockKey,

@@ -12,7 +12,7 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-[#F4F5F6] text-[#08090A] hover:bg-white shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.6)]",
+          "bg-[#F4F5F6] text-[#08090A] hover:bg-white shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.6)] disabled:opacity-100 disabled:border disabled:border-white/[0.08] disabled:bg-white/[0.06] disabled:text-[#6B7280] disabled:shadow-none",
         secondary:
           "bg-[#15181D] text-[#F4F5F6] border border-white/[0.1] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:bg-[#1B1F26] hover:border-white/[0.16]",
         emerald:

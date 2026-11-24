@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import { cn, truncateMiddle } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { href: "/", label: "Overview" },
-  { href: "/campaigns", label: "Campaigns" },
-  { href: "/claim", label: "Claim" },
-  { href: "/ledger", label: "Audit Ledger" },
-  { href: "/console", label: "Console" },
+  { href: "/", label: "Overview", shortLabel: "Overview" },
+  { href: "/campaigns", label: "Campaigns", shortLabel: "Campaigns" },
+  { href: "/claim", label: "Claim", shortLabel: "Claim" },
+  { href: "/ledger", label: "Audit Ledger", shortLabel: "Ledger" },
+  { href: "/console", label: "Console", shortLabel: "Console" },
 ];
 
 export function Navbar() {
@@ -157,19 +157,20 @@ export function Navbar() {
       </div>
 
       {/* Mobile navigation strip */}
-      <div className="flex items-center gap-1 overflow-x-auto border-t border-white/[0.06] px-4 py-1.5 md:hidden">
+      <div className="flex items-center justify-between gap-1 border-t border-white/[0.06] px-3 py-1.5 md:hidden">
         {NAV_LINKS.map((item) => {
           const active = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium",
+                "vire-pressable whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium",
                 active ? "bg-white/[0.1] text-[#F4F5F6]" : "text-[#8A8F98]"
               )}
             >
-              {item.label}
+              {item.shortLabel}
             </Link>
           );
         })}

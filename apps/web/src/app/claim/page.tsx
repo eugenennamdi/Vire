@@ -502,7 +502,7 @@ function ClaimFlowInner() {
                 {isSubmitting ? (
                   <>
                     <CircleNotch className="h-4 w-4 animate-spin" />
-                    Verifying via Celo buy &amp; clearing FX…
+                    Verifying via x402 &amp; clearing FX…
                   </>
                 ) : (
                   <>
@@ -523,7 +523,7 @@ function ClaimFlowInner() {
                 Autonomous settlement pipeline
               </h2>
               <p className="mt-0.5 text-[11px] text-[#6B7280]">
-                Live execution trace across Celo buy, Policy Gate, Textile FX v2, and Celo mainnet.
+                Live execution trace across x402 usebuy.ai, Policy Gate, Textile FX v2, and Celo mainnet.
               </p>
             </div>
 
@@ -531,7 +531,7 @@ function ClaimFlowInner() {
               {!result && !isSubmitting && (
                 <div className="space-y-3 py-3">
                   {[
-                    ["01", "Paid Celo buy verification", "Cencori LLM + Chainstack RPC ($0.01)"],
+                    ["01", "Paid x402 verification", "usebuy.ai · Cencori LLM & Chainstack ($0.01)"],
                     ["02", "7-rule Policy Gate", "Replay, non-team wallet, spread, $1 floor"],
                     ["03", "Textile FX exact-output swap", "buyAmount RFQ + ERC-8021 builderCodes"],
                     ["04", "Direct local stablecoin transfer", "cNGN / wARS / wBRL / wMXN / IDRX"],
@@ -555,7 +555,7 @@ function ClaimFlowInner() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-3.5 text-xs text-emerald-200">
                     <CircleNotch className="h-4 w-4 animate-spin text-emerald-400" />
-                    <span>Running Celo buy verification, live Textile preview, and Policy Gate…</span>
+                    <span>Running x402 verification, live Textile preview, and Policy Gate…</span>
                   </div>
                   <Skeleton className="h-24 w-full" />
                   <Skeleton className="h-32 w-full" />
@@ -591,7 +591,7 @@ function ClaimFlowInner() {
                   {result.buyReceipts && result.buyReceipts.length > 0 && (
                     <div className="rounded-lg border border-white/[0.07] bg-[#0B0D10] p-3.5 text-xs">
                       <div className="font-mono text-[11px] font-medium text-[#8A8F98]">
-                        01 · Celo buy receipts
+                        01 · x402 usebuy.ai receipts
                       </div>
                       <div className="mt-2 space-y-1.5">
                         {result.buyReceipts.map((r, i) => (

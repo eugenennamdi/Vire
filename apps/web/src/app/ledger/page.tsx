@@ -116,8 +116,8 @@ export default function LedgerPage() {
             Public settlement &amp; audit ledger
           </h1>
           <p className="mt-1.5 max-w-[66ch] text-sm text-[#8A8F98]">
-            Every Textile FX swap, VireVault release, local payout, Policy Gate rejection, Celo{" "}
-            <code className="font-mono text-xs text-[#D5D8DE]">buy</code> call, and x402 PayTo
+            Every Textile FX swap, VireVault release, local payout, Policy Gate rejection, paid{" "}
+            <code className="font-mono text-xs text-[#D5D8DE]">usebuy.ai</code> call, and x402 PayTo
             inflow is indexed with direct Celoscan links. Zero synthetic entries.
           </p>
         </div>
@@ -145,9 +145,9 @@ export default function LedgerPage() {
               sub: m?.corridorsCleared.join(", ") || "ready",
             },
             {
-              label: "Paid Celo buy",
+              label: "Paid x402 calls",
               value: m?.totalPaidBuyCalls ?? 0,
-              sub: `${m?.totalBuyCallsRecorded ?? 0} total logged`,
+              sub: `${m?.totalBuyCallsRecorded ?? 0} usebuy.ai logged`,
             },
             {
               label: "x402 inflows",
@@ -180,7 +180,7 @@ export default function LedgerPage() {
           options={[
             { value: "settled", label: "Completed settlements", count: data?.completedSettlements.length ?? 0 },
             { value: "rejected", label: "Rejected claims", count: data?.rejectedClaims.length ?? 0 },
-            { value: "buy", label: "Paid buy receipts", count: data?.buyPayments.length ?? 0 },
+            { value: "buy", label: "x402 buy receipts", count: data?.buyPayments.length ?? 0 },
             { value: "x402", label: "x402 inflows", count: data?.x402Inflows.length ?? 0 },
           ]}
         />
@@ -406,7 +406,7 @@ export default function LedgerPage() {
               </table>
             ) : (
               <div className="px-6 py-14 text-center">
-                <p className="text-sm font-medium text-[#E5E7EB]">No Celo buy receipts yet</p>
+                <p className="text-sm font-medium text-[#E5E7EB]">No x402 usebuy.ai receipts yet</p>
                 <p className="mx-auto mt-1.5 max-w-md text-xs text-[#8A8F98]">
                   Paid per-call receipts to Cencori LLM and Chainstack RPC on{" "}
                   <code className="font-mono">gateway.usebuy.ai</code> appear here automatically.

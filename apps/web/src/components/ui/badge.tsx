@@ -11,7 +11,8 @@ const badgeVariants = cva(
         emerald: "border-emerald-500/25 bg-emerald-500/10 text-emerald-300",
         amber: "border-amber-500/25 bg-amber-500/10 text-amber-300",
         rose: "border-rose-500/25 bg-rose-500/10 text-rose-300",
-        solid: "border-white/20 bg-[#F4F5F6] text-[#08090A]",
+        solid:
+          "border-white/[0.16] bg-white/[0.08] text-[#F4F5F6] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
       },
     },
     defaultVariants: {
