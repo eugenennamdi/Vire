@@ -238,7 +238,7 @@ export function ProtocolProofBlock() {
             active === "vault" && "rounded-tl-none"
           )}
         >
-          <div className="min-h-[282px] overflow-x-auto px-5 py-6 sm:px-7">
+          <div className="min-h-[312px] overflow-x-auto px-5 py-6 sm:px-7">
             <pre className="font-mono text-[12.5px] leading-[1.75]">
               {current.lines.map((line, i) => (
                 <div key={i} className="flex gap-6">
