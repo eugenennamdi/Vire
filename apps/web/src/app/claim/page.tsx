@@ -382,7 +382,7 @@ function ClaimFlowInner() {
                 <h2 className="text-sm font-medium text-[#111111]">Deliverable proof</h2>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-4">
                 <div className="min-w-0 space-y-1.5">
                   <FieldLabel htmlFor="claim-campaign">Campaign</FieldLabel>
                   <Select
