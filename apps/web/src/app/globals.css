@@ -1,48 +1,32 @@
 @import "tailwindcss";
 
 /*
- * Vire Institutional Light Monochrome Design System
- * Calibrated OKLCH alabaster canvas + sculptural pure-white modules + recessed wells + Emil Kowalski motion.
+ * Vire — Swiss Clearinghouse Light Monochrome Design System
+ * Warm archival paper (#FAF9F6), sharp 1px architectural sheets (#FFFFFF),
+ * editorial serif headings (Newsreader) + Geist Sans + Geist Mono tabular figures.
  */
 :root {
   color-scheme: light;
 
-  /* Calibrated alabaster canvas + pure white sculptural modules (zero chroma) */
-  --background: oklch(0.968 0 0);
-  --foreground: oklch(0.105 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.105 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.105 0 0);
+  --background: #faf9f6;
+  --foreground: #121210;
+  --card: #ffffff;
+  --card-foreground: #121210;
+  --secondary: #f3f1ec;
+  --secondary-foreground: #1c1b18;
+  --muted: #f3f1ec;
+  --muted-foreground: #68665f;
+  --border: #e4e2dc;
+  --border-strong: #c8c5bc;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
 
-  /* Stark carbon-ink primary CTA */
-  --primary: oklch(0.115 0 0);
-  --primary-foreground: oklch(0.99 0 0);
-
-  /* Secondary / inset well / muted luminance ladder */
-  --secondary: oklch(0.955 0 0);
-  --secondary-foreground: oklch(0.18 0 0);
-  --muted: oklch(0.942 0 0);
-  --muted-foreground: oklch(0.46 0 0);
-  --accent: oklch(0.935 0 0);
-  --accent-foreground: oklch(0.105 0 0);
-
-  /* Destructive reserved strictly for hard errors / policy rejections */
-  --destructive: oklch(0.51 0.19 25);
-  --destructive-foreground: oklch(0.99 0 0);
-
-  /* Translucent crisp hairlines */
-  --border: oklch(0 0 0 / 7.5%);
-  --border-strong: oklch(0 0 0 / 16%);
-  --input: oklch(0 0 0 / 11%);
-  --ring: oklch(0 0 0 / 24%);
-
-  /* Emil Kowalski custom easing curves */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 @theme inline {
+  --font-serif: var(--font-newsreader), Georgia, "Times New Roman", serif;
   --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
@@ -50,24 +34,19 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
 }
 
 @layer base {
   * {
     border-color: var(--border);
-    outline-color: var(--ring);
   }
 
   html {
@@ -95,37 +74,25 @@
 }
 
 ::selection {
-  background-color: #111111;
-  color: #ffffff;
+  background-color: #121210;
+  color: #faf9f6;
 }
 
-/* Sculptural Morpho/Vercel surfaces: hairline ring + ultra-diffuse multi-layer light shadow */
-.surface-card {
-  background-color: var(--card);
-  border: 1px solid var(--border);
-  box-shadow:
-    0 1px 1px oklch(0 0 0 / 2.5%),
-    0 3px 10px -2px oklch(0 0 0 / 3.5%);
+/* Crisp architectural ledger surfaces — zero heavy shadows */
+.vire-sheet {
+  background-color: #ffffff;
+  border: 1px solid #e4e2dc;
 }
 
-.surface-elevated {
-  background-color: var(--card);
-  border: 1px solid oklch(0 0 0 / 8.5%);
-  box-shadow:
-    0 1px 2px oklch(0 0 0 / 3%),
-    0 12px 32px -10px oklch(0 0 0 / 7.5%),
-    0 2px 6px -1px oklch(0 0 0 / 3%);
-}
-
-.surface-well {
-  background-color: oklch(0.962 0 0);
-  box-shadow: inset 0 1px 2px oklch(0 0 0 / 3%);
+.vire-band {
+  background-color: #f3f1ec;
+  border: 1px solid #e4e2dc;
 }
 
 /* Tactile press feedback (Emil Kowalski) — explicit properties only */
 .vire-pressable {
-  transition-property: transform, background-color, border-color, box-shadow, color, opacity;
-  transition-duration: 150ms;
+  transition-property: transform, background-color, border-color, color, opacity;
+  transition-duration: 140ms;
   transition-timing-function: var(--ease-out);
 }
 
@@ -133,23 +100,19 @@
   transform: scale(0.98);
 }
 
-/* Subtle interactive elevation gated to pointer devices */
-.vire-interactive-card {
-  transition-property: border-color, box-shadow;
-  transition-duration: 180ms;
+.vire-interactive-sheet {
+  transition-property: border-color, background-color;
+  transition-duration: 160ms;
   transition-timing-function: var(--ease-out);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .vire-interactive-card:hover {
-    border-color: var(--border-strong);
-    box-shadow:
-      0 1px 2px oklch(0 0 0 / 3.5%),
-      0 8px 22px -6px oklch(0 0 0 / 6.5%);
+  .vire-interactive-sheet:hover {
+    border-color: #b5b2a8;
   }
 }
 
-/* Subtle entrance: opacity + 4px rise (never scale(0)) */
+/* Subtle entrance: opacity + 4px rise */
 @keyframes vire-enter {
   from {
     opacity: 0;
@@ -162,7 +125,7 @@
 }
 
 .vire-enter {
-  animation: vire-enter 220ms var(--ease-out) both;
+  animation: vire-enter 200ms var(--ease-out) both;
 }
 
 .vire-delay-1 {
@@ -188,7 +151,7 @@
 }
 
 .vire-skeleton {
-  background-color: oklch(0.935 0 0);
+  background-color: #eceae4;
   animation: vire-pulse 1.5s var(--ease-in-out) infinite;
 }
 

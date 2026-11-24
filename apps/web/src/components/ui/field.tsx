@@ -7,15 +7,15 @@ import type {
 import { cn } from "@/lib/utils";
 
 const FIELD_BASE =
-  "w-full rounded-lg border border-black/[0.11] bg-card px-3 text-[13px] text-foreground placeholder:text-muted-foreground/60 " +
-  "shadow-[0_1px_1px_rgba(0,0,0,0.02)] transition-[border-color,box-shadow] duration-150 " +
-  "hover:border-black/[0.2] focus:border-foreground focus:outline-none focus:ring-2 focus:ring-black/[0.07] " +
-  "disabled:cursor-not-allowed disabled:bg-secondary disabled:text-muted-foreground/60";
+  "w-full rounded-[6px] border border-[#D5D2C9] bg-white px-3 text-[13px] text-[#121210] placeholder:text-[#9E9B93] " +
+  "transition-[border-color,box-shadow] duration-150 " +
+  "hover:border-[#A8A49A] focus:border-[#121210] focus:outline-none focus:ring-2 focus:ring-[#121210]/[0.07] " +
+  "disabled:cursor-not-allowed disabled:bg-[#F3F1EC] disabled:text-[#9E9B93]";
 
 export function FieldLabel({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={cn("block text-xs font-medium text-foreground/80", className)}
+      className={cn("block text-xs font-medium text-[#3D3C37]", className)}
       {...props}
     />
   );

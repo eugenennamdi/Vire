@@ -105,17 +105,17 @@ export default function LedgerPage() {
 
   return (
     <div className="space-y-8">
-      <div className="vire-enter flex flex-wrap items-end justify-between gap-4">
+      <div className="vire-enter flex flex-wrap items-end justify-between gap-4 border-b border-[#E4E2DC] pb-6">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            Public Verification
+          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
+            Public Verification · Celo 42220
           </p>
-          <h1 className="mt-1.5 text-3xl font-semibold tracking-[-0.035em] text-foreground">
+          <h1 className="mt-1.5 font-serif text-3xl font-normal tracking-[-0.025em] text-[#121210] sm:text-[36px]">
             Audit ledger
           </h1>
-          <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-[#4F4E4A]">
             Onchain settlements, Policy Gate rejections, paid{" "}
-            <code className="font-mono text-xs text-foreground">usebuy.ai</code> calls, and x402
+            <code className="font-mono text-xs text-[#121210]">usebuy.ai</code> calls, and x402
             inflows with direct Celoscan proofs.
           </p>
         </div>
@@ -126,16 +126,16 @@ export default function LedgerPage() {
         </Button>
       </div>
 
-      {/* 6-Cell Sculptural Metrics Band */}
+      {/* 6-Cell Ledger Statement Metrics */}
       <Card className="vire-enter vire-delay-1 overflow-hidden">
-        <div className="grid grid-cols-2 divide-x divide-y divide-black/[0.06] sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+        <div className="grid grid-cols-2 divide-x divide-y divide-[#E4E2DC] sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
           {[
             { label: "Recipients", value: m?.totalExternalRecipients ?? 0, sub: "external wallets" },
             { label: "Repeat", value: m?.repeatContributorsCount ?? 0, sub: "2+ stages" },
             {
               label: "Textile swaps",
               value: m?.totalCompletedSettlements ?? 0,
-              sub: `$${m?.totalUsdtSettledFormatted ?? "0"} USD₮`,
+              sub: `$${m?.totalUsdtSettledFormatted ?? "0"} USDT`,
             },
             {
               label: "Corridors",
@@ -154,11 +154,13 @@ export default function LedgerPage() {
             },
           ].map((kpi) => (
             <div key={kpi.label} className="p-5">
-              <div className="text-[11px] font-medium text-muted-foreground">{kpi.label}</div>
-              <div className="mt-1.5 font-mono text-2xl font-semibold tracking-[-0.03em] text-foreground tabular-nums">
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
+                {kpi.label}
+              </div>
+              <div className="mt-1.5 font-mono text-2xl font-semibold tracking-[-0.03em] text-[#121210] tabular-nums">
                 {kpi.value}
               </div>
-              <div className="mt-1 truncate font-mono text-[10.5px] text-muted-foreground">
+              <div className="mt-1 truncate font-mono text-[10.5px] text-[#787670]">
                 {kpi.sub}
               </div>
             </div>
@@ -166,7 +168,7 @@ export default function LedgerPage() {
         </div>
       </Card>
 
-      {/* Pill Tabs + Corridor Filter */}
+      {/* Square Tabs + Corridor Filter */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SegmentedTabs
           value={tab}
@@ -198,7 +200,7 @@ export default function LedgerPage() {
         )}
       </div>
 
-      {/* Ledger Table Surface */}
+      {/* Ledger Table */}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           {isLoading ? (
@@ -210,38 +212,38 @@ export default function LedgerPage() {
           ) : tab === "settled" ? (
             data?.completedSettlements.length ? (
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-black/[0.06] bg-[#FAFAFB] font-mono text-[10.5px] uppercase tracking-[0.06em] text-muted-foreground">
+                <thead className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
                   <tr>
                     <th className="px-5 py-3 font-medium">Timestamp</th>
                     <th className="px-5 py-3 font-medium">Campaign / Recipient</th>
                     <th className="px-5 py-3 font-medium">Local output</th>
-                    <th className="px-5 py-3 font-medium">USD₮ spent</th>
+                    <th className="px-5 py-3 font-medium">USDT spent</th>
                     <th className="px-5 py-3 font-medium">Proofs</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/[0.06]">
+                <tbody className="divide-y divide-[#E4E2DC]">
                   {data.completedSettlements.map((s) => (
                     <tr
                       key={s.id}
-                      className="transition-colors duration-150 hover:bg-[#FAFAFB]"
+                      className="transition-colors duration-150 hover:bg-[#FAF9F6]"
                     >
-                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-[#68665F] tabular-nums">
                         {new Date(s.settledAt).toLocaleString()}
                       </td>
                       <td className="px-5 py-3.5">
-                        <div className="font-medium text-foreground">{s.campaignTitle}</div>
-                        <div className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                        <div className="font-medium text-[#121210]">{s.campaignTitle}</div>
+                        <div className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-[#68665F]">
                           <span>{truncateMiddle(s.recipientWallet, 8, 6)}</span>
                           <CopyButton value={s.recipientWallet} toastMessage="Recipient copied" />
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 font-mono font-semibold text-foreground tabular-nums">
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono font-semibold text-[#121210] tabular-nums">
                         {s.localAmountFormatted} {s.corridor}
                       </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-muted-foreground tabular-nums">
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[#4F4E4A] tabular-nums">
                         ${s.usdtSpentFormatted}
                         {s.usdtRefundedFormatted !== "0" && (
-                          <span className="block text-[10px]">
+                          <span className="block text-[10px] text-[#787670]">
                             +${s.usdtRefundedFormatted} refunded
                           </span>
                         )}
@@ -252,7 +254,7 @@ export default function LedgerPage() {
                             href={s.vaultReleaseUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md border border-black/[0.09] bg-card px-2 py-0.5 text-muted-foreground hover:border-foreground hover:text-foreground"
+                            className="inline-flex items-center gap-1 rounded-[4px] border border-[#D5D2C9] bg-white px-2 py-0.5 text-[#4F4E4A] hover:border-[#121210] hover:text-[#121210]"
                           >
                             Vault <ArrowUpRight className="h-3 w-3" />
                           </a>
@@ -260,7 +262,7 @@ export default function LedgerPage() {
                             href={s.textileSwapUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md bg-foreground px-2 py-0.5 text-primary-foreground hover:bg-[#222222]"
+                            className="inline-flex items-center gap-1 rounded-[4px] bg-[#121210] px-2 py-0.5 text-[#FAF9F6] hover:bg-[#292824]"
                           >
                             Swap <ArrowUpRight className="h-3 w-3" />
                           </a>
@@ -268,7 +270,7 @@ export default function LedgerPage() {
                             href={s.payoutUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md border border-black/[0.09] bg-card px-2 py-0.5 text-muted-foreground hover:border-foreground hover:text-foreground"
+                            className="inline-flex items-center gap-1 rounded-[4px] border border-[#D5D2C9] bg-white px-2 py-0.5 text-[#4F4E4A] hover:border-[#121210] hover:text-[#121210]"
                           >
                             Payout <ArrowUpRight className="h-3 w-3" />
                           </a>
@@ -277,7 +279,7 @@ export default function LedgerPage() {
                               href={s.buyPaymentUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 rounded-md border border-black/[0.09] bg-secondary px-2 py-0.5 text-muted-foreground hover:border-foreground hover:text-foreground"
+                              className="inline-flex items-center gap-1 rounded-[4px] border border-[#D5D2C9] bg-[#F3F1EC] px-2 py-0.5 text-[#4F4E4A] hover:border-[#121210] hover:text-[#121210]"
                             >
                               x402 <ArrowUpRight className="h-3 w-3" />
                             </a>
@@ -291,8 +293,8 @@ export default function LedgerPage() {
               </table>
             ) : (
               <div className="px-6 py-16 text-center">
-                <p className="text-sm font-medium text-foreground">No settlements recorded yet</p>
-                <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-muted-foreground">
+                <p className="text-sm font-medium text-[#121210]">No settlements recorded yet</p>
+                <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-[#68665F]">
                   Verified payouts appear here with Celoscan links once cleared through VireVault
                   and Textile FX.
                 </p>
@@ -309,7 +311,7 @@ export default function LedgerPage() {
           ) : tab === "rejected" ? (
             data?.rejectedClaims.length ? (
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-black/[0.06] bg-[#FAFAFB] font-mono text-[10.5px] uppercase tracking-[0.06em] text-muted-foreground">
+                <thead className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
                   <tr>
                     <th className="px-5 py-3 font-medium">Timestamp</th>
                     <th className="px-5 py-3 font-medium">Claim / Wallet</th>
@@ -317,23 +319,23 @@ export default function LedgerPage() {
                     <th className="px-5 py-3 font-medium">Verdict &amp; reason</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/[0.06]">
+                <tbody className="divide-y divide-[#E4E2DC]">
                   {data.rejectedClaims.map((r) => (
-                    <tr key={r.id} className="hover:bg-[#FAFAFB]">
-                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+                    <tr key={r.id} className="hover:bg-[#FAF9F6]">
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-[#68665F] tabular-nums">
                         {new Date(r.createdAt).toLocaleString()}
                       </td>
                       <td className="px-5 py-3.5">
-                        <div className="font-medium text-foreground">{r.campaignTitle}</div>
-                        <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                        <div className="font-medium text-[#121210]">{r.campaignTitle}</div>
+                        <div className="mt-0.5 font-mono text-[11px] text-[#68665F]">
                           {truncateMiddle(r.contributorWallet, 8, 6)} · {r.corridor}
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
                         <Badge tone="destructive">{r.failedPolicyRule ?? "POLICY_REJECTED"}</Badge>
                       </td>
-                      <td className="max-w-md px-5 py-3.5 text-muted-foreground">
-                        <span className="font-mono font-medium text-foreground">
+                      <td className="max-w-md px-5 py-3.5 text-[#4F4E4A]">
+                        <span className="font-mono font-medium text-[#121210]">
                           {r.aiScore ?? 0}/100 ({r.aiVerdict ?? "n/a"})
                         </span>{" "}
                         — {r.aiReason ?? "Blocked before vault release."}
@@ -344,8 +346,8 @@ export default function LedgerPage() {
               </table>
             ) : (
               <div className="px-6 py-16 text-center">
-                <p className="text-sm font-medium text-foreground">No rejected claims</p>
-                <p className="mx-auto mt-1.5 max-w-sm text-xs text-muted-foreground">
+                <p className="text-sm font-medium text-[#121210]">No rejected claims</p>
+                <p className="mx-auto mt-1.5 max-w-sm text-xs text-[#68665F]">
                   Submissions blocked by the 7-rule Policy Gate are logged here.
                 </p>
               </div>
@@ -353,7 +355,7 @@ export default function LedgerPage() {
           ) : tab === "buy" ? (
             data?.buyPayments.length ? (
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-black/[0.06] bg-[#FAFAFB] font-mono text-[10.5px] uppercase tracking-[0.06em] text-muted-foreground">
+                <thead className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
                   <tr>
                     <th className="px-5 py-3 font-medium">Timestamp</th>
                     <th className="px-5 py-3 font-medium">Capability</th>
@@ -361,14 +363,14 @@ export default function LedgerPage() {
                     <th className="px-5 py-3 font-medium">Receipt</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/[0.06]">
+                <tbody className="divide-y divide-[#E4E2DC]">
                   {data.buyPayments.map((b) => (
-                    <tr key={b.id} className="hover:bg-[#FAFAFB]">
-                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+                    <tr key={b.id} className="hover:bg-[#FAF9F6]">
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-[#68665F] tabular-nums">
                         {new Date(b.createdAt).toLocaleString()}
                       </td>
-                      <td className="px-5 py-3.5 font-mono text-foreground">{b.capabilityId}</td>
-                      <td className="px-5 py-3.5 font-mono text-muted-foreground tabular-nums">
+                      <td className="px-5 py-3.5 font-mono text-[#121210]">{b.capabilityId}</td>
+                      <td className="px-5 py-3.5 font-mono text-[#4F4E4A] tabular-nums">
                         {b.paymentAmountFormatted} {b.paymentToken}
                       </td>
                       <td className="px-5 py-3.5 font-mono text-[11px]">
@@ -377,13 +379,13 @@ export default function LedgerPage() {
                             href={b.txUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-foreground underline underline-offset-2"
+                            className="inline-flex items-center gap-1 text-[#121210] underline underline-offset-2"
                           >
                             {truncateMiddle(b.paymentTxHash, 10, 6)}
                             <ArrowUpRight className="h-3 w-3" />
                           </a>
                         ) : (
-                          <span className="text-muted-foreground">
+                          <span className="text-[#68665F]">
                             {b.dryRun ? "dry-run" : "recorded"}
                           </span>
                         )}
@@ -394,17 +396,17 @@ export default function LedgerPage() {
               </table>
             ) : (
               <div className="px-6 py-16 text-center">
-                <p className="text-sm font-medium text-foreground">No x402 call receipts</p>
-                <p className="mx-auto mt-1.5 max-w-sm text-xs text-muted-foreground">
+                <p className="text-sm font-medium text-[#121210]">No x402 call receipts</p>
+                <p className="mx-auto mt-1.5 max-w-sm text-xs text-[#68665F]">
                   Paid verification calls to{" "}
-                  <code className="font-mono text-foreground">gateway.usebuy.ai</code> are indexed
+                  <code className="font-mono text-[#121210]">gateway.usebuy.ai</code> are indexed
                   here.
                 </p>
               </div>
             )
           ) : data?.x402Inflows.length ? (
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-black/[0.06] bg-[#FAFAFB] font-mono text-[10.5px] uppercase tracking-[0.06em] text-muted-foreground">
+              <thead className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
                 <tr>
                   <th className="px-5 py-3 font-medium">Timestamp</th>
                   <th className="px-5 py-3 font-medium">Endpoint</th>
@@ -413,17 +415,17 @@ export default function LedgerPage() {
                   <th className="px-5 py-3 font-medium">Transaction</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/[0.06]">
+              <tbody className="divide-y divide-[#E4E2DC]">
                 {data.x402Inflows.map((x) => (
-                  <tr key={x.id} className="hover:bg-[#FAFAFB]">
-                    <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+                  <tr key={x.id} className="hover:bg-[#FAF9F6]">
+                    <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-[#68665F] tabular-nums">
                       {new Date(x.createdAt).toLocaleString()}
                     </td>
-                    <td className="px-5 py-3.5 font-mono text-foreground">{x.endpoint}</td>
-                    <td className="px-5 py-3.5 font-mono text-[11px] text-muted-foreground">
+                    <td className="px-5 py-3.5 font-mono text-[#121210]">{x.endpoint}</td>
+                    <td className="px-5 py-3.5 font-mono text-[11px] text-[#68665F]">
                       {truncateMiddle(x.payerWallet, 6, 4)} → {truncateMiddle(x.payToWallet, 6, 4)}
                     </td>
-                    <td className="px-5 py-3.5 font-mono text-muted-foreground tabular-nums">
+                    <td className="px-5 py-3.5 font-mono text-[#4F4E4A] tabular-nums">
                       {x.amountAtomic} {x.assetSymbol}
                     </td>
                     <td className="px-5 py-3.5 font-mono text-[11px]">
@@ -431,7 +433,7 @@ export default function LedgerPage() {
                         href={x.txUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-foreground underline underline-offset-2"
+                        className="inline-flex items-center gap-1 text-[#121210] underline underline-offset-2"
                       >
                         {truncateMiddle(x.settlementTxHash, 10, 6)}
                         <ArrowUpRight className="h-3 w-3" />
@@ -443,10 +445,10 @@ export default function LedgerPage() {
             </table>
           ) : (
             <div className="px-6 py-16 text-center">
-              <p className="text-sm font-medium text-foreground">No x402 inflows yet</p>
-              <p className="mx-auto mt-1.5 max-w-sm text-xs text-muted-foreground">
-                Paid calls to <code className="font-mono text-foreground">/api/x402/verify</code>{" "}
-                or <code className="font-mono text-foreground">/api/x402/campaigns</code> appear
+              <p className="text-sm font-medium text-[#121210]">No x402 inflows yet</p>
+              <p className="mx-auto mt-1.5 max-w-sm text-xs text-[#68665F]">
+                Paid calls to <code className="font-mono text-[#121210]">/api/x402/verify</code>{" "}
+                or <code className="font-mono text-[#121210]">/api/x402/campaigns</code> appear
                 here.
               </p>
               <div className="mt-5">

@@ -278,30 +278,28 @@ function ClaimFlowInner() {
 
   return (
     <div className="space-y-8">
-      <div className="vire-enter">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          Clearing Execution
+      <div className="vire-enter border-b border-[#E4E2DC] pb-6">
+        <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
+          Clearing Execution · Celo 42220
         </p>
-        <h1 className="mt-1.5 text-3xl font-semibold tracking-[-0.035em] text-foreground">
+        <h1 className="mt-1.5 font-serif text-3xl font-normal tracking-[-0.025em] text-[#121210] sm:text-[36px]">
           Submit deliverable
         </h1>
-        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-muted-foreground">
-          Connect an external Celo wallet, bind your handle, and submit proof for exact-output
-          settlement.
+        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-[#4F4E4A]">
+          Connect an external Celo wallet, bind your handle, and submit proof for automated x402
+          verification and exact-output local stablecoin settlement.
         </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
         {/* Left Action Column */}
-        <div className="space-y-5 lg:col-span-7">
+        <div className="min-w-0 space-y-5 lg:col-span-7">
           {/* Step 1: Identity Binding */}
           <Card className="vire-enter vire-delay-1 p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
-                <span className="font-mono text-xs text-muted-foreground">01</span>
-                <h2 className="text-sm font-semibold tracking-[-0.015em] text-foreground">
-                  Identity binding
-                </h2>
+                <span className="font-mono text-xs text-[#787670]">01</span>
+                <h2 className="text-sm font-semibold text-[#121210]">Identity binding</h2>
               </div>
 
               {identityData?.contributor ? (
@@ -316,8 +314,8 @@ function ClaimFlowInner() {
             </div>
 
             {!isConnected ? (
-              <div className="surface-well mt-4 flex items-center gap-2.5 rounded-xl px-4 py-3 text-xs text-muted-foreground">
-                <WarningCircle weight="regular" className="h-4 w-4 shrink-0 text-foreground" />
+              <div className="vire-band mt-4 flex items-center gap-2.5 rounded-[4px] px-4 py-3 text-xs text-[#4F4E4A]">
+                <WarningCircle weight="regular" className="h-4 w-4 shrink-0 text-[#121210]" />
                 <span>Connect a Celo Mainnet wallet in the header to bind your identity.</span>
               </div>
             ) : (
@@ -379,7 +377,7 @@ function ClaimFlowInner() {
                 )}
 
                 {bindError && (
-                  <p className="font-mono text-xs text-destructive" role="alert">
+                  <p className="font-mono text-xs text-[#B42318]" role="alert">
                     {bindError}
                   </p>
                 )}
@@ -391,10 +389,8 @@ function ClaimFlowInner() {
           <Card className="vire-enter vire-delay-2 p-6">
             <form onSubmit={handleSubmitDeliverable} className="space-y-4">
               <div className="flex items-center gap-2.5">
-                <span className="font-mono text-xs text-muted-foreground">02</span>
-                <h2 className="text-sm font-semibold tracking-[-0.015em] text-foreground">
-                  Deliverable proof
-                </h2>
+                <span className="font-mono text-xs text-[#787670]">02</span>
+                <h2 className="text-sm font-semibold text-[#121210]">Deliverable proof</h2>
               </div>
 
               <div className="space-y-4">
@@ -433,14 +429,14 @@ function ClaimFlowInner() {
               </div>
 
               {activeStage && (
-                <div className="surface-well rounded-xl p-4">
+                <div className="vire-band rounded-[4px] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="font-medium text-foreground">{activeStage.title}</span>
-                    <span className="font-mono font-semibold text-foreground tabular-nums">
+                    <span className="font-medium text-[#121210]">{activeStage.title}</span>
+                    <span className="font-mono font-semibold text-[#121210] tabular-nums">
                       {activeStage.rewardLocalFormatted} {activeCampaign?.corridor}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  <p className="mt-1 text-xs leading-relaxed text-[#4F4E4A]">
                     {activeStage.instructions}
                   </p>
                 </div>
@@ -479,7 +475,7 @@ function ClaimFlowInner() {
                     type="text"
                     readOnly
                     value={address ?? "Connect wallet above"}
-                    className="font-mono text-muted-foreground"
+                    className="font-mono text-[#68665F]"
                   />
                 </div>
               </div>
@@ -518,18 +514,18 @@ function ClaimFlowInner() {
           </Card>
         </div>
 
-        {/* Right Sticky Elevated Execution Trace */}
-        <div className="lg:sticky lg:top-20 lg:col-span-5">
-          <Card elevated className="vire-enter vire-delay-2 overflow-hidden">
-            <div className="border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                Execution trace
+        {/* Right Sticky Clearing Execution Statement */}
+        <div className="min-w-0 lg:sticky lg:top-20 lg:col-span-5">
+          <Card className="vire-enter vire-delay-2 overflow-hidden">
+            <div className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 px-6 py-3">
+              <h2 className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#68665F]">
+                Live Execution Trace
               </h2>
             </div>
 
             <div className="p-6">
               {!result && !isSubmitting && (
-                <ol className="divide-y divide-black/[0.06]">
+                <ol className="divide-y divide-[#E4E2DC]">
                   {[
                     ["01", "x402 verification", "usebuy.ai · Cencori LLM & Chainstack ($0.01)"],
                     ["02", "Policy Gate", "7 deterministic rules + VireVault limits"],
@@ -538,10 +534,10 @@ function ClaimFlowInner() {
                     ["05", "Off-ramp & ERC-8004", "Local ramp links + onchain giveFeedback()"],
                   ].map(([num, title, desc]) => (
                     <li key={num} className="flex items-start gap-3.5 py-3.5 first:pt-0 last:pb-0">
-                      <span className="mt-0.5 font-mono text-[11px] text-muted-foreground">{num}</span>
+                      <span className="mt-0.5 font-mono text-[11px] text-[#787670]">{num}</span>
                       <div>
-                        <div className="text-[13px] font-medium text-foreground">{title}</div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">{desc}</div>
+                        <div className="text-[13px] font-medium text-[#121210]">{title}</div>
+                        <div className="mt-0.5 text-xs text-[#68665F]">{desc}</div>
                       </div>
                     </li>
                   ))}
@@ -550,12 +546,12 @@ function ClaimFlowInner() {
 
               {isSubmitting && (
                 <div className="space-y-3">
-                  <div className="surface-well flex items-center gap-2.5 rounded-xl p-3.5 text-xs text-foreground">
+                  <div className="vire-band flex items-center gap-2.5 rounded-[4px] p-3.5 text-xs text-[#121210]">
                     <CircleNotch className="h-4 w-4 animate-spin" />
                     <span>Running x402 verification, Textile quote, and Policy Gate…</span>
                   </div>
-                  <Skeleton className="h-20 w-full rounded-xl" />
-                  <Skeleton className="h-28 w-full rounded-xl" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-28 w-full" />
                 </div>
               )}
 
@@ -563,10 +559,10 @@ function ClaimFlowInner() {
                 <div className="space-y-4">
                   <div
                     className={cn(
-                      "rounded-xl border p-4 text-xs",
+                      "rounded-[4px] border p-4 text-xs",
                       result.status === "COMPLETED"
-                        ? "border-foreground bg-foreground text-primary-foreground"
-                        : "border-destructive/25 bg-destructive/[0.05] text-foreground"
+                        ? "border-[#121210] bg-[#121210] text-[#FAF9F6]"
+                        : "border-[#B42318]/30 bg-[#B42318]/[0.05] text-[#121210]"
                     )}
                   >
                     <div className="flex items-center justify-between font-mono text-[11px] font-semibold">
@@ -575,33 +571,33 @@ function ClaimFlowInner() {
                     </div>
                     {result.error && <p className="mt-1.5 leading-relaxed">{result.error}</p>}
                     {result.policyDecision?.failedReason && (
-                      <p className="mt-1.5 font-medium">
+                      <p className="mt-1.5 font-medium text-[#B42318]">
                         {result.policyDecision.failedRule}: {result.policyDecision.failedReason}
                       </p>
                     )}
                   </div>
 
                   {result.buyReceipts && result.buyReceipts.length > 0 && (
-                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-muted-foreground">
+                    <div className="border-t border-[#E4E2DC] pt-3.5 text-xs">
+                      <div className="font-mono text-[11px] text-[#68665F]">
                         01 · x402 usebuy.ai receipts
                       </div>
                       <div className="mt-2 space-y-1.5">
                         {result.buyReceipts.map((r, i) => (
                           <div key={i} className="flex items-center justify-between font-mono text-[11px]">
-                            <span className="text-foreground">{r.capabilityId}</span>
+                            <span className="text-[#121210]">{r.capabilityId}</span>
                             {r.paymentTxHash ? (
                               <a
                                 href={celoscanTxUrl(r.paymentTxHash)}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-foreground underline underline-offset-2"
+                                className="inline-flex items-center gap-1 text-[#121210] underline underline-offset-2"
                               >
                                 {truncateMiddle(r.paymentTxHash, 8, 6)}
                                 <ArrowUpRight className="h-3 w-3" />
                               </a>
                             ) : (
-                              <span className="text-muted-foreground">
+                              <span className="text-[#68665F]">
                                 {r.dryRun ? "dry-run" : "settled"}
                               </span>
                             )}
@@ -612,8 +608,8 @@ function ClaimFlowInner() {
                   )}
 
                   {result.policyDecision && (
-                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-muted-foreground">
+                    <div className="border-t border-[#E4E2DC] pt-3.5 text-xs">
+                      <div className="font-mono text-[11px] text-[#68665F]">
                         02 · Policy Gate checks
                       </div>
                       <ul className="mt-2 space-y-2">
@@ -622,19 +618,19 @@ function ClaimFlowInner() {
                             {chk.passed ? (
                               <Check
                                 weight="bold"
-                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-foreground"
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#121210]"
                               />
                             ) : (
                               <X
                                 weight="bold"
-                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive"
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#B42318]"
                               />
                             )}
                             <div className="min-w-0">
-                              <span className="font-mono font-medium text-foreground">
+                              <span className="font-mono font-medium text-[#121210]">
                                 {chk.rule}
                               </span>
-                              <p className="text-muted-foreground">{chk.detail}</p>
+                              <p className="text-[#68665F]">{chk.detail}</p>
                             </div>
                           </li>
                         ))}
@@ -643,8 +639,8 @@ function ClaimFlowInner() {
                   )}
 
                   {result.txHashes && (
-                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-muted-foreground">
+                    <div className="border-t border-[#E4E2DC] pt-3.5 text-xs">
+                      <div className="font-mono text-[11px] text-[#68665F]">
                         03 &amp; 04 · Onchain settlement proofs
                       </div>
                       <div className="mt-2.5 space-y-2 font-mono text-[11px]">
@@ -655,13 +651,13 @@ function ClaimFlowInner() {
                           ["Audit Receipt", result.txHashes.vaultReceipt],
                         ].map(([label, hash]) => (
                           <div key={label} className="flex items-center justify-between gap-2">
-                            <span className="text-muted-foreground">{label}</span>
+                            <span className="text-[#68665F]">{label}</span>
                             <div className="flex items-center gap-1.5">
                               <a
                                 href={celoscanTxUrl(hash!)}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-0.5 text-foreground underline underline-offset-2"
+                                className="inline-flex items-center gap-0.5 text-[#121210] underline underline-offset-2"
                               >
                                 {truncateMiddle(hash!, 8, 6)}
                                 <ArrowUpRight className="h-3 w-3" />
@@ -675,21 +671,21 @@ function ClaimFlowInner() {
                   )}
 
                   {result.offramp && (
-                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-muted-foreground">
+                    <div className="border-t border-[#E4E2DC] pt-3.5 text-xs">
+                      <div className="font-mono text-[11px] text-[#68665F]">
                         05 · Off-ramp &amp; ERC-8004 rating
                       </div>
-                      <h3 className="mt-1 text-sm font-medium text-foreground">
+                      <h3 className="mt-1 text-sm font-medium text-[#121210]">
                         {result.offramp.headline}
                       </h3>
-                      <ul className="mt-2 space-y-1 text-muted-foreground">
+                      <ul className="mt-2 space-y-1 text-[#4F4E4A]">
                         {result.offramp.instructions.map((line, idx) => (
                           <li key={idx}>· {line}</li>
                         ))}
                       </ul>
 
-                      <div className="surface-well mt-3 flex items-center justify-between gap-2 rounded-lg px-3 py-2 font-mono text-[11px]">
-                        <span className="truncate text-muted-foreground">
+                      <div className="vire-band mt-3 flex items-center justify-between gap-2 rounded-[4px] px-3 py-2 font-mono text-[11px]">
+                        <span className="truncate text-[#4F4E4A]">
                           {result.offramp.tokenDecimals}dp · {result.offramp.tokenAddress}
                         </span>
                         <CopyButton
@@ -714,12 +710,12 @@ function ClaimFlowInner() {
                         ))}
                       </div>
 
-                      <div className="mt-4 border-t border-black/[0.06] pt-3.5">
+                      <div className="mt-4 border-t border-[#E4E2DC] pt-3.5">
                         <div className="flex items-center justify-between">
-                          <span className="font-medium text-foreground">
+                          <span className="font-medium text-[#121210]">
                             Rate onchain (ERC-8004)
                           </span>
-                          <span className="font-mono text-[10px] text-muted-foreground">
+                          <span className="font-mono text-[10px] text-[#68665F]">
                             tag: settlement
                           </span>
                         </div>
@@ -729,24 +725,24 @@ function ClaimFlowInner() {
                             href={celoscanTxUrl(ratingTxHash)}
                             target="_blank"
                             rel="noreferrer"
-                            className="mt-2 inline-flex items-center gap-1 font-mono text-xs text-foreground underline underline-offset-2"
+                            className="mt-2 inline-flex items-center gap-1 font-mono text-xs text-[#121210] underline underline-offset-2"
                           >
                             Confirmed: {truncateMiddle(ratingTxHash, 10, 6)}
                             <ArrowUpRight className="h-3 w-3" />
                           </a>
                         ) : repData?.registered && repData.agentId ? (
                           <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                            <div className="inline-flex items-center gap-0.5 rounded-full bg-black/[0.045] p-0.5">
+                            <div className="inline-flex items-center border border-[#E4E2DC] bg-[#FAF9F6] p-0.5 rounded-[4px]">
                               {[80, 90, 95, 100].map((val) => (
                                 <button
                                   key={val}
                                   type="button"
                                   onClick={() => setRatingScore(val)}
                                   className={cn(
-                                    "vire-pressable rounded-full px-2.5 py-1 font-mono text-[11px]",
+                                    "vire-pressable rounded-[3px] px-2 py-1 font-mono text-[11px]",
                                     ratingScore === val
-                                      ? "bg-foreground text-primary-foreground"
-                                      : "text-muted-foreground hover:text-foreground"
+                                      ? "bg-[#121210] text-[#FAF9F6]"
+                                      : "text-[#68665F] hover:text-[#121210]"
                                   )}
                                 >
                                   {val}
@@ -764,7 +760,7 @@ function ClaimFlowInner() {
                             </Button>
                           </div>
                         ) : (
-                          <p className="mt-1.5 text-[11px] text-muted-foreground">
+                          <p className="mt-1.5 text-[11px] text-[#68665F]">
                             Agent registration ID pending configuration.
                           </p>
                         )}
@@ -786,8 +782,8 @@ export default function ClaimPage() {
     <Suspense
       fallback={
         <div className="grid gap-6 lg:grid-cols-12">
-          <Skeleton className="h-96 rounded-2xl lg:col-span-7" />
-          <Skeleton className="h-96 rounded-2xl lg:col-span-5" />
+          <Skeleton className="h-96 lg:col-span-7" />
+          <Skeleton className="h-96 lg:col-span-5" />
         </div>
       }
     >

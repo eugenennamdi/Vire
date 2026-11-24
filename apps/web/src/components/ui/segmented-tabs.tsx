@@ -8,6 +8,9 @@ export interface TabOption<T extends string> {
   count?: number;
 }
 
+/**
+ * Architectural square-tab ledger switcher (flat 1px container, crisp black active state).
+ */
 export function SegmentedTabs<T extends string>({
   options,
   value,
@@ -23,7 +26,7 @@ export function SegmentedTabs<T extends string>({
     <div
       role="tablist"
       className={cn(
-        "inline-flex flex-wrap items-center gap-0.5 rounded-full bg-black/[0.045] p-1",
+        "inline-flex flex-wrap items-center border border-[#E4E2DC] bg-white p-0.5 rounded-[6px]",
         className
       )}
     >
@@ -37,10 +40,10 @@ export function SegmentedTabs<T extends string>({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "vire-pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium",
+              "vire-pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded-[4px] px-3 py-1.5 text-xs font-medium",
               active
-                ? "bg-card text-foreground shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-[#121210] text-[#FAF9F6]"
+                : "text-[#68665F] hover:bg-[#F3F1EC] hover:text-[#121210]"
             )}
           >
             <span>{opt.label}</span>
@@ -48,7 +51,7 @@ export function SegmentedTabs<T extends string>({
               <span
                 className={cn(
                   "font-mono text-[10.5px] tabular-nums",
-                  active ? "text-foreground/75" : "text-muted-foreground/70"
+                  active ? "text-[#FAF9F6]/75" : "text-[#8D8A82]"
                 )}
               >
                 {opt.count}

@@ -88,17 +88,17 @@ function CampaignsInner() {
 
   return (
     <div className="space-y-8">
-      <div className="vire-enter flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+      <div className="vire-enter flex flex-col justify-between gap-4 border-b border-[#E4E2DC] pb-6 lg:flex-row lg:items-end">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            Active Missions
+          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
+            Active Missions · Celo 42220
           </p>
-          <h1 className="mt-1.5 text-3xl font-semibold tracking-[-0.035em] text-foreground">
-            Campaigns
+          <h1 className="mt-1.5 font-serif text-3xl font-normal tracking-[-0.025em] text-[#121210] sm:text-[36px]">
+            Clearing campaigns
           </h1>
-          <p className="mt-1.5 max-w-[58ch] text-sm leading-relaxed text-muted-foreground">
-            Multi-stage work campaigns settled with exact local output via Textile FX and bounded by{" "}
-            <code className="font-mono text-xs text-foreground">VireVault</code>.
+          <p className="mt-1.5 max-w-[58ch] text-sm leading-relaxed text-[#4F4E4A]">
+            Multi-stage work mandates settled with exact local output via Textile FX and bounded onchain by{" "}
+            <code className="font-mono text-xs text-[#121210]">VireVault</code>.
           </p>
         </div>
 
@@ -130,12 +130,12 @@ function CampaignsInner() {
         </div>
       ) : filtered.length === 0 ? (
         <Card className="p-12 text-center">
-          <p className="text-sm font-medium text-foreground">
-            No campaigns for {corridorFilter}.
+          <p className="text-sm font-medium text-[#121210]">
+            No campaigns configured for {corridorFilter}.
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-[#68665F]">
             Create one permissionlessly via{" "}
-            <code className="font-mono text-foreground">POST /api/x402/campaigns</code>.
+            <code className="font-mono text-[#121210]">POST /api/x402/campaigns</code>.
           </p>
           <div className="mt-5 flex justify-center gap-2">
             <button
@@ -169,45 +169,45 @@ function CampaignsInner() {
                   idx >= 3 && "vire-delay-3"
                 )}
               >
-                <div className="p-6 sm:p-7">
+                <div className="p-6">
                   <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                        {camp.isLaunchPartner && <Badge tone="ink">Featured</Badge>}
-                        <span className="font-medium text-foreground">
+                      <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-[#68665F]">
+                        {camp.isLaunchPartner && <Badge tone="ink">Launch Partner</Badge>}
+                        <span className="font-semibold text-[#121210]">
                           {camp.corridor} · {camp.localTokenDecimals}dp
                         </span>
-                        <span>·</span>
+                        <span>/</span>
                         <span>{camp.deliverableType.replace("_", " ")}</span>
-                        <span>·</span>
+                        <span>/</span>
                         <span>
                           {camp.partnerName} ({camp.partnerLocation})
                         </span>
                       </div>
 
-                      <h2 className="mt-2.5 text-lg font-semibold tracking-[-0.025em] text-foreground">
+                      <h2 className="mt-2.5 font-serif text-xl font-normal tracking-[-0.015em] text-[#121210]">
                         {camp.title}
                       </h2>
-                      <p className="mt-1.5 max-w-[66ch] text-[13.5px] leading-[1.6] text-muted-foreground">
+                      <p className="mt-1.5 max-w-[66ch] text-[13.5px] leading-[1.6] text-[#4F4E4A]">
                         {camp.description}
                       </p>
                     </div>
 
                     <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center lg:w-64 lg:flex-col lg:items-stretch">
-                      <div className="surface-well space-y-1.5 rounded-xl px-4 py-3">
+                      <div className="vire-band space-y-1.5 rounded-[4px] px-3.5 py-2.5">
                         <div className="flex items-baseline justify-between font-mono text-xs tabular-nums">
-                          <span className="text-muted-foreground">Budget</span>
-                          <span className="font-semibold text-foreground">
+                          <span className="text-[#68665F]">Remaining USDT</span>
+                          <span className="font-semibold text-[#121210]">
                             ${camp.remainingUsdtFormatted}
-                            <span className="font-normal text-muted-foreground">
+                            <span className="font-normal text-[#68665F]">
                               {" "}
                               / ${camp.budgetUsdtFormatted}
                             </span>
                           </span>
                         </div>
-                        <div className="h-1 w-full overflow-hidden rounded-full bg-black/[0.08]">
+                        <div className="h-[2px] w-full bg-[#DEDBD3]">
                           <div
-                            className="h-full rounded-full bg-foreground"
+                            className="h-full bg-[#121210]"
                             style={{ width: `${remainingPct}%` }}
                           />
                         </div>
@@ -229,28 +229,28 @@ function CampaignsInner() {
                 </div>
 
                 {/* Hairline 3-column stage divider row */}
-                <div className="grid grid-cols-1 divide-y divide-black/[0.06] border-t border-black/[0.06] md:grid-cols-3 md:divide-x md:divide-y-0">
+                <div className="grid grid-cols-1 divide-y divide-[#E4E2DC] border-t border-[#E4E2DC] md:grid-cols-3 md:divide-x md:divide-y-0">
                   {camp.stages.map((st) => (
                     <Link
                       key={st.stageIndex}
                       href={`/claim?campaign=${encodeURIComponent(camp.slug)}&stage=${st.stageIndex}`}
-                      className="group flex flex-col justify-between p-5 transition-colors hover:bg-[#FAFAFB] sm:p-6"
+                      className="group flex flex-col justify-between p-5 transition-colors hover:bg-[#FAF9F6]"
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2 font-mono text-[11px]">
-                          <span className="text-muted-foreground">STAGE 0{st.stageIndex}</span>
-                          <span className="font-semibold text-foreground tabular-nums">
+                          <span className="text-[#68665F]">STAGE 0{st.stageIndex}</span>
+                          <span className="font-semibold text-[#121210] tabular-nums">
                             {st.rewardLocalFormatted} {camp.corridor}
                           </span>
                         </div>
-                        <h3 className="mt-2 text-[13.5px] font-medium text-foreground group-hover:underline">
+                        <h3 className="mt-2 text-[13.5px] font-medium text-[#121210] group-hover:underline">
                           {st.title.replace(/^Stage \d+\s*[—-]\s*/i, "")}
                         </h3>
-                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        <p className="mt-1 text-xs leading-relaxed text-[#68665F]">
                           {st.instructions}
                         </p>
                       </div>
-                      <div className="mt-3 font-mono text-[10.5px] text-muted-foreground/80">
+                      <div className="mt-3 font-mono text-[10.5px] text-[#787670]">
                         {st.cooldownHours === 0
                           ? "Immediate entry"
                           : `${st.cooldownHours}h cooldown after Stage ${st.stageIndex - 1}`}
@@ -260,8 +260,8 @@ function CampaignsInner() {
                 </div>
 
                 {/* Guardrails strip */}
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-black/[0.06] bg-[#FAFAFB] px-6 py-3 font-mono text-[11px] text-muted-foreground tabular-nums">
-                  <span className="font-medium text-foreground">Guardrails</span>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-[#E4E2DC] bg-[#F3F1EC]/70 px-6 py-2.5 font-mono text-[11px] text-[#68665F] tabular-nums">
+                  <span className="font-medium text-[#121210]">Policy Guardrails</span>
                   <span>maxSpread {camp.maxSpreadBps} bps</span>
                   <span>maxPerPayout ${camp.maxPerPayoutUsdtFormatted}</span>
                   <span>dailyCap ${camp.dailyLimitUsdtFormatted}/24h</span>

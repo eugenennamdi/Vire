@@ -4,21 +4,21 @@ import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
   [
-    "vire-pressable inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium",
+    "vire-pressable inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[6px] font-medium",
     "select-none cursor-pointer disabled:pointer-events-none",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#121210]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAF9F6]",
   ].join(" "),
   {
     variants: {
       variant: {
         primary:
-          "bg-primary text-primary-foreground shadow-[0_1px_2px_rgba(0,0,0,0.16)] hover:bg-[#222222] disabled:border disabled:border-black/[0.06] disabled:bg-black/[0.05] disabled:text-muted-foreground/70 disabled:shadow-none",
+          "bg-[#121210] text-[#FAF9F6] hover:bg-[#292824] disabled:border disabled:border-[#E4E2DC] disabled:bg-[#F3F1EC] disabled:text-[#9E9B93]",
         secondary:
-          "border border-black/[0.09] bg-card text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-black/[0.18] hover:bg-[#FAFAFA] disabled:bg-[#FAFAFA] disabled:text-muted-foreground/60",
+          "border border-[#D5D2C9] bg-white text-[#121210] hover:border-[#121210] hover:bg-[#FAF9F6] disabled:border-[#E4E2DC] disabled:bg-[#FAF9F6] disabled:text-[#9E9B93]",
         outlineStrong:
-          "border border-foreground bg-card text-foreground hover:bg-foreground hover:text-primary-foreground disabled:border-black/[0.08] disabled:text-muted-foreground/60",
+          "border border-[#121210] bg-white text-[#121210] hover:bg-[#121210] hover:text-[#FAF9F6] disabled:border-[#E4E2DC] disabled:text-[#9E9B93]",
         ghost:
-          "bg-transparent text-muted-foreground hover:bg-black/[0.045] hover:text-foreground disabled:text-muted-foreground/50",
+          "bg-transparent text-[#68665F] hover:bg-[#EFECE6] hover:text-[#121210] disabled:text-[#9E9B93]",
       },
       size: {
         sm: "h-8 px-3 text-xs",

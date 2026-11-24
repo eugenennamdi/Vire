@@ -1,15 +1,18 @@
 import { ArrowRight, ArrowUpRight } from "@phosphor-icons/react/dist/ssr";
 import {
   celoscanAddressUrl,
+  celoscanTxUrl,
   CORRIDORS,
+  DEFAULT_ATTRIBUTION_CODE,
   formatTokenAmount,
   type CampaignStage,
   type CorridorSymbol,
 } from "@vire/shared";
 import { desc } from "drizzle-orm";
 import Link from "next/link";
-import { ClearingTerminal, type TerminalCampaign } from "@/components/clearing-terminal";
+import { ClearingInspector, type InspectorCampaign } from "@/components/clearing-inspector";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { ensureDatabaseReady, getDb, schema } from "@/db";
 import { ensureDefaultCampaignsSeeded } from "@/db/seed";
 import { getLiveReputationSnapshot, getVaultSnapshot } from "@/lib/runtime";
@@ -17,18 +20,12 @@ import { truncateMiddle } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-const AGENT_ENDPOINTS = [
-  { href: "/api/agent-card.json", label: "agent-card.json" },
-  { href: "/api/corridors/live", label: "Corridors API" },
-  { href: "/api/ledger", label: "Ledger API" },
-  { href: "/console", label: "x402 Playground" },
-] as const;
-
 export default async function HomePage() {
   await ensureDatabaseReady();
   await ensureDefaultCampaignsSeeded();
 
   const db = getDb();
+  const attributionCode = process.env.VIRE_ATTRIBUTION_CODE || DEFAULT_ATTRIBUTION_CODE;
 
   const [vault, rep, campaignRows, settlements, buyRows, x402Rows, rejectedRows] =
     await Promise.all([
@@ -38,35 +35,34 @@ export default async function HomePage() {
         .select()
         .from(schema.campaigns)
         .orderBy(desc(schema.campaigns.isLaunchPartner), desc(schema.campaigns.createdAt)),
-      db.select().from(schema.settlements),
+      db.select().from(schema.settlements).orderBy(desc(schema.settlements.settledAt)),
       db.select().from(schema.buyPayments),
       db.select().from(schema.x402Inflows),
       db.select({ status: schema.submissions.status }).from(schema.submissions),
     ]);
 
-  const uniqueRecipients = new Set(settlements.map((s) => s.recipientWallet.toLowerCase())).size;
   const rejectedCount = rejectedRows.filter((r) => r.status === "REJECTED").length;
   const paidBuyCount = buyRows.filter((b) => !b.dryRun && b.paymentTxHash).length;
 
-  const initialCampaigns: TerminalCampaign[] = campaignRows.map((row) => {
+  const inspectorCampaigns: InspectorCampaign[] = campaignRows.map((row) => {
     const corridor = row.corridor as CorridorSymbol;
     const stages = JSON.parse(row.stagesJson) as CampaignStage[];
+    const stage1 = stages[0];
     const meta = CORRIDORS[corridor];
     return {
       id: row.id,
       slug: row.slug,
       partnerName: row.partnerName,
       partnerLocation: row.partnerLocation,
-      isLaunchPartner: row.isLaunchPartner,
       title: row.title,
-      description: row.description,
       deliverableType: row.deliverableType,
       corridor: row.corridor,
       localTokenDecimals: row.localTokenDecimals,
-      stages: stages.map((st) => ({
-        ...st,
-        rewardLocalFormatted: formatTokenAmount(st.rewardLocalAtomic, corridor, 2),
-      })),
+      stage1Title: stage1?.title ?? "Stage 1",
+      stage1Instructions: stage1?.instructions ?? row.description,
+      stage1RewardFormatted: stage1
+        ? formatTokenAmount(stage1.rewardLocalAtomic, corridor, 2)
+        : "0",
       budgetUsdtFormatted: formatTokenAmount(row.budgetUsdtAtomic, "USDT", 2),
       remainingUsdtFormatted: formatTokenAmount(row.remainingUsdtAtomic, "USDT", 2),
       maxPerPayoutUsdtFormatted: formatTokenAmount(row.maxPerPayoutUsdtAtomic, "USDT", 2),
@@ -82,222 +78,243 @@ export default async function HomePage() {
     };
   });
 
+  const recentSettlements = settlements.slice(0, 4);
+
   return (
-    <div className="space-y-12">
-      {/* Asymmetric Editorial Hero + Live Sculptural Vault Card */}
-      <section className="vire-enter grid gap-8 pt-2 lg:grid-cols-12 lg:items-center">
-        <div className="min-w-0 space-y-4 lg:col-span-7">
-          <h1 className="max-w-[16ch] text-4xl font-semibold tracking-[-0.04em] text-foreground leading-[1.05] sm:text-[46px]">
-            Verify work. Settle exact local FX.
+    <div className="space-y-14">
+      {/* BAND 1: Editorial Clearinghouse Masthead + Live VireVault Custody Sheet */}
+      <section className="vire-enter grid gap-8 border-b border-[#E4E2DC] pb-12 pt-2 lg:grid-cols-12 lg:items-end">
+        <div className="min-w-0 space-y-5 lg:col-span-7">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] uppercase tracking-[0.06em] text-[#68665F]">
+            <span>Celo Mainnet · 42220</span>
+            <span>/</span>
+            <span>{rep.registered && rep.agentId ? `ERC-8004 #${rep.agentId}` : "ERC-8004"}</span>
+            <span>/</span>
+            <span>{attributionCode}</span>
+          </div>
+
+          <h1 className="max-w-[16ch] font-serif text-[40px] font-normal tracking-[-0.03em] text-[#121210] leading-[1.04] sm:text-[52px]">
+            Verify off-chain work. Clear{" "}
+            <em className="italic">exact</em> local FX.
           </h1>
-          <p className="max-w-[54ch] text-[15px] leading-[1.6] text-muted-foreground">
-            Audit off-chain deliverables via{" "}
-            <code className="font-mono text-[13px] font-medium text-foreground">x402</code>, enforce
-            onchain{" "}
-            <code className="font-mono text-[13px] font-medium text-foreground">VireVault</code>{" "}
-            caps, and pay exact{" "}
-            <code className="font-mono text-[13px] font-medium text-foreground">cNGN</code>,{" "}
-            <code className="font-mono text-[13px] font-medium text-foreground">wARS</code>,{" "}
-            <code className="font-mono text-[13px] font-medium text-foreground">wBRL</code>,{" "}
-            <code className="font-mono text-[13px] font-medium text-foreground">IDRX</code>, and{" "}
-            <code className="font-mono text-[13px] font-medium text-foreground">wMXN</code> on Celo
-            Mainnet.
+
+          <p className="max-w-[56ch] text-[15px] leading-[1.65] text-[#4F4E4A]">
+            Vire is an autonomous clearing agent for merchants and remote contributors. It audits
+            deliverables over paid{" "}
+            <code className="font-mono text-[13px] text-[#121210]">x402</code>, enforces onchain{" "}
+            <code className="font-mono text-[13px] text-[#121210]">VireVault</code> spending caps,
+            and converts USDT into exact local stablecoins on Textile FX.
           </p>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <Link href="/claim" className={buttonVariants({ variant: "primary", size: "lg" })}>
+              Submit deliverable
+              <ArrowRight weight="bold" className="h-4 w-4" />
+            </Link>
+            <Link href="/campaigns" className={buttonVariants({ variant: "secondary", size: "lg" })}>
+              Browse campaigns
+            </Link>
+            <Link href="/ledger" className={buttonVariants({ variant: "ghost", size: "lg" })}>
+              Audit ledger
+            </Link>
+          </div>
         </div>
 
-        {/* Right: Sculptural Live VireVault Instrument */}
-        <div className="surface-card min-w-0 rounded-2xl p-5 sm:p-6 lg:col-span-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Onchain Treasury · Celo 42220
-              </div>
-              <div className="mt-1.5 flex items-center gap-2">
-                <span className="font-mono text-sm font-semibold text-foreground">VireVault</span>
-                <Badge tone="neutral">
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      vault.deployed && !vault.paused
-                        ? "bg-foreground"
-                        : "border border-muted-foreground/60"
-                    }`}
-                  />
-                  {vault.deployed ? (vault.paused ? "PAUSED" : "ACTIVE") : "UNCONFIGURED"}
-                </Badge>
-              </div>
-            </div>
+        {/* Right: Architectural VireVault Custody Sheet */}
+        <div className="vire-sheet min-w-0 overflow-hidden rounded-[6px] lg:col-span-5">
+          <div className="flex items-center justify-between border-b border-[#E4E2DC] bg-[#F3F1EC]/70 px-5 py-3">
+            <span className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#68665F]">
+              VireVault Custody Account
+            </span>
+            <Badge tone={vault.deployed && !vault.paused ? "ink" : "neutral"}>
+              {vault.deployed ? (vault.paused ? "PAUSED" : "ACTIVE") : "UNCONFIGURED"}
+            </Badge>
+          </div>
 
-            <div className="text-right">
-              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Balance
+          <div className="p-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <div>
+                <div className="font-mono text-[11px] text-[#68665F]">Onchain USDT balance</div>
+                <div className="mt-1 font-mono text-3xl font-semibold tracking-[-0.03em] text-[#121210] tabular-nums">
+                  {vault.usdtBalanceAtomic !== null
+                    ? `$${formatTokenAmount(vault.usdtBalanceAtomic, "USDT")}`
+                    : "—"}
+                  <span className="ml-1.5 text-xs font-normal text-[#68665F]">USDT</span>
+                </div>
               </div>
-              <div className="mt-1 font-mono text-2xl font-semibold tracking-[-0.03em] text-foreground tabular-nums">
-                {vault.usdtBalanceAtomic !== null
-                  ? `$${formatTokenAmount(vault.usdtBalanceAtomic, "USDT")}`
-                  : "—"}
-                <span className="ml-1 text-xs font-normal text-muted-foreground">USD₮</span>
-              </div>
+
+              {vault.address && (
+                <a
+                  href={celoscanAddressUrl(vault.address)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-mono text-xs text-[#4F4E4A] underline underline-offset-4 hover:text-[#121210]"
+                >
+                  {truncateMiddle(vault.address, 6, 4)}
+                  <ArrowUpRight className="h-3 w-3" />
+                </a>
+              )}
             </div>
           </div>
 
-          <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-black/[0.06]">
-            <div
-              className="h-full rounded-full bg-foreground"
-              style={{
-                width:
-                  vault.usdtBalanceAtomic && BigInt(vault.usdtBalanceAtomic) > 0n ? "100%" : "8%",
-              }}
-            />
-          </div>
-
-          <div className="mt-4 grid grid-cols-4 gap-2 border-t border-black/[0.06] pt-3.5 font-mono text-[11px] tabular-nums">
-            <div>
-              <div className="text-muted-foreground">Settled</div>
-              <div className="mt-0.5 font-semibold text-foreground">{settlements.length}</div>
+          <div className="grid grid-cols-3 divide-x divide-[#E4E2DC] border-t border-[#E4E2DC] bg-[#FAF9F6] font-mono text-[11px] tabular-nums">
+            <div className="px-4 py-3">
+              <div className="text-[#68665F]">Settled</div>
+              <div className="mt-0.5 text-sm font-semibold text-[#121210]">{settlements.length}</div>
             </div>
-            <div>
-              <div className="text-muted-foreground">Guarded</div>
-              <div className="mt-0.5 font-semibold text-foreground">{rejectedCount}</div>
+            <div className="px-4 py-3">
+              <div className="text-[#68665F]">Rejected</div>
+              <div className="mt-0.5 text-sm font-semibold text-[#121210]">{rejectedCount}</div>
             </div>
-            <div>
-              <div className="text-muted-foreground">x402</div>
-              <div className="mt-0.5 font-semibold text-foreground">
+            <div className="px-4 py-3">
+              <div className="text-[#68665F]">x402 calls</div>
+              <div className="mt-0.5 text-sm font-semibold text-[#121210]">
                 {x402Rows.length + paidBuyCount}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-muted-foreground">Contract</div>
-              <div className="mt-0.5 font-medium text-foreground">
-                {vault.address ? (
-                  <a
-                    href={celoscanAddressUrl(vault.address)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-0.5 hover:underline"
-                  >
-                    {truncateMiddle(vault.address, 4, 3)}
-                    <ArrowUpRight className="h-3 w-3" />
-                  </a>
-                ) : (
-                  "—"
-                )}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Hairline Divider into Live Interactive Clearing Terminal */}
-      <div className="border-t border-black/[0.06] pt-10">
-        <ClearingTerminal initialCampaigns={initialCampaigns} />
-      </div>
+      {/* BAND 2 & 3: Interactive 4-Stage Agent Clearing Inspector + Live Bank FX Rate Board */}
+      <ClearingInspector campaigns={inspectorCampaigns} />
 
-      {/* Unified Architectural 5-Cell Bento Protocol Overview */}
-      <section
-        aria-labelledby="how-vire-works"
-        className="space-y-6 border-t border-black/[0.06] pt-12"
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">How clearing works</p>
-            <h2
-              id="how-vire-works"
-              className="text-2xl font-semibold tracking-[-0.03em] leading-[1.15] text-foreground sm:text-[28px]"
+      {/* BAND 4: Live Ledger Snapshot + Machine-Readable Agent Surfaces */}
+      <section className="grid gap-8 border-t border-[#E4E2DC] pt-12 lg:grid-cols-12">
+        {/* Left: Live Mainnet Settlement Feed */}
+        <div className="min-w-0 space-y-4 lg:col-span-7">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
+                Live Proof of Execution
+              </p>
+              <h2 className="mt-1 font-serif text-2xl font-normal tracking-[-0.02em] text-[#121210]">
+                Recent onchain settlements
+              </h2>
+            </div>
+            <Link
+              href="/ledger"
+              className="inline-flex items-center gap-1 font-mono text-xs text-[#4F4E4A] hover:text-[#121210]"
             >
-              Three steps from proof to exact local currency.
+              Full ledger <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="vire-sheet overflow-hidden rounded-[6px]">
+            {recentSettlements.length > 0 ? (
+              <div className="divide-y divide-[#E4E2DC]">
+                {recentSettlements.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-mono font-semibold text-[#121210] tabular-nums">
+                        {formatTokenAmount(s.localAmountAtomic, s.corridor as CorridorSymbol, 2)}{" "}
+                        {s.corridor}
+                      </div>
+                      <div className="mt-0.5 font-mono text-[11px] text-[#68665F]">
+                        {truncateMiddle(s.recipientWallet, 8, 6)} ·{" "}
+                        {new Date(s.settledAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <a
+                      href={celoscanTxUrl(s.textileSwapTxHash)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-mono text-[11px] text-[#121210] underline underline-offset-4"
+                    >
+                      Textile tx <ArrowUpRight className="h-3 w-3" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6">
+                <p className="text-sm font-medium text-[#121210]">
+                  Zero synthetic entries — awaiting live mainnet payouts.
+                </p>
+                <p className="mt-1.5 text-xs leading-relaxed text-[#68665F]">
+                  Every verified settlement posts 4 immutable Celo Mainnet proofs (VireVault
+                  release, ERC-8021 tagged Textile FX swap, direct local payout, and audit receipt)
+                  directly to the public ledger.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2.5">
+                  <Link href="/claim" className={buttonVariants({ variant: "primary", size: "sm" })}>
+                    Run first claim
+                  </Link>
+                  <Link href="/console" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                    Test x402 HTTP 402
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Autonomous Agent & x402 Specification Table */}
+        <div className="min-w-0 space-y-4 lg:col-span-5">
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
+              Programmatic Access
+            </p>
+            <h2 className="mt-1 font-serif text-2xl font-normal tracking-[-0.02em] text-[#121210]">
+              Agent &amp; x402 endpoints
             </h2>
           </div>
 
-          <Link
-            href="/ledger"
-            className="group inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <span>Inspect public ledger</span>
-            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
-          </Link>
-        </div>
-
-        <div className="surface-card overflow-hidden rounded-2xl">
-          {/* Top Row: 3 Equal Steps */}
-          <div className="grid divide-y divide-black/[0.06] md:grid-cols-3 md:divide-x md:divide-y-0">
-            <article className="p-7 sm:p-8">
-              <div className="font-mono text-xs font-medium text-muted-foreground/75">01</div>
-              <h3 className="mt-4 text-[15px] font-semibold tracking-[-0.015em] text-foreground">
-                Verify off-chain proof
-              </h3>
-              <p className="mt-2 text-[13.5px] leading-[1.6] text-muted-foreground">
-                Contributors bind an external Celo wallet via EIP-191 or GitHub OAuth and submit a
-                deliverable URL. Vire fetches the artifact safely and scores it via paid{" "}
-                <code className="font-mono text-xs text-foreground">usebuy.ai</code> calls.
-              </p>
-            </article>
-
-            <article className="p-7 sm:p-8">
-              <div className="font-mono text-xs font-medium text-muted-foreground/75">02</div>
-              <h3 className="mt-4 text-[15px] font-semibold tracking-[-0.015em] text-foreground">
-                Enforce vault guardrails
-              </h3>
-              <p className="mt-2 text-[13.5px] leading-[1.6] text-muted-foreground">
-                A deterministic 7-rule Policy Gate and{" "}
-                <code className="font-mono text-xs text-foreground">VireVault</code> verify replay
-                hashes, non-team wallets, live spread bps, and 24-hour USD₮ spending caps before any
-                funds leave custody.
-              </p>
-            </article>
-
-            <article className="p-7 sm:p-8">
-              <div className="font-mono text-xs font-medium text-muted-foreground/75">03</div>
-              <h3 className="mt-4 text-[15px] font-semibold tracking-[-0.015em] text-foreground">
-                Clear exact local FX
-              </h3>
-              <p className="mt-2 text-[13.5px] leading-[1.6] text-muted-foreground">
-                Vire executes a firm Textile FX v2{" "}
-                <code className="font-mono text-xs text-foreground">buyAmount</code> RFQ with
-                ERC-8021 attribution, pays the contributor directly, refunds unused USD₮ dust, and
-                enables 1-click ERC-8004 reputation feedback.
-              </p>
-            </article>
-          </div>
-
-          {/* Bottom Row: 2-Column Hairline Split */}
-          <div className="grid divide-y divide-black/[0.06] border-t border-black/[0.06] bg-[#FAFAFB] md:grid-cols-2 md:divide-x md:divide-y-0">
-            <div className="p-7 sm:p-8">
-              <h3 className="text-[14px] font-semibold tracking-[-0.015em] text-foreground">
-                Custody separated from judgment.
-              </h3>
-              <p className="mt-2 max-w-[48ch] text-[13.5px] leading-[1.6] text-muted-foreground">
-                AI verifiers can misjudge edge cases, so treasury limits live onchain in{" "}
-                <code className="font-mono text-xs text-foreground">VireVault</code> rather than in
-                prompts. Every settlement, rejection, and refund is publicly verifiable across{" "}
-                {uniqueRecipients} external recipient{uniqueRecipients === 1 ? "" : "s"}.
-              </p>
-            </div>
-
-            <div className="flex flex-col justify-between gap-4 p-7 sm:p-8">
-              <div>
-                <h3 className="text-[14px] font-semibold tracking-[-0.015em] text-foreground">
-                  Built for autonomous agents{rep.registered && rep.agentId ? ` · ERC-8004 #${rep.agentId}` : ""}.
-                </h3>
-                <p className="mt-2 max-w-[48ch] text-[13.5px] leading-[1.6] text-muted-foreground">
-                  External agents can discover capabilities via ERC-8004, inspect live Textile FX
-                  quotes, and pay per request over HTTP 402 through{" "}
-                  <code className="font-mono text-xs text-foreground">api.x402.celo.org</code>.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {AGENT_ENDPOINTS.map((ep) => (
-                  <Link
-                    key={ep.href}
-                    href={ep.href}
-                    className="vire-pressable inline-flex items-center gap-1 rounded-lg border border-black/[0.08] bg-card px-2.5 py-1 font-mono text-[11px] font-medium text-foreground/85 shadow-[0_1px_1px_rgba(0,0,0,0.02)] hover:border-black/20 hover:text-foreground"
-                  >
-                    <span>{ep.label}</span>
-                    <ArrowUpRight className="h-2.5 w-2.5 text-muted-foreground" />
-                  </Link>
-                ))}
-              </div>
-            </div>
+          <div className="vire-sheet overflow-hidden rounded-[6px]">
+            <dl className="divide-y divide-[#E4E2DC] font-mono text-xs">
+              {[
+                {
+                  method: "GET",
+                  path: "/api/agent-card.json",
+                  desc: "ERC-8004 manifest",
+                  href: "/api/agent-card.json",
+                },
+                {
+                  method: "POST",
+                  path: "/api/x402/verify",
+                  desc: "Paid x402 audit",
+                  href: "/console",
+                },
+                {
+                  method: "POST",
+                  path: "/api/x402/campaigns",
+                  desc: "Create campaign",
+                  href: "/console",
+                },
+                {
+                  method: "GET",
+                  path: "/api/corridors/live",
+                  desc: "Textile FX feed",
+                  href: "/api/corridors/live",
+                },
+                {
+                  method: "GET",
+                  path: "/api/ledger",
+                  desc: "Public audit feed",
+                  href: "/api/ledger",
+                },
+              ].map((ep) => (
+                <Link
+                  key={ep.path}
+                  href={ep.href}
+                  className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-[#FAF9F6]"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="w-9 shrink-0 text-[10px] font-semibold text-[#68665F]">
+                      {ep.method}
+                    </span>
+                    <span className="truncate text-[#121210]">{ep.path}</span>
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-[#68665F]">
+                    {ep.desc}
+                    <ArrowUpRight className="h-3 w-3" />
+                  </span>
+                </Link>
+              ))}
+            </dl>
           </div>
         </div>
       </section>

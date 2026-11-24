@@ -19,48 +19,6 @@ const NAV_LINKS = [
   { href: "/console", label: "Console" },
 ] as const;
 
-/** Deterministic Swiss monochrome 3x3 geometric avatar derived from EVM address bytes. */
-function AddressAvatar({ address, size = 20 }: { address: string; size?: number }) {
-  const hex = address.replace(/^0x/i, "").padEnd(16, "0");
-  const cells: number[] = [];
-  for (let i = 0; i < 6; i++) {
-    cells.push(parseInt(hex.slice(i * 2, i * 2 + 2), 16));
-  }
-  const c = (idx: number) => (cells[idx] ?? 0) % 3;
-  const grid = [
-    c(0), c(1), c(0),
-    c(2), c(3), c(2),
-    c(4), c(5), c(4),
-  ];
-  const fills = ["#111111", "#71717A", "#E4E4E7"];
-
-  return (
-    <span
-      aria-hidden="true"
-      style={{ width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded bg-[#F4F4F5] ring-1 ring-black/[0.08]"
-    >
-      <svg width={size * 0.68} height={size * 0.68} viewBox="0 0 18 18" fill="none">
-        {grid.map((tone, idx) => {
-          const x = (idx % 3) * 6;
-          const y = Math.floor(idx / 3) * 6;
-          return (
-            <rect
-              key={idx}
-              x={x + 0.6}
-              y={y + 0.6}
-              width={4.8}
-              height={4.8}
-              rx={1.1}
-              fill={fills[tone]}
-            />
-          );
-        })}
-      </svg>
-    </span>
-  );
-}
-
 export function Navbar() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
@@ -97,61 +55,68 @@ export function Navbar() {
   const wrongChain = isConnected && chainId !== celo.id;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-background/85 backdrop-blur-md">
-      <div className="mx-auto grid h-16 max-w-[1240px] grid-cols-[1fr_auto] items-center gap-3 px-4 sm:gap-4 sm:px-6 md:grid-cols-[1fr_auto_1fr] lg:px-8">
-        {/* Left: Brand Lockup */}
-        <div className="flex min-w-0 items-center">
+    <header className="sticky top-0 z-40 border-b border-[#E4E2DC] bg-[#FAF9F6]/92 backdrop-blur-sm">
+      <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        {/* Left: Brand Lockup + Hairline Divider + Flush-Underline Ledger Nav */}
+        <div className="flex h-full items-center gap-5">
           <Link
             href="/"
             aria-label="Vire — Overview"
-            className="vire-pressable inline-flex shrink-0 items-center rounded-lg py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20"
+            className="vire-pressable inline-flex shrink-0 items-center rounded-[4px] py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#121210]/20"
           >
-            <VireLogo size={28} />
+            <VireLogo size={24} />
           </Link>
+
+          <span className="hidden h-4 w-px bg-[#D5D2C9] md:block" aria-hidden="true" />
+
+          <nav aria-label="Primary" className="hidden h-full items-stretch gap-1 md:flex">
+            {NAV_LINKS.map((item) => {
+              const active = activeHref === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  prefetch={true}
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => {
+                    if (item.href !== pathname) setPendingHref(item.href);
+                  }}
+                  className={cn(
+                    "relative inline-flex items-center whitespace-nowrap px-2.5 text-[13px] font-medium transition-colors duration-150",
+                    active
+                      ? "text-[#121210]"
+                      : "text-[#68665F] hover:text-[#121210]"
+                  )}
+                >
+                  <span>{item.label}</span>
+                  {active && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-x-1.5 bottom-0 h-[2px] bg-[#121210]"
+                    />
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
 
-        {/* Center: Floating Segmented Pill Navigation */}
-        <nav
-          aria-label="Primary"
-          className="hidden items-center gap-0.5 rounded-full bg-black/[0.045] p-1 md:inline-flex"
-        >
-          {NAV_LINKS.map((item) => {
-            const active = activeHref === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                prefetch={true}
-                aria-current={active ? "page" : undefined}
-                onClick={() => {
-                  if (item.href !== pathname) setPendingHref(item.href);
-                }}
-                className={cn(
-                  "vire-pressable whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-medium",
-                  active
-                    ? "bg-card text-foreground shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Right: Quiet Protocol Link + Wallet Control */}
-        <div className="flex min-w-0 items-center justify-end gap-2.5 sm:gap-3">
+        {/* Right: Quiet Celo Chain Stamp + Rectangular Wallet Control */}
+        <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/api/agent-card.json"
-            className="hidden items-center gap-1.5 font-mono text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
+            className="hidden items-center gap-2 border-r border-[#E4E2DC] pr-3 font-mono text-[11px] text-[#68665F] transition-colors hover:text-[#121210] lg:inline-flex"
             title="Inspect ERC-8004 agent registration manifest"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-            <span>{rep?.registered && rep.agentId ? `Agent #${rep.agentId}` : "Celo 42220"}</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-[#121210]" />
+            <span>CELO 42220</span>
+            {rep?.registered && rep.agentId && (
+              <span className="text-[#121210]">#{rep.agentId}</span>
+            )}
           </Link>
 
           {!mounted ? (
-            <div className="h-8 w-28 animate-pulse rounded-lg bg-black/[0.06]" />
+            <div className="h-8 w-28 animate-pulse rounded-[6px] bg-[#ECEAE4]" />
           ) : wrongChain ? (
             <Button
               size="sm"
@@ -162,15 +127,15 @@ export function Navbar() {
               Switch to Celo
             </Button>
           ) : isConnected && address ? (
-            <div className="inline-flex h-8 items-center gap-2 rounded-lg border border-black/[0.09] bg-card pl-1.5 pr-1 font-mono text-xs text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-              <AddressAvatar address={address} size={20} />
+            <div className="inline-flex h-8 items-center gap-1.5 rounded-[6px] border border-[#D5D2C9] bg-white pl-2.5 pr-1 font-mono text-xs text-[#121210]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#121210]" />
               <span className="tabular-nums">{truncateMiddle(address, 6, 4)}</span>
               <button
                 type="button"
                 onClick={() => disconnect()}
                 aria-label="Disconnect wallet"
                 title="Disconnect wallet"
-                className="vire-pressable flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-black/[0.05] hover:text-foreground"
+                className="vire-pressable ml-0.5 flex h-6 w-6 items-center justify-center rounded-[4px] text-[#68665F] hover:bg-[#F3F1EC] hover:text-[#121210]"
               >
                 <SignOut weight="regular" className="h-3.5 w-3.5" />
               </button>
@@ -192,10 +157,10 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile navigation strip — fits all 5 concise links cleanly inside 390px */}
+      {/* Mobile navigation strip — crisp underline tabs fitting 390px cleanly */}
       <nav
         aria-label="Mobile navigation"
-        className="flex items-center justify-between border-t border-black/[0.06] bg-background/95 px-3 py-1.5 md:hidden"
+        className="flex items-stretch justify-between border-t border-[#E4E2DC] bg-[#FAF9F6] px-3 md:hidden"
       >
         {NAV_LINKS.map((item) => {
           const active = activeHref === item.href;
@@ -208,13 +173,17 @@ export function Navbar() {
                 if (item.href !== pathname) setPendingHref(item.href);
               }}
               className={cn(
-                "vire-pressable whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium",
-                active
-                  ? "bg-card text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.07)]"
-                  : "text-muted-foreground"
+                "relative whitespace-nowrap px-2 py-2.5 text-xs font-medium",
+                active ? "text-[#121210]" : "text-[#68665F]"
               )}
             >
               {item.label}
+              {active && (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-1 bottom-0 h-[2px] bg-[#121210]"
+                />
+              )}
             </Link>
           );
         })}
