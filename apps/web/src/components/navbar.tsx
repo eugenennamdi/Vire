@@ -57,9 +57,9 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-[#F5F5F7]/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-[1220px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        {/* Left: Brand + Quiet Institutional Capsule Navigation */}
-        <div className="flex items-center gap-6">
+      <div className="mx-auto flex h-16 max-w-[1220px] items-center justify-between gap-4 px-4 sm:px-6 md:grid md:grid-cols-[1fr_auto_1fr] lg:px-8">
+        {/* Left: Brand Anchor */}
+        <div className="flex items-center justify-self-start">
           <Link
             href="/"
             aria-label="Vire — Overview"
@@ -67,35 +67,39 @@ export function Navbar() {
           >
             <VireLogo size={26} />
           </Link>
-
-          <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
-            {NAV_LINKS.map((item) => {
-              const active = activeHref === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  prefetch={true}
-                  aria-current={active ? "page" : undefined}
-                  onClick={() => {
-                    if (item.href !== pathname) setPendingHref(item.href);
-                  }}
-                  className={cn(
-                    "vire-pressable inline-flex h-8 items-center whitespace-nowrap rounded-full px-3.5 text-[13.5px] font-medium",
-                    active
-                      ? "vire-pill-surface text-[#0A0A0C]"
-                      : "text-[#71717A] hover:bg-black/[0.04] hover:text-[#0A0A0C]"
-                  )}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
         </div>
 
+        {/* Center: Optically Centered Primary Navigation */}
+        <nav
+          aria-label="Primary"
+          className="hidden items-center justify-center gap-1 justify-self-center md:flex"
+        >
+          {NAV_LINKS.map((item) => {
+            const active = activeHref === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                prefetch={true}
+                aria-current={active ? "page" : undefined}
+                onClick={() => {
+                  if (item.href !== pathname) setPendingHref(item.href);
+                }}
+                className={cn(
+                  "vire-pressable inline-flex h-8 items-center whitespace-nowrap rounded-full px-3.5 text-[13.5px] font-medium leading-none",
+                  active
+                    ? "vire-pill-surface text-[#0A0A0C]"
+                    : "text-[#71717A] hover:bg-black/[0.04] hover:text-[#0A0A0C]"
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
         {/* Right: Official Celo Network Pill + Full-Capsule Wallet Control */}
-        <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex min-w-0 items-center justify-end gap-2.5 justify-self-end">
           <Link
             href="/api/agent-card.json"
             className="vire-pressable vire-pill-surface hidden h-8 items-center gap-2 rounded-full pl-1.5 pr-3 text-[12px] font-medium text-[#3F3F46] hover:text-[#0A0A0C] lg:inline-flex"

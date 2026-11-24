@@ -84,38 +84,38 @@ export default async function HomePage() {
   return (
     <div className="space-y-16">
       {/* BAND 1: Morpho-Inspired Architectural Monochrome Hero Frame */}
-      <section className="vire-enter vire-card vire-blueprint relative overflow-hidden rounded-2xl p-6 sm:p-10 lg:p-12">
+      <section className="vire-enter vire-card vire-blueprint relative overflow-hidden rounded-2xl p-7 sm:p-10 lg:px-12 lg:py-11">
         {/* Corner Registration Ticks (Morpho Blueprint Precision) */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute left-3 top-3 h-2.5 w-2.5 border-l border-t border-black/20"
+          className="pointer-events-none absolute left-3.5 top-3.5 h-2.5 w-2.5 border-l border-t border-black/20"
         />
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute right-3 top-3 h-2.5 w-2.5 border-r border-t border-black/20"
+          className="pointer-events-none absolute right-3.5 top-3.5 h-2.5 w-2.5 border-r border-t border-black/20"
         />
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute bottom-3 left-3 h-2.5 w-2.5 border-b border-l border-black/20"
+          className="pointer-events-none absolute bottom-3.5 left-3.5 h-2.5 w-2.5 border-b border-l border-black/20"
         />
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute bottom-3 right-3 h-2.5 w-2.5 border-b border-r border-black/20"
+          className="pointer-events-none absolute bottom-3.5 right-3.5 h-2.5 w-2.5 border-b border-r border-black/20"
         />
 
-        <div className="relative grid gap-10 lg:grid-cols-12 lg:items-end">
+        <div className="relative grid gap-10 lg:grid-cols-12 lg:items-stretch">
           {/* Left: Calm Institutional Display Copy */}
           <div className="min-w-0 space-y-5 lg:col-span-7">
-            <div className="vire-pill-surface inline-flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1 text-[12px] font-medium text-[#3F3F46]">
+            <div className="vire-pill-surface inline-flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1 text-[12px] font-medium leading-none text-[#3F3F46]">
               <TokenIcon symbol="CELO" size={16} />
               <span>Autonomous FX clearing on Celo</span>
             </div>
 
-            <h1 className="max-w-[16ch] text-[36px] font-normal leading-[1.06] tracking-[-0.04em] text-[#0A0A0C] sm:text-[48px] lg:text-[52px]">
+            <h1 className="max-w-[15ch] text-[36px] font-normal leading-[1.06] tracking-[-0.04em] text-[#0A0A0C] sm:text-[48px] lg:text-[52px]">
               Pay verified work in exact local currency.
             </h1>
 
-            <p className="max-w-[48ch] text-[15px] leading-[1.6] text-[#52525B] sm:text-[16px]">
+            <p className="max-w-[46ch] text-[15px] leading-[1.6] text-[#52525B] sm:text-[15.5px]">
               Vire audits off-chain deliverables via paid x402, enforces onchain vault caps, and
               settles exact local stablecoins over Textile FX.
             </p>
@@ -131,56 +131,64 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Right: Calm Right-Aligned Protocol Telemetry (Morpho Scale + Official Token Icons) */}
-          <div className="flex flex-col gap-6 border-t border-black/[0.06] pt-6 lg:col-span-5 lg:items-end lg:border-t-0 lg:pt-0 lg:text-right">
+          {/* Right: Balanced Protocol Telemetry aligned to top, middle, and bottom of hero */}
+          <div className="flex flex-col justify-between gap-6 border-t border-black/[0.06] pt-6 lg:col-span-5 lg:items-end lg:border-t-0 lg:pt-1 lg:text-right">
+            {/* Top-right: Live VireVault Custody */}
             <div>
-              <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-[#71717A] lg:justify-end">
+              <div className="flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] text-[#71717A] lg:justify-end">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A] ring-4 ring-[#16A34A]/15" />
-                <span>VireVault Custody</span>
+                <span className="uppercase">VireVault Custody</span>
                 {vault.address && (
                   <a
                     href={celoscanAddressUrl(vault.address)}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-0.5 text-[#0A0A0C] hover:underline"
+                    className="inline-flex items-center gap-0.5 normal-case tracking-normal text-[#0A0A0C] hover:underline"
                   >
                     {truncateMiddle(vault.address, 6, 4)}
                     <ArrowUpRight className="h-3 w-3" />
                   </a>
                 )}
               </div>
-              <div className="mt-2 inline-flex items-center gap-2.5 lg:justify-end">
+              <div className="mt-2.5 inline-flex items-center gap-2.5 lg:justify-end">
                 <TokenIcon symbol="USDT" size={28} showChainBadge />
-                <span className="text-[32px] font-normal leading-none tracking-[-0.035em] text-[#0A0A0C] tabular-nums sm:text-[36px]">
-                  {vaultFormatted !== null ? `$${vaultFormatted}` : "—"}
-                </span>
-                <span className="font-mono text-[12px] text-[#71717A]">USDT</span>
+                <div className="inline-flex items-baseline gap-1.5">
+                  <span className="text-[34px] font-normal leading-none tracking-[-0.035em] text-[#0A0A0C] tabular-nums sm:text-[38px]">
+                    {vaultFormatted !== null ? `$${vaultFormatted}` : "—"}
+                  </span>
+                  <span className="font-mono text-[12px] font-medium text-[#71717A]">USDT</span>
+                </div>
               </div>
             </div>
 
+            {/* Middle-right: Official Unclipped Supported Rails */}
             <div>
-              <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#71717A]">
+              <div className="font-mono text-[11px] uppercase tracking-[0.06em] text-[#71717A]">
                 Supported Local Rails
               </div>
-              <div className="mt-2 inline-flex items-center gap-3 lg:justify-end">
+              <div className="mt-2.5 inline-flex flex-wrap items-center gap-3 lg:justify-end">
                 <TokenStack
                   symbols={["cNGN", "wARS", "wBRL", "IDRX", "wMXN"]}
-                  size={24}
+                  size={23}
                 />
-                <span className="text-[14px] font-medium text-[#0A0A0C] tabular-nums">
+                <span className="text-[13.5px] font-medium text-[#0A0A0C] tabular-nums">
                   5 corridors
                 </span>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11.5px] text-[#71717A] lg:justify-end">
-              <Link href="/api/agent-card.json" className="hover:text-[#0A0A0C]">
+            {/* Bottom-right: Anchored cleanly to CTA baseline */}
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pb-1 font-mono text-[11.5px] text-[#71717A] lg:justify-end">
+              <Link href="/api/agent-card.json" className="transition-colors hover:text-[#0A0A0C]">
                 {rep.registered && rep.agentId ? `ERC-8004 #${rep.agentId}` : "ERC-8004"}
               </Link>
-              <span>·</span>
+              <span className="text-[#D4D4D8]">/</span>
               <span>{attributionCode}</span>
-              <span>·</span>
-              <Link href="/ledger" className="inline-flex items-center gap-0.5 text-[#0A0A0C] hover:underline">
+              <span className="text-[#D4D4D8]">/</span>
+              <Link
+                href="/ledger"
+                className="inline-flex items-center gap-0.5 font-medium text-[#0A0A0C] hover:underline"
+              >
                 Audit ledger <ArrowUpRight className="h-3 w-3" />
               </Link>
             </div>

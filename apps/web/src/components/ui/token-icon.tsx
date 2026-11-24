@@ -102,11 +102,9 @@ export function TokenStack({
   className?: string;
 }) {
   return (
-    <span className={cn("inline-flex items-center -space-x-1.5", className)}>
+    <span className={cn("inline-flex items-center gap-1.5", className)}>
       {symbols.map((sym) => (
-        <span key={sym} className="inline-flex rounded-full ring-2 ring-white">
-          <TokenIcon symbol={sym} size={size} />
-        </span>
+        <TokenIcon key={sym} symbol={sym} size={size} />
       ))}
     </span>
   );

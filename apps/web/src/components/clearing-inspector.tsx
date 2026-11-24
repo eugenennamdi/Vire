@@ -559,7 +559,7 @@ export function ClearingInspector({
                   <div className="flex items-center justify-between gap-3 py-2.5">
                     <dt className="text-[#71717A]">Vault limits</dt>
                     <dd className="font-mono text-[#0A0A0C] tabular-nums">
-                      &le; ${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "15"}/tx · &le;{" "}
+                      &lt;= ${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "15"}/tx · &lt;={" "}
                       {matchedCampaign?.maxSpreadBps ?? 250} bps
                     </dd>
                   </div>
