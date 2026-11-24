@@ -4,12 +4,14 @@ import { CELO_CONTRACTS, CELO_TOKENS, parseTokenAmount } from "@vire/shared";
 import { TextileClient } from "@vire/textile";
 import {
   assertSafePublicUrl,
+  computeDeliverableHash,
   evaluatePolicyGate,
   fetchDeliverableArtifact,
   isPrivateOrReservedIp,
   normalizeDeliverableUrl,
   parseVerificationVerdict,
   SettlementOrchestrator,
+  verifyDeliverableWithBuy,
   type OrchestratorCampaignRecord,
   type OrchestratorPersistenceAdapter,
   type PolicyGateInput,
@@ -195,6 +197,39 @@ describe("SSRF & prompt-injection fail-closed guards", () => {
     expect(artifact.authorHandle).toBe("promouser");
     expect(artifact.excerpt).toContain("swotgadgets.com/product/iphone-15");
     expect(artifact.excerpt).toContain("#SWOTBlackFriday");
+
+    // Same URL submitted by two different handles MUST produce the exact same anti-replay hash
+    const campaignId = "0x1111111111111111111111111111111111111111111111111111111111111111";
+    expect(
+      computeDeliverableHash({
+        campaignIdBytes32: campaignId,
+        deliverableUrl: "https://x.com/promouser/status/123456789",
+        contributorHandle: "promouser",
+      })
+    ).toBe(
+      computeDeliverableHash({
+        campaignIdBytes32: campaignId,
+        deliverableUrl: "https://twitter.com/PromoUser/status/123456789?s=20",
+        contributorHandle: "other_person",
+      })
+    );
+
+    // Author spoofing guard: @other_person submitting @promouser's tweet MUST reject BEFORE spending on `buy`
+    const buyClient = new CeloBuyClient({ dryRun: true });
+    const inferSpy = vi.spyOn(buyClient, "callCencoriInference");
+    const spoofed = await verifyDeliverableWithBuy(buyClient, {
+      deliverableUrl: "https://x.com/promouser/status/123456789",
+      deliverableType: "promo_post",
+      campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
+      criteria: "Post about swotgadgets.com",
+      contributorHandle: "other_person",
+      fetchImpl: mockFetch,
+    });
+    expect(spoofed.verdict.verdict).toBe("reject");
+    expect(spoofed.verdict.score).toBe(0);
+    expect(spoofed.verdict.reason).toContain("Author mismatch");
+    expect(spoofed.buyReceipts).toHaveLength(0);
+    expect(inferSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -311,6 +346,11 @@ describe("SettlementOrchestrator atomic flow & quote-expiry refund recovery", ()
 
     const publicClient = {
       readContract: vi.fn(async () => 1_000_000_000n),
+      getBalance: vi.fn(async ({ address }: { address: string }) =>
+        address.toLowerCase() === "0x3333333333333333333333333333333333333333"
+          ? 0n
+          : 5_000_000_000_000_000_000n
+      ),
       waitForTransactionReceipt: vi.fn(async () => ({ status: "success" })),
     } as never;
 
@@ -347,7 +387,7 @@ describe("SettlementOrchestrator atomic flow & quote-expiry refund recovery", ()
       contributorWallet: "0x3333333333333333333333333333333333333333",
       identityVerified: true,
       identityHandle: "ada_dev",
-      deliverableUrl: "https://example.com/promo-post-1",
+      deliverableUrl: "https://example.com/?promo=1",
     });
 
     expect(result.status).toBe("COMPLETED");
@@ -356,6 +396,7 @@ describe("SettlementOrchestrator atomic flow & quote-expiry refund recovery", ()
     expect(completedRecord?.usdtSpentAtomic).toBe("10382000");
     // 10556000 released - 10382000 spent = 174000 refunded back to VireVault
     expect(completedRecord?.usdtRefundedAtomic).toBe("174000");
+    expect(result.txHashes?.gasDrip).toBeDefined();
     expect(result.offramp?.provider).toBe("cngn_venues");
   });
 
@@ -425,7 +466,7 @@ describe("SettlementOrchestrator atomic flow & quote-expiry refund recovery", ()
       contributorWallet: "0x3333333333333333333333333333333333333333",
       identityVerified: true,
       identityHandle: "ada_dev",
-      deliverableUrl: "https://example.com/promo-post-2",
+      deliverableUrl: "https://example.com/?promo=2",
     });
 
     expect(result.status).toBe("REFUNDED");

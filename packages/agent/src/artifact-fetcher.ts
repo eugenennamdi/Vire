@@ -102,10 +102,15 @@ export function normalizeDeliverableUrl(rawUrl: string): string {
   return `${u.protocol}//${u.hostname.toLowerCase()}${u.pathname.replace(/\/+$/, "") || "/"}${u.search}`;
 }
 
-/** Deterministic onchain bytes32 deliverable hash matching VireVault replay protection. */
+/**
+ * Deterministic onchain bytes32 deliverable hash matching VireVault replay protection.
+ * Intentionally binds ONLY (campaignId, normalizedUrl) so a second wallet/handle cannot
+ * replay an already-claimed X post or GitHub PR URL under a different handle.
+ */
 export function computeDeliverableHash(params: {
   campaignIdBytes32: Hex;
   deliverableUrl: string;
+  /** @deprecated Ignored so the same URL cannot be replayed across handles. */
   contributorHandle?: string;
 }): Hex {
   const normalizedUrl = normalizeDeliverableUrl(params.deliverableUrl);
@@ -114,9 +119,8 @@ export function computeDeliverableHash(params: {
       [
         { name: "campaignId", type: "bytes32" },
         { name: "normalizedUrl", type: "string" },
-        { name: "handle", type: "string" },
       ],
-      [params.campaignIdBytes32, normalizedUrl, (params.contributorHandle ?? "").trim().toLowerCase()]
+      [params.campaignIdBytes32, normalizedUrl]
     )
   );
 }
@@ -127,6 +131,8 @@ function stripHtmlToExcerpt(html: string, maxChars = 4_000): { title: string; ex
   const stripped = html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    // Preserve external href URLs (e.g. oEmbed tweet links) before stripping anchor tags
+    .replace(/<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>/gi, " $1 ")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();

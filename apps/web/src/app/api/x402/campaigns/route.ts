@@ -11,6 +11,7 @@ import { ensureDatabaseReady, getDb, schema } from "@/db";
 import { executeX402ProtectedRoute } from "@/lib/x402";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const CAMPAIGN_PRICE_USDT_ATOMIC = process.env.X402_CAMPAIGN_PRICE_USDT_ATOMIC?.trim() || "250000"; // $0.25 USD₮
 

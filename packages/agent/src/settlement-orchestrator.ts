@@ -107,7 +107,17 @@ export interface OrchestratorDeps {
   githubApiToken?: string;
   /** Optional explicit reference rate fetcher; defaults to Textile live levels top-of-book. */
   getReferenceRate?: (corridor: CorridorSymbol) => Promise<number | undefined>;
+  /**
+   * Optional first-time recipient native CELO gas drip (default 0.01 CELO when recipient holds < 0.005 CELO).
+   * Ensures Privy social-login embedded wallets can immediately transfer cNGN or submit ERC-8004 feedback.
+   * Set to 0n to disable.
+   */
+  recipientGasDripWei?: bigint;
 }
+
+const DEFAULT_RECIPIENT_GAS_DRIP_WEI = 10_000_000_000_000_000n; // 0.01 CELO (~$0.005)
+const RECIPIENT_GAS_THRESHOLD_WEI = 5_000_000_000_000_000n; // 0.005 CELO
+const AGENT_MIN_CELO_RESERVE_WEI = 50_000_000_000_000_000n; // Keep >= 0.05 CELO reserve in agent wallet
 
 export interface ProcessSubmissionParams {
   submissionId: string;
@@ -133,6 +143,7 @@ export interface ProcessSubmissionResult {
     textileSwap: Hash;
     localPayout: Hash;
     vaultReceipt: Hash;
+    gasDrip?: Hash;
   };
   refundTxHash?: Hash;
   offramp?: OfframpPackage;
@@ -208,19 +219,8 @@ export class SettlementOrchestrator {
 
     await this.deps.persistence.updateSubmissionStatus(submissionId, { status: "VERIFYING" });
 
-    // 1. Run Paid Verification via Celo `buy` + live Textile FX free preview in parallel
-    const [verification, previewResult, refRate, hashAlreadyUsed, contributorStats] = await Promise.all([
-      verifyDeliverableWithBuy(this.deps.buyClient, {
-        deliverableUrl: params.deliverableUrl,
-        deliverableType: campaign.deliverableType,
-        campaignTitle: campaign.title,
-        criteria: campaign.criteria,
-        contributorHandle: params.identityHandle ?? undefined,
-        deliverableNotes: params.deliverableNotes,
-        referralCode: params.referralCode,
-        githubApiToken: this.deps.githubApiToken,
-        useChainstackRpc: this.deps.useChainstackRpc,
-      }),
+    // 1a. Fast free deterministic pre-checks before paying $0.01 to `usebuy.ai`
+    const [previewResult, refRate, hashAlreadyUsed, contributorStats] = await Promise.all([
       this.deps.textileClient
         .previewExactOutput({
           buyToken: corridorMeta.tokenAddress,
@@ -232,6 +232,61 @@ export class SettlementOrchestrator {
       this.deps.persistence.isDeliverableHashUsed(deliverableHash),
       this.deps.persistence.getContributorPayoutStats(campaign.idBytes32, contributorWallet),
     ]);
+
+    const walletLower = contributorWallet.toLowerCase();
+    const isTeamWallet =
+      this.deps.teamBlocklist.has(walletLower) ||
+      (this.deps.vaultOwnerAddress && walletLower === this.deps.vaultOwnerAddress.toLowerCase()) ||
+      walletLower === this.deps.taggedWalletClient.account.address.toLowerCase();
+    const cooldownMs = campaign.stageCooldownHours * 60 * 60 * 1000;
+    const elapsedMs =
+      contributorStats.lastPayoutAtMs !== null
+        ? Date.now() - contributorStats.lastPayoutAtMs
+        : Number.POSITIVE_INFINITY;
+    const preEligible =
+      !hashAlreadyUsed &&
+      params.identityVerified &&
+      Boolean(params.identityHandle) &&
+      !isTeamWallet &&
+      campaign.active &&
+      contributorStats.count < campaign.maxPayoutsPerRecipient &&
+      params.stageIndex === contributorStats.count + 1 &&
+      elapsedMs >= cooldownMs &&
+      BigInt(campaign.remainingBudgetUsdtAtomic) > 0n;
+
+    // 1b. Run Paid Verification via Celo `buy` ONLY when contributor & campaign pre-checks pass
+    const verification = preEligible
+      ? await verifyDeliverableWithBuy(this.deps.buyClient, {
+          deliverableUrl: params.deliverableUrl,
+          deliverableType: campaign.deliverableType,
+          campaignTitle: campaign.title,
+          criteria: campaign.criteria,
+          contributorHandle: params.identityHandle ?? undefined,
+          deliverableNotes: params.deliverableNotes,
+          referralCode: params.referralCode,
+          githubApiToken: this.deps.githubApiToken,
+          useChainstackRpc: this.deps.useChainstackRpc,
+        })
+      : {
+          artifact: {
+            normalizedUrl: params.deliverableUrl,
+            sourceKind: "web_post" as const,
+            title: "Pre-check skipped",
+            authorHandle: null,
+            excerpt: "",
+            httpStatus: 0,
+            reachable: false,
+          },
+          verdict: {
+            verdict: "reject" as const,
+            score: 0,
+            confidence: 1,
+            reason: "Skipped paid AI verification because an eligibility or budget rule failed first.",
+            evidenceSummary: "Deterministic pre-check blocked claim before incurring verification cost.",
+          },
+          buyReceipts: [] as BuyPaymentReceipt[],
+          modelUsed: "pre-check-shortcircuit",
+        };
 
     for (const receipt of verification.buyReceipts) {
       await this.deps.persistence.recordBuyPayment(submissionId, receipt);
@@ -451,6 +506,32 @@ export class SettlementOrchestrator {
       useUsdtFeeAbstraction: this.deps.useUsdtFeeAbstraction,
     });
 
+    // 7b. Best-effort first-time native CELO gas drip (0.01 CELO) so social-login embedded wallets
+    // can immediately withdraw cNGN or submit ERC-8004 ratings without hitting a zero-gas trap.
+    let gasDripTxHash: Hash | undefined;
+    const dripWei = this.deps.recipientGasDripWei ?? DEFAULT_RECIPIENT_GAS_DRIP_WEI;
+    if (dripWei > 0n && typeof this.deps.publicClient.getBalance === "function") {
+      try {
+        const [recipientCelo, agentCelo] = await Promise.all([
+          this.deps.publicClient.getBalance({ address: contributorWallet }),
+          this.deps.publicClient.getBalance({ address: this.deps.taggedWalletClient.account.address }),
+        ]);
+        if (recipientCelo < RECIPIENT_GAS_THRESHOLD_WEI && agentCelo >= AGENT_MIN_CELO_RESERVE_WEI + dripWei) {
+          const dripTx = await sendTaggedTx({
+            walletClient: this.deps.taggedWalletClient,
+            publicClient: this.deps.publicClient,
+            to: contributorWallet,
+            value: dripWei,
+            attributionCode: this.attributionCode,
+            useUsdtFeeAbstraction: false, // simple native transfer paid in native CELO
+          });
+          gasDripTxHash = dripTx.hash;
+        }
+      } catch {
+        // Non-fatal: recipient already received their exact local stablecoin payout.
+      }
+    }
+
     const offramp = buildOfframpPackage({
       corridor: campaign.corridor,
       atomicAmount: exactBuyAmount,
@@ -487,6 +568,7 @@ export class SettlementOrchestrator {
         textileSwap: swapResult.swapTxHash,
         localPayout: payoutTx.hash,
         vaultReceipt: vaultReceiptTx.hash,
+        ...(gasDripTxHash ? { gasDrip: gasDripTxHash } : {}),
       },
       offramp,
     };

@@ -154,6 +154,117 @@ export async function getVaultSnapshot(): Promise<VaultLiveSnapshot> {
   }
 }
 
+export interface OnchainCampaignState {
+  exists: boolean;
+  active: boolean;
+  vaultPaused: boolean;
+  budgetUsdtAtomic: string;
+  remainingBudgetUsdtAtomic: string;
+  maxPerPayoutUsdtAtomic: string;
+  dailyLimitUsdtAtomic: string;
+  remainingDailyLimitUsdtAtomic: string;
+  maxPayoutsPerRecipient: number;
+}
+
+function minAtomic(a: string, b: string): string {
+  const ba = BigInt(a);
+  const bb = BigInt(b);
+  return (ba < bb ? ba : bb).toString();
+}
+
+/**
+ * Read live onchain campaign budgets, active status, and remaining 24h daily limits from VireVault.
+ * Keeps UI readouts and Policy Gate 100% synced with Celo Mainnet even after owner topUpCampaign() calls.
+ */
+export async function getOnchainCampaignStates(
+  campaignIds: Hex[]
+): Promise<Map<string, OnchainCampaignState>> {
+  const result = new Map<string, OnchainCampaignState>();
+  const address = getVaultAddress();
+  if (!address || campaignIds.length === 0) return result;
+
+  try {
+    const client = getPublicClient();
+    const [vaultPaused, entries] = await Promise.all([
+      client.readContract({ address, abi: VIRE_VAULT_ABI, functionName: "paused" }),
+      Promise.all(
+        campaignIds.map(async (id) => {
+          const [camp, remDaily] = await Promise.all([
+            client.readContract({
+              address,
+              abi: VIRE_VAULT_ABI,
+              functionName: "getCampaign",
+              args: [id],
+            }),
+            client.readContract({
+              address,
+              abi: VIRE_VAULT_ABI,
+              functionName: "remainingDailyLimit",
+              args: [id],
+            }),
+          ]);
+          return { id, camp, remDaily };
+        })
+      ),
+    ]);
+
+    for (const { id, camp, remDaily } of entries) {
+      if (!camp.exists) continue;
+      result.set(id.toLowerCase(), {
+        exists: true,
+        active: Boolean(camp.active && !vaultPaused),
+        vaultPaused: Boolean(vaultPaused),
+        budgetUsdtAtomic: camp.budgetUsdt.toString(),
+        remainingBudgetUsdtAtomic: camp.remainingBudget.toString(),
+        maxPerPayoutUsdtAtomic: camp.maxPerPayoutUsdt.toString(),
+        dailyLimitUsdtAtomic: camp.dailyLimitUsdt.toString(),
+        remainingDailyLimitUsdtAtomic: remDaily.toString(),
+        maxPayoutsPerRecipient: Number(camp.maxPayoutsPerRecipient),
+      });
+    }
+  } catch {
+    // Graceful fallback to DB cache if RPC is transiently unreachable
+  }
+
+  return result;
+}
+
+/** Merge a DB campaign row with its live onchain VireVault state when funded onchain. */
+export function mergeCampaignWithOnchain<
+  T extends {
+    id: string;
+    active: boolean;
+    budgetUsdtAtomic: string;
+    remainingUsdtAtomic: string;
+    maxPerPayoutUsdtAtomic: string;
+    dailyLimitUsdtAtomic: string;
+    maxPayoutsPerRecipient: number;
+  },
+>(row: T, onchainMap: Map<string, OnchainCampaignState>): T & { remainingDailyLimitUsdtAtomic: string; onchainSynced: boolean } {
+  const onchain = onchainMap.get(row.id.toLowerCase());
+  if (!onchain) {
+    return {
+      ...row,
+      remainingDailyLimitUsdtAtomic: row.dailyLimitUsdtAtomic,
+      onchainSynced: false,
+    };
+  }
+  return {
+    ...row,
+    active: row.active && onchain.active,
+    budgetUsdtAtomic: onchain.budgetUsdtAtomic,
+    remainingUsdtAtomic: onchain.remainingBudgetUsdtAtomic,
+    maxPerPayoutUsdtAtomic: minAtomic(row.maxPerPayoutUsdtAtomic, onchain.maxPerPayoutUsdtAtomic),
+    dailyLimitUsdtAtomic: minAtomic(row.dailyLimitUsdtAtomic, onchain.dailyLimitUsdtAtomic),
+    remainingDailyLimitUsdtAtomic: minAtomic(
+      row.dailyLimitUsdtAtomic,
+      onchain.remainingDailyLimitUsdtAtomic
+    ),
+    maxPayoutsPerRecipient: Math.min(row.maxPayoutsPerRecipient, onchain.maxPayoutsPerRecipient),
+    onchainSynced: true,
+  };
+}
+
 export interface ReputationLiveSnapshot {
   registered: boolean;
   agentId: string | null;
@@ -207,9 +318,25 @@ export function createDrizzlePersistenceAdapter(): OrchestratorPersistenceAdapte
         .limit(1);
 
       const row = existing[0];
-      if (!row) return false;
-      // Only AUTHORIZED/SWAPPING/PAYING/COMPLETED lock the hash permanently; REJECTED/REFUNDED do not steal a valid deliverable.
-      return ["AUTHORIZED", "SWAPPING", "PAYING", "COMPLETED"].includes(row.status);
+      if (row && ["AUTHORIZED", "SWAPPING", "PAYING", "COMPLETED"].includes(row.status)) {
+        return true;
+      }
+      // Belt-and-suspenders: also verify onchain VireVault replay flag so DB resets can never allow replay.
+      const vaultAddr = getVaultAddress();
+      if (vaultAddr) {
+        try {
+          const usedOnchain = await getPublicClient().readContract({
+            address: vaultAddr,
+            abi: VIRE_VAULT_ABI,
+            functionName: "usedDeliverableHashes",
+            args: [deliverableHash],
+          });
+          if (usedOnchain) return true;
+        } catch {
+          // Fall back to DB check on transient RPC hiccup
+        }
+      }
+      return false;
     },
 
     async getContributorPayoutStats(campaignIdBytes32: Hex, wallet: Address) {

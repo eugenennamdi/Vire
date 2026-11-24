@@ -18,12 +18,15 @@ import {
   createLiveOrchestrator,
   getAgentAddress,
   getBuyClient,
+  getOnchainCampaignStates,
   getTextileClient,
   getVaultAddress,
   getVaultSnapshot,
+  mergeCampaignWithOnchain,
 } from "@/lib/runtime";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   await ensureDatabaseReady();
@@ -106,11 +109,27 @@ export async function POST(req: NextRequest) {
       createdAt: now,
       updatedAt: now,
     });
+  } else {
+    // Cleanly reset a previously REJECTED/REFUNDED/FAILED submission row on retry
+    await db
+      .update(schema.submissions)
+      .set({
+        stageIndex: selectedStage.stageIndex,
+        contributorWallet: walletLower,
+        deliverableUrl: parsed.data.deliverableUrl,
+        deliverableNotes: parsed.data.deliverableNotes,
+        status: "SUBMITTED",
+        failedPolicyRule: null,
+        updatedAt: now,
+      })
+      .where(eq(schema.submissions.id, submissionId));
   }
 
   const vaultAddress = getVaultAddress();
   const agentAddress = getAgentAddress();
   const hasLiveExecutionKeys = Boolean(vaultAddress && agentAddress);
+  const onchainMap = await getOnchainCampaignStates([campaignRow.id as Hex]);
+  const syncedCampaign = mergeCampaignWithOnchain(campaignRow, onchainMap);
 
   // When mainnet vault & agent key are configured, run the full atomic SettlementOrchestrator.
   if (hasLiveExecutionKeys) {
@@ -119,21 +138,21 @@ export async function POST(req: NextRequest) {
       const result = await orchestrator.processSubmission({
         submissionId,
         campaign: {
-          idBytes32: campaignRow.id as Hex,
-          slug: campaignRow.slug,
-          title: campaignRow.title,
-          deliverableType: campaignRow.deliverableType as DeliverableType,
-          criteria: `${campaignRow.criteria}\nStage ${selectedStage.stageIndex}: ${selectedStage.instructions}`,
-          corridor: campaignRow.corridor as CorridorSymbol,
+          idBytes32: syncedCampaign.id as Hex,
+          slug: syncedCampaign.slug,
+          title: syncedCampaign.title,
+          deliverableType: syncedCampaign.deliverableType as DeliverableType,
+          criteria: `${syncedCampaign.criteria}\nStage ${selectedStage.stageIndex}: ${selectedStage.instructions}`,
+          corridor: syncedCampaign.corridor as CorridorSymbol,
           rewardLocalAtomic: selectedStage.rewardLocalAtomic,
-          active: campaignRow.active,
-          remainingBudgetUsdtAtomic: campaignRow.remainingUsdtAtomic,
-          maxPerPayoutUsdtAtomic: campaignRow.maxPerPayoutUsdtAtomic,
-          remainingDailyLimitUsdtAtomic: campaignRow.dailyLimitUsdtAtomic,
-          maxPayoutsPerRecipient: campaignRow.maxPayoutsPerRecipient,
+          active: syncedCampaign.active,
+          remainingBudgetUsdtAtomic: syncedCampaign.remainingUsdtAtomic,
+          maxPerPayoutUsdtAtomic: syncedCampaign.maxPerPayoutUsdtAtomic,
+          remainingDailyLimitUsdtAtomic: syncedCampaign.remainingDailyLimitUsdtAtomic,
+          maxPayoutsPerRecipient: syncedCampaign.maxPayoutsPerRecipient,
           stageCooldownHours: selectedStage.cooldownHours,
-          maxSpreadBps: campaignRow.maxSpreadBps,
-          minPassScore: campaignRow.minPassScore,
+          maxSpreadBps: syncedCampaign.maxSpreadBps,
+          minPassScore: syncedCampaign.minPassScore,
         },
         stageIndex: selectedStage.stageIndex,
         contributorWallet: wallet,
@@ -206,12 +225,12 @@ export async function POST(req: NextRequest) {
     teamBlocklist: parseTeamBlocklist(process.env.TEAM_WALLET_BLOCKLIST),
     vaultOwnerAddress: vaultSnap.owner ?? undefined,
     settlementAgentAddress: agentAddress ?? undefined,
-    campaignActive: campaignRow.active,
-    campaignRemainingBudgetUsdtAtomic: BigInt(campaignRow.remainingUsdtAtomic),
-    campaignMaxPerPayoutUsdtAtomic: BigInt(campaignRow.maxPerPayoutUsdtAtomic),
-    campaignRemainingDailyLimitUsdtAtomic: BigInt(campaignRow.dailyLimitUsdtAtomic),
+    campaignActive: syncedCampaign.active,
+    campaignRemainingBudgetUsdtAtomic: BigInt(syncedCampaign.remainingUsdtAtomic),
+    campaignMaxPerPayoutUsdtAtomic: BigInt(syncedCampaign.maxPerPayoutUsdtAtomic),
+    campaignRemainingDailyLimitUsdtAtomic: BigInt(syncedCampaign.remainingDailyLimitUsdtAtomic),
     contributorPayoutCountInCampaign: stats.count,
-    maxPayoutsPerRecipient: campaignRow.maxPayoutsPerRecipient,
+    maxPayoutsPerRecipient: syncedCampaign.maxPayoutsPerRecipient,
     requestedStageIndex: selectedStage.stageIndex,
     lastPayoutAtMs: stats.lastPayoutAtMs,
     stageCooldownHours: selectedStage.cooldownHours,

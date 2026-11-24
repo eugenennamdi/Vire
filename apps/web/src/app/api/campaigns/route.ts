@@ -1,8 +1,10 @@
 import { CORRIDORS, formatTokenAmount, type CampaignStage, type CorridorSymbol } from "@vire/shared";
 import { desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import type { Hex } from "viem";
 import { ensureDatabaseReady, getDb, schema } from "@/db";
 import { ensureDefaultCampaignsSeeded } from "@/db/seed";
+import { getOnchainCampaignStates, mergeCampaignWithOnchain } from "@/lib/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,10 @@ export async function GET() {
     .from(schema.campaigns)
     .orderBy(desc(schema.campaigns.isLaunchPartner), desc(schema.campaigns.createdAt));
 
-  const campaigns = rows.map((row) => {
+  const onchainMap = await getOnchainCampaignStates(rows.map((r) => r.id as Hex));
+
+  const campaigns = rows.map((rawRow) => {
+    const row = mergeCampaignWithOnchain(rawRow, onchainMap);
     const corridor = row.corridor as CorridorSymbol;
     const stages = JSON.parse(row.stagesJson) as CampaignStage[];
     return {

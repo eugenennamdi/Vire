@@ -24,7 +24,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { zeroHash, type Address } from "viem";
-import { useAccount, useSignMessage, useWriteContract } from "wagmi";
+import { useAccount, useConnect, useSignMessage, useWriteContract } from "wagmi";
+import { useIsMiniPay } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -79,6 +80,7 @@ interface SubmissionResponse {
     textileSwap: string;
     localPayout: string;
     vaultReceipt: string;
+    gasDrip?: string;
   };
   refundTxHash?: string;
   offramp?: OfframpPackage;
@@ -111,11 +113,18 @@ function ClaimFlowInner({
       : 1;
 
   const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount();
+  const { connect, connectors } = useConnect();
   const { signMessageAsync } = useSignMessage();
   const { writeContractAsync, isPending: isRatingTxPending } = useWriteContract();
 
   const address = wagmiAddress ?? privyWalletAddress;
   const isSignedIn = Boolean(address);
+  const triggerSignIn =
+    onSignIn ??
+    (() => {
+      const connector = connectors[0];
+      if (connector) connect({ connector });
+    });
 
   const [selectedSlug, setSelectedSlug] = useState(initialSlug);
   const [stageIndex, setStageIndex] = useState(validInitialStage);
@@ -152,6 +161,7 @@ function ClaimFlowInner({
           identityHandle: string;
           identityProfileUrl: string;
         } | null;
+        completedBySlug?: Record<string, { count: number; lastPayoutAtMs: number | null }>;
       };
     },
   });
@@ -189,6 +199,28 @@ function ClaimFlowInner({
   const activeCampaign = campData?.campaigns.find((c) => c.slug === selectedSlug);
   const activeStage =
     activeCampaign?.stages.find((s) => s.stageIndex === stageIndex) ?? activeCampaign?.stages[0];
+  const completedCountForCampaign = selectedSlug
+    ? (identityData?.completedBySlug?.[selectedSlug]?.count ?? 0)
+    : 0;
+  const expectedNextStage = completedCountForCampaign + 1;
+  const hasExplicitStageParam = Boolean(searchParams.get("stage"));
+
+  useEffect(() => {
+    if (!activeCampaign || hasExplicitStageParam) return;
+    const maxStage = activeCampaign.stages.length;
+    const nextStage = Math.min(maxStage, expectedNextStage);
+    if (nextStage >= 1) {
+      setStageIndex(nextStage);
+    }
+    // Only auto-select when the campaign or contributor's completed stage count changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSlug, expectedNextStage, hasExplicitStageParam, Boolean(activeCampaign)]);
+
+  const profileLinked = Boolean(identityData?.contributor);
+  const stageMismatchNote =
+    activeCampaign && expectedNextStage <= activeCampaign.stages.length && stageIndex !== expectedNextStage
+      ? `Complete Stage ${expectedNextStage} first before submitting Stage ${stageIndex}.`
+      : null;
 
   async function handleBindIdentity() {
     if (!address) return;
@@ -348,11 +380,9 @@ function ClaimFlowInner({
                   <WarningCircle weight="regular" className="h-4 w-4 shrink-0 text-[#0A0A0C]" />
                   <span>Sign in to link your profile and receive payouts.</span>
                 </div>
-                {onSignIn && (
-                  <Button type="button" size="sm" variant="primary" onClick={onSignIn}>
-                    Sign in
-                  </Button>
-                )}
+                <Button type="button" size="sm" variant="primary" onClick={triggerSignIn}>
+                  Sign in
+                </Button>
               </div>
             ) : (
               <div className="mt-4 space-y-3">
@@ -536,11 +566,17 @@ function ClaimFlowInner({
                 />
               </div>
 
+              {stageMismatchNote && (
+                <div className="rounded-xl bg-[#FEF2F2] px-3.5 py-2.5 text-[12px] text-[#B91C1C] ring-1 ring-[#DC2626]/20">
+                  {stageMismatchNote}
+                </div>
+              )}
+
               <Button
                 type="submit"
                 size="lg"
                 variant="primary"
-                disabled={!isSignedIn || isSubmitting}
+                disabled={!isSignedIn || !profileLinked || isSubmitting}
                 className="w-full"
               >
                 {isSubmitting ? (
@@ -548,6 +584,8 @@ function ClaimFlowInner({
                     <CircleNotch className="h-4 w-4 animate-spin" />
                     Verifying and paying…
                   </>
+                ) : isSignedIn && !profileLinked ? (
+                  <>Link your profile in Step 01 first</>
                 ) : (
                   <>
                     Verify &amp; get paid
@@ -632,7 +670,7 @@ function ClaimFlowInner({
                   {result.buyReceipts && result.buyReceipts.length > 0 && (
                     <div className="border-t border-black/[0.06] pt-3.5 text-xs">
                       <div className="font-mono text-[11px] text-[#71717A]">
-                        01 · x402 usebuy.ai receipts
+                        01 · Verification receipts
                       </div>
                       <div className="mt-2 space-y-1.5">
                         {result.buyReceipts.map((r, i) => (
@@ -662,7 +700,7 @@ function ClaimFlowInner({
                   {result.policyDecision && (
                     <div className="border-t border-black/[0.06] pt-3.5 text-xs">
                       <div className="font-mono text-[11px] text-[#71717A]">
-                        02 · Policy Gate checks
+                        02 · Safety &amp; limit checks
                       </div>
                       <ul className="mt-2 space-y-2">
                         {result.policyDecision.checks.map((chk) => (
@@ -701,6 +739,9 @@ function ClaimFlowInner({
                           ["Textile Swap", result.txHashes.textileSwap],
                           ["Local Payout", result.txHashes.localPayout],
                           ["Audit Receipt", result.txHashes.vaultReceipt],
+                          ...(result.txHashes.gasDrip
+                            ? [["Welcome Gas (CELO)", result.txHashes.gasDrip]]
+                            : []),
                         ].map(([label, hash]) => (
                           <div key={label} className="flex items-center justify-between gap-2">
                             <span className="text-[#71717A]">{label}</span>
@@ -847,6 +888,11 @@ function ClaimFlowWithPrivy() {
   );
 }
 
+function ClaimPageRouter() {
+  const isMiniPay = useIsMiniPay();
+  return PRIVY_ENABLED && !isMiniPay ? <ClaimFlowWithPrivy /> : <ClaimFlowInner />;
+}
+
 export default function ClaimPage() {
   return (
     <Suspense
@@ -857,7 +903,7 @@ export default function ClaimPage() {
         </div>
       }
     >
-      {PRIVY_ENABLED ? <ClaimFlowWithPrivy /> : <ClaimFlowInner />}
+      <ClaimPageRouter />
     </Suspense>
   );
 }

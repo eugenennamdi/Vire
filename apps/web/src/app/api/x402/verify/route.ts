@@ -13,6 +13,7 @@ import { getBuyClient, getTextileClient } from "@/lib/runtime";
 import { executeX402ProtectedRoute } from "@/lib/x402";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const VERIFY_PRICE_USDT_ATOMIC = process.env.X402_VERIFY_PRICE_USDT_ATOMIC?.trim() || "50000"; // $0.05 USD₮
 

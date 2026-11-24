@@ -9,6 +9,7 @@ import {
 } from "@vire/shared";
 import { desc } from "drizzle-orm";
 import Link from "next/link";
+import type { Hex } from "viem";
 import { ClearingInspector, type InspectorCampaign } from "@/components/clearing-inspector";
 import { HeroHyperboloid } from "@/components/hero-hyperboloid";
 import { ProtocolProofBlock } from "@/components/protocol-proof-block";
@@ -17,6 +18,7 @@ import { TokenIcon } from "@/components/ui/token-icon";
 import { ensureDatabaseReady, getDb, schema } from "@/db";
 import { ensureDefaultCampaignsSeeded } from "@/db/seed";
 import { getLiveCorridors } from "@/lib/corridors-live";
+import { getOnchainCampaignStates, mergeCampaignWithOnchain } from "@/lib/runtime";
 import { truncateMiddle } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +30,7 @@ export default async function HomePage() {
   const db = getDb();
   const attributionCode = process.env.VIRE_ATTRIBUTION_CODE || DEFAULT_ATTRIBUTION_CODE;
 
-  const [liveCorridors, campaignRows, settlements] = await Promise.all([
+  const [liveCorridors, rawCampaignRows, settlements] = await Promise.all([
     getLiveCorridors().catch(() => ({ asOf: new Date().toISOString(), corridors: [] })),
     db
       .select()
@@ -36,6 +38,9 @@ export default async function HomePage() {
       .orderBy(desc(schema.campaigns.isLaunchPartner), desc(schema.campaigns.createdAt)),
     db.select().from(schema.settlements).orderBy(desc(schema.settlements.settledAt)),
   ]);
+
+  const onchainMap = await getOnchainCampaignStates(rawCampaignRows.map((r) => r.id as Hex));
+  const campaignRows = rawCampaignRows.map((r) => mergeCampaignWithOnchain(r, onchainMap));
 
   const inspectorCampaigns: InspectorCampaign[] = campaignRows.map((row) => {
     const corridor = row.corridor as CorridorSymbol;

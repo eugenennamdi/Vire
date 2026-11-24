@@ -1,6 +1,13 @@
 # Vire — Autonomous Proof-of-Work & Multi-Corridor FX Settlement Agent (Celo Mainnet)
 
-Vire is an autonomous proof-of-work and commission settlement agent built for a Nigerian gadget retail launch partner and cross-border remote teams that verifies off-chain deliverables (promo posts, verified referrals, QA bug reports, and localization tasks), converts exact-output USD₮ into local stablecoins (`cNGN`, `wARS`, `wBRL`, `wMXN`, `IDRX`) on Textile FX, and settles directly to external contributors on Celo Mainnet (`42220`). It replaces hours of manual deliverable checking, spreadsheets, and 4–8% multi-hop FX/bank fees with a single auditable onchain settlement loop funded from one USD₮ treasury.
+**Vire** is an autonomous proof-of-work verification and exact-output local-currency payout agent built on **Celo Mainnet (`42220`)** and **Textile FX** for **SWOT Gadgets** (`swotgadgets.com`, `@swotgadgets`, Abeokuta, Nigeria) and cross-border remote teams. It verifies off-chain work (Black Friday promo posts, QA bug reports, and localization tasks) via paid Celo `buy` inference, enforces deterministic onchain spending caps in `VireVault.sol`, converts USD₮ into exact local stablecoins (`cNGN`, `wARS`, `wBRL`, `wMXN`, `IDRX`) via Textile FX request-for-quote, and pays contributors directly — replacing hours of manual link-checking, spreadsheets, and 4–8% multi-hop FX/bank fees with a single auditable onchain settlement loop.
+
+### Named Launch Partner & Real Job Done
+
+- **Partner**: **SWOT Gadgets** ([swotgadgets.com](https://swotgadgets.com) · `@swotgadgets` · Abeokuta, Nigeria)
+- **Job Done**: Automating Black Friday social promo verification and instant **exact Naira (`cNGN`)** payouts (`2,500 cNGN` Stage 1 + `3,500 cNGN` Stage 2 after 12h cooldown) for independent local promoters from a single USD₮ treasury — plus open-source QA bug bounties settled in exact **Argentine Peso (`wARS`)**.
+- **Time & Money Saved**: Eliminates ~15–20 minutes per promoter of manual tweet review, handle verification, bank-detail collection, and manual bank/FX conversion, while cutting FX/settlement overhead from 4–8% to live Textile FX maker quotes settled in one Celo block.
+- **Zero-Friction Onboarding**: Native auto-connect inside **Opera MiniPay** (`window.ethereum.isMiniPay`) + **Privy** (`Google` / `Email` / `X` / `WalletConnect` / `MetaMask` / `Rabby` / `Valora`) with automatic `0.01 CELO` welcome gas drip for first-time social wallets and 1-click in-app `cNGN` withdrawal to Busha, Quidax, Roqqu, Obiex, or MiniPay.
 
 ---
 
@@ -106,10 +113,10 @@ pnpm dev
 ```
 
 Visit:
-- **`/`** — Mission Control, live Textile FX corridor strip, Named Launch Partner spotlight
-- **`/campaigns`** — Multi-stage repeat missions (`Stage 1 → 2 → 3`) with onchain policy guardrails
-- **`/claim`** — Contributor wallet connect, EIP-191 / GitHub identity bind, live 5-step verification & settlement pipeline, Ripio/cNGN/IDRX cash-out package, and 1-click ERC-8004 `giveFeedback()`
-- **`/ledger`** — Public Live Settlement & Audit Ledger (Completed Settlements, Rejected Policy Gate Claims, Paid `buy` Receipts, and x402 PayTo Inflows)
+- **`/`** — Overview, live Textile FX liquidity & active onchain payout pool, live multi-currency corridor rates, and verifiable contract & policy code
+- **`/campaigns`** — Active multi-stage campaigns (`SWOT Gadgets Black Friday Promo Sprint` in `cNGN`, `Vire Open-Source QA Bug Bounty` in `wARS`) synced live to onchain `VireVault` balances
+- **`/claim`** — Native MiniPay auto-connect or Privy sign-in, EIP-191 profile link, live 5-step verification & exact-output Textile FX payout, cash-out links, and 1-click ERC-8004 onchain rating
+- **`/ledger`** — Public Live Settlement & Audit Ledger (Completed Payouts, Rejected Claims, Paid `buy` Verification Receipts, and x402 PayTo Inflows)
 - **`/console`** — Live `VireVault` inspector and interactive `POST /api/x402/verify` HTTP 402 playground
 
 ---
