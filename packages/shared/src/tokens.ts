@@ -27,6 +27,14 @@ export function validateAttributionCode(code: string): string {
 
 export type TokenSymbol = "USDT" | "USDC" | "cNGN" | "IDRX" | "wARS" | "wBRL" | "wMXN" | "wCOP";
 export type CorridorSymbol = "cNGN" | "IDRX" | "wARS" | "wBRL" | "wMXN" | "wCOP";
+export type FundingTokenSymbol = "USDT" | "USDC" | "CELO" | "cNGN" | "wARS" | "wBRL" | "wMXN" | "IDRX";
+
+export interface FundingTokenInfo {
+  symbol: FundingTokenSymbol;
+  name: string;
+  address: Address;
+  decimals: number;
+}
 
 export interface X402AssetDomain {
   name: string;
@@ -160,6 +168,31 @@ export const CELO_TOKENS: Record<TokenSymbol, CeloTokenInfo> = {
     notes: "Ripio wFIAT (18 decimals, Colombia interbank FX market hours).",
   },
 } as const;
+
+export const CELO_NATIVE_ERC20_ADDRESS = getAddress("0x471EcE3750Da237f93B8E339c536989b8978a438");
+
+/** Deep-liquidity Celo Mainnet tokens supported for campaign funding (direct USD₮ or auto-swapped via Textile FX into USD₮). */
+export const FUNDING_TOKENS: Record<FundingTokenSymbol, FundingTokenInfo> = {
+  USDT: { symbol: "USDT", name: "Tether USD", address: CELO_TOKENS.USDT.address, decimals: 6 },
+  USDC: { symbol: "USDC", name: "USD Coin", address: CELO_TOKENS.USDC.address, decimals: 6 },
+  CELO: { symbol: "CELO", name: "Celo", address: CELO_NATIVE_ERC20_ADDRESS, decimals: 18 },
+  cNGN: { symbol: "cNGN", name: "Compliant Naira", address: CELO_TOKENS.cNGN.address, decimals: 6 },
+  wARS: { symbol: "wARS", name: "Argentine Peso", address: CELO_TOKENS.wARS.address, decimals: 18 },
+  wBRL: { symbol: "wBRL", name: "Brazilian Real", address: CELO_TOKENS.wBRL.address, decimals: 18 },
+  wMXN: { symbol: "wMXN", name: "Mexican Peso", address: CELO_TOKENS.wMXN.address, decimals: 18 },
+  IDRX: { symbol: "IDRX", name: "Indonesian Rupiah", address: CELO_TOKENS.IDRX.address, decimals: 2 },
+};
+
+export const FUNDING_TOKEN_LIST: readonly FundingTokenSymbol[] = [
+  "USDT",
+  "USDC",
+  "CELO",
+  "cNGN",
+  "wARS",
+  "wBRL",
+  "wMXN",
+  "IDRX",
+];
 
 export const CELO_CONTRACTS = {
   USDT_FEE_ADAPTER: getAddress("0x0E2A3e05bc9A16F5292A6170456A710cb89C6f72"),

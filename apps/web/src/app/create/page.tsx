@@ -18,6 +18,8 @@ import {
   CELO_TOKENS,
   celoscanTxUrl,
   CORRIDORS,
+  FUNDING_TOKEN_LIST,
+  FUNDING_TOKENS,
   parseTokenAmount,
   PRIMARY_CORRIDORS,
   VIRE_VAULT_ABI,
@@ -26,6 +28,7 @@ import {
   type CorridorLiveStatus,
   type CorridorSymbol,
   type DeliverableType,
+  type FundingTokenSymbol,
   type VerificationMode,
 } from "@vire/shared";
 import Link from "next/link";
@@ -47,6 +50,7 @@ import {
   useConnect,
   usePublicClient,
   useReadContracts,
+  useSendTransaction,
   useSignMessage,
   useSwitchChain,
   useWriteContract,
@@ -164,6 +168,7 @@ export default function CreateCampaignPage() {
   const publicClient = usePublicClient({ chainId: celo.id });
   const { signMessageAsync } = useSignMessage();
   const { writeContractAsync } = useWriteContract();
+  const { sendTransactionAsync } = useSendTransaction();
 
   // Form state
   const [partnerName, setPartnerName] = useState("");
@@ -179,6 +184,7 @@ export default function CreateCampaignPage() {
   const [minAccountAgeDays, setMinAccountAgeDays] = useState(30);
 
   const [corridor, setCorridor] = useState<CorridorSymbol>("cNGN");
+  const [fundingToken, setFundingToken] = useState<FundingTokenSymbol>("USDT");
   const [rewardLocalHuman, setRewardLocalHuman] = useState("2500");
   const [spotsCount, setSpotsCount] = useState(10);
   const [maxPayoutsPerRecipient, setMaxPayoutsPerRecipient] = useState(1);
@@ -190,7 +196,7 @@ export default function CreateCampaignPage() {
 
   // Execution state
   const [stepStatus, setStepStatus] = useState<
-    "idle" | "signing" | "approving" | "funding" | "publishing"
+    "idle" | "signing" | "swapping" | "approving" | "funding" | "publishing"
   >("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [publishedResult, setPublishedResult] = useState<{
@@ -231,6 +237,8 @@ export default function CreateCampaignPage() {
     vaultData?.address ??
     ((process.env.NEXT_PUBLIC_VIRE_VAULT_ADDRESS?.trim() as Address | undefined) || null);
 
+  const fundingTokenMeta = FUNDING_TOKENS[fundingToken];
+
   const { data: walletReads, refetch: refetchWalletReads } = useReadContracts({
     contracts:
       connectedWallet && vaultAddress
@@ -247,6 +255,13 @@ export default function CreateCampaignPage() {
               abi: erc20Abi,
               functionName: "allowance",
               args: [connectedWallet, vaultAddress],
+              chainId: celo.id,
+            },
+            {
+              address: fundingTokenMeta.address,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [connectedWallet],
               chainId: celo.id,
             },
           ]
@@ -301,10 +316,45 @@ export default function CreateCampaignPage() {
 
   const usdtBalanceRaw = walletReads?.[0]?.result as bigint | undefined;
   const usdtAllowanceRaw = walletReads?.[1]?.result as bigint | undefined;
+  const altBalanceRaw =
+    fundingToken === "USDT" ? usdtBalanceRaw : (walletReads?.[2]?.result as bigint | undefined);
   const usdtBalanceNum = usdtBalanceRaw !== undefined ? Number(formatUnits(usdtBalanceRaw, 6)) : null;
-  const hasEnoughUsdt = usdtBalanceRaw !== undefined ? usdtBalanceRaw >= depositAtomic : true;
   const needsApproval = usdtAllowanceRaw !== undefined ? usdtAllowanceRaw < depositAtomic : true;
   const celoNum = celoBalance ? Number(formatUnits(celoBalance.value, 18)) : null;
+
+  // Live Textile FX indicative conversion quote when funding with a non-USDT token
+  const { data: fundingPreview, isFetching: isFetchingFundingQuote } = useQuery({
+    queryKey: ["funding-fx-preview", fundingToken, depositAtomic.toString()],
+    enabled: fundingToken !== "USDT",
+    staleTime: 15_000,
+    queryFn: async () => {
+      const r = await fetch(
+        `/api/funding?sellToken=${encodeURIComponent(fundingToken)}&buyUsdtAtomic=${encodeURIComponent(depositAtomic.toString())}`
+      );
+      return (await r.json()) as {
+        status: string;
+        takerPaysAtomic?: string | null;
+        takerPaysFormatted?: string | null;
+        reason?: string | null;
+      };
+    },
+  });
+
+  const isSwapFunding = fundingToken !== "USDT";
+  const swapQuoteReady = !isSwapFunding || fundingPreview?.status === "preview";
+  const requiredSellAtomic = isSwapFunding
+    ? fundingPreview?.takerPaysAtomic
+      ? (BigInt(fundingPreview.takerPaysAtomic) * 101n) / 100n // 1% safety check vs live preview drift
+      : null
+    : depositAtomic;
+  const selectedBalanceNum =
+    altBalanceRaw !== undefined ? Number(formatUnits(altBalanceRaw, fundingTokenMeta.decimals)) : null;
+  const hasEnoughFundingBalance =
+    altBalanceRaw === undefined
+      ? true
+      : requiredSellAtomic !== null
+        ? altBalanceRaw >= requiredSellAtomic
+        : true;
 
   const isSessionMatched = Boolean(
     authData?.authenticated &&
@@ -444,9 +494,17 @@ export default function CreateCampaignPage() {
       );
       return;
     }
-    if (!hasEnoughUsdt) {
+    if (isSwapFunding && !swapQuoteReady) {
       setErrorMsg(
-        `Your wallet needs at least $${depositUsdt.toFixed(2)} USDT on Celo Mainnet (currently $${(usdtBalanceNum ?? 0).toFixed(2)} USDT).`
+        `Textile FX liquidity for ${fundingToken} → USDT is currently unavailable. Choose USDT, USDC, or another supported currency.`
+      );
+      return;
+    }
+    if (!hasEnoughFundingBalance) {
+      setErrorMsg(
+        isSwapFunding
+          ? `Your wallet needs ~${fundingPreview?.takerPaysFormatted ?? "more"} ${fundingToken} on Celo Mainnet to fund $${depositUsdt.toFixed(2)} USDT.`
+          : `Your wallet needs at least $${depositUsdt.toFixed(2)} USDT on Celo Mainnet (currently $${(usdtBalanceNum ?? 0).toFixed(2)} USDT).`
       );
       return;
     }
@@ -474,8 +532,95 @@ export default function CreateCampaignPage() {
     const authed = await ensureWalletSession();
     if (!authed) return;
 
-    // 2. Approve USDT if needed
+    // 1b. If funding with USDC / CELO / local currency, execute firm Textile FX exact-output swap into USDT first
+    let activeRfqId: string | null = null;
     try {
+      if (isSwapFunding) {
+        setStepStatus("swapping");
+        const quoteRes = await fetch("/api/funding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "request",
+            sellToken: fundingToken,
+            buyUsdtAtomic: depositAtomic.toString(),
+          }),
+        });
+        const quoteJson = (await quoteRes.json()) as {
+          rfqId?: string;
+          takerPaysAtomic?: string;
+          takerPaysFormatted?: string;
+          expiresAt?: string;
+          spender?: Address;
+          transactions?: {
+            approval: { to: Address; data: Hex; value: string; chainId: number };
+            swap: { to: Address; data: Hex; value: string; chainId: number };
+          };
+          error?: string;
+        };
+        if (!quoteRes.ok || !quoteJson.rfqId || !quoteJson.transactions?.swap || !quoteJson.spender) {
+          throw new Error(quoteJson.error || `Failed to lock ${fundingToken} → USDT Textile FX quote.`);
+        }
+        activeRfqId = quoteJson.rfqId;
+
+        // Check existing ERC-20 allowance for Textile spender before sending approval
+        const sellAllowance = publicClient
+          ? await publicClient.readContract({
+              address: fundingTokenMeta.address,
+              abi: erc20Abi,
+              functionName: "allowance",
+              args: [connectedWallet, quoteJson.spender],
+            })
+          : 0n;
+
+        if (sellAllowance < BigInt(quoteJson.takerPaysAtomic ?? "0")) {
+          toast.message(`Approve ${quoteJson.takerPaysFormatted ?? ""} ${fundingToken} for Textile FX swap…`);
+          const swapApproveHash = await sendTransactionAsync({
+            to: quoteJson.transactions.approval.to,
+            data: quoteJson.transactions.approval.data,
+            value: BigInt(quoteJson.transactions.approval.value || "0"),
+            chainId: celo.id,
+          });
+          if (publicClient) {
+            const appReceipt = await publicClient.waitForTransactionReceipt({ hash: swapApproveHash });
+            if (appReceipt.status !== "success") {
+              throw new Error(`${fundingToken} approval reverted on Celo.`);
+            }
+          }
+        }
+
+        if (quoteJson.expiresAt && Date.now() >= Date.parse(quoteJson.expiresAt) - 3000) {
+          throw new Error("Textile FX quote expired during approval. Click Launch again for a fresh quote.");
+        }
+
+        toast.message(`Swapping ${quoteJson.takerPaysFormatted ?? ""} ${fundingToken} → $${depositUsdt.toFixed(2)} USDT via Textile FX…`);
+        const swapTxHash = await sendTransactionAsync({
+          to: quoteJson.transactions.swap.to,
+          data: quoteJson.transactions.swap.data,
+          value: BigInt(quoteJson.transactions.swap.value || "0"),
+          chainId: celo.id,
+        });
+
+        // Report txHash immediately while confirming onchain
+        const submitPromise = fetch("/api/funding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "submit", rfqId: quoteJson.rfqId, txHash: swapTxHash }),
+        }).catch(() => {});
+
+        if (publicClient) {
+          const swapReceipt = await publicClient.waitForTransactionReceipt({ hash: swapTxHash });
+          if (swapReceipt.status !== "success") {
+            throw new Error(`Textile FX ${fundingToken} → USDT swap reverted on Celo.`);
+          }
+        }
+        await submitPromise;
+        activeRfqId = null;
+        toast.success(`Converted ${fundingToken} → $${depositUsdt.toFixed(2)} USDT on Celo`);
+        await refetchWalletReads();
+      }
+
+      // 2. Approve USDT to VireVault v2 if needed
       if (needsApproval) {
         setStepStatus("approving");
         const approveHash = await writeContractAsync({
@@ -576,6 +721,13 @@ export default function CreateCampaignPage() {
       // 5. Publish metadata to Vire DB (server verifies onchain creator + balance)
       await publishDraftToServer(draft);
     } catch (err) {
+      if (activeRfqId) {
+        void fetch("/api/funding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "cancel", rfqId: activeRfqId }),
+        }).catch(() => {});
+      }
       const msg = err instanceof Error ? err.message : "Transaction cancelled or failed.";
       setErrorMsg(msg.slice(0, 240));
       toast.error("Campaign launch interrupted");
@@ -1061,22 +1213,74 @@ export default function CreateCampaignPage() {
             </div>
 
             <div className="space-y-5 p-6">
-              {/* Big deposit figure */}
-              <div className="vire-well flex items-center justify-between rounded-xl px-4 py-3.5">
-                <div>
-                  <span className="block text-[11.5px] text-[#71717A]">Total USDT deposit</span>
-                  <span className="font-mono text-[24px] font-medium tracking-[-0.03em] text-[#0A0A0C] tabular-nums">
-                    ${depositUsdt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {/* Fund with selector (USDT direct OR any Textile FX deep-liquidity Celo token) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11.5px]">
+                  <span className="font-medium text-[#52525B]">Fund with</span>
+                  <span className="font-mono text-[11px] text-[#71717A]">
+                    {isSwapFunding ? "Auto-swapped → USDT via Textile FX" : "Direct USDT vault deposit"}
                   </span>
                 </div>
-                <div className="text-right">
-                  <span className="block text-[11.5px] text-[#71717A]">Exact payout</span>
-                  <span className="inline-flex items-center gap-1.5 font-mono text-[14px] font-medium text-[#0A0A0C] tabular-nums">
-                    <TokenIcon symbol={corridor} size={16} />
-                    {Number.isFinite(rewardNum) ? rewardNum.toLocaleString("en-US") : "0"} {corridor}
-                  </span>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {FUNDING_TOKEN_LIST.map((sym) => (
+                    <button
+                      key={sym}
+                      type="button"
+                      onClick={() => setFundingToken(sym)}
+                      className={cn(
+                        "inline-flex items-center justify-center gap-1.5 rounded-xl px-2 py-1.5 text-[12px] font-medium transition-all",
+                        fundingToken === sym
+                          ? "bg-[#0A0A0C] text-white"
+                          : "bg-[#FAFAFB] text-[#3F3F46] ring-1 ring-black/[0.08] hover:bg-white"
+                      )}
+                    >
+                      <TokenIcon symbol={sym} size={15} />
+                      <span>{sym}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
+
+              {/* Big deposit figure */}
+              <div className="vire-well space-y-2.5 rounded-xl px-4 py-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="block text-[11.5px] text-[#71717A]">Vault pool (USDT)</span>
+                    <span className="font-mono text-[24px] font-medium tracking-[-0.03em] text-[#0A0A0C] tabular-nums">
+                      ${depositUsdt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-[11.5px] text-[#71717A]">Exact payout</span>
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[14px] font-medium text-[#0A0A0C] tabular-nums">
+                      <TokenIcon symbol={corridor} size={16} />
+                      {Number.isFinite(rewardNum) ? rewardNum.toLocaleString("en-US") : "0"} {corridor}
+                    </span>
+                  </div>
+                </div>
+
+                {isSwapFunding && (
+                  <div className="flex items-center justify-between border-t border-black/[0.06] pt-2.5 font-mono text-[11.5px]">
+                    <span className="text-[#71717A]">Est. you pay ({fundingToken})</span>
+                    {isFetchingFundingQuote ? (
+                      <span className="text-[#71717A]">Quoting…</span>
+                    ) : swapQuoteReady && fundingPreview?.takerPaysFormatted ? (
+                      <span className="font-medium text-[#0A0A0C] tabular-nums">
+                        ≈ {fundingPreview.takerPaysFormatted} {fundingToken}
+                      </span>
+                    ) : (
+                      <span className="text-[#DC2626]">No live quote</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {isSwapFunding && fundingToken === corridor && (
+                <p className="text-[11.5px] leading-relaxed text-[#71717A]">
+                  <span className="font-medium text-[#0A0A0C]">Note:</span> Funding with {fundingToken} converts{" "}
+                  {fundingToken} → USDT in the vault and USDT → {corridor} on payout. Funding with USDT or USDC avoids converting twice.
+                </p>
+              )}
 
               <dl className="divide-y divide-black/[0.055] font-mono text-[12px]">
                 <div className="flex justify-between py-2.5">
@@ -1121,21 +1325,31 @@ export default function CreateCampaignPage() {
                     />
                   </div>
                   <div className="flex items-center justify-between font-mono text-[12px] tabular-nums">
-                    <span className="text-[#71717A]">USDT balance</span>
-                    <span className={cn("font-medium", hasEnoughUsdt ? "text-[#0A0A0C]" : "text-[#DC2626]")}>
-                      {usdtBalanceNum !== null ? `$${usdtBalanceNum.toFixed(2)} USDT` : "Checking…"}
+                    <span className="text-[#71717A]">{fundingToken} balance</span>
+                    <span className={cn("font-medium", hasEnoughFundingBalance ? "text-[#0A0A0C]" : "text-[#DC2626]")}>
+                      {selectedBalanceNum !== null
+                        ? `${selectedBalanceNum.toLocaleString("en-US", { maximumFractionDigits: fundingToken === "IDRX" ? 2 : 4 })} ${fundingToken}`
+                        : "Checking…"}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between font-mono text-[12px] tabular-nums">
-                    <span className="text-[#71717A]">CELO gas</span>
-                    <span className="text-[#3F3F46]">
-                      {celoNum !== null ? `${celoNum.toFixed(4)} CELO` : "Checking…"}
-                    </span>
-                  </div>
-                  {!hasEnoughUsdt && (
+                  {fundingToken !== "CELO" && (
+                    <div className="flex items-center justify-between font-mono text-[12px] tabular-nums">
+                      <span className="text-[#71717A]">CELO gas</span>
+                      <span className="text-[#3F3F46]">
+                        {celoNum !== null ? `${celoNum.toFixed(4)} CELO` : "Checking…"}
+                      </span>
+                    </div>
+                  )}
+                  {isSwapFunding && !isFetchingFundingQuote && !swapQuoteReady && (
                     <p className="pt-1 text-[11.5px] leading-snug text-[#DC2626]">
-                      Deposit at least ${(depositUsdt - (usdtBalanceNum ?? 0)).toFixed(2)} more USDT
-                      on Celo network to your address above.
+                      Textile FX liquidity for {fundingToken} → USDT is currently offline. Pick USDT, USDC, or another active token.
+                    </p>
+                  )}
+                  {!hasEnoughFundingBalance && (
+                    <p className="pt-1 text-[11.5px] leading-snug text-[#DC2626]">
+                      {isSwapFunding
+                        ? `Your wallet needs ~${fundingPreview?.takerPaysFormatted ?? "more"} ${fundingToken} on Celo network to fund this pool.`
+                        : `Deposit at least $${(depositUsdt - (usdtBalanceNum ?? 0)).toFixed(2)} more USDT on Celo network to your address above.`}
                     </p>
                   )}
                   {!isMiniPay && celoNum !== null && celoNum < 0.003 && (
@@ -1172,18 +1386,31 @@ export default function CreateCampaignPage() {
                   size="lg"
                   variant="primary"
                   className="w-full"
-                  disabled={stepStatus !== "idle" || !hasEnoughUsdt || !clearsFloor || Boolean(vaultData?.paused)}
+                  disabled={
+                    stepStatus !== "idle" ||
+                    !hasEnoughFundingBalance ||
+                    !swapQuoteReady ||
+                    !clearsFloor ||
+                    Boolean(vaultData?.paused)
+                  }
                 >
                   {stepStatus !== "idle" ? (
                     <>
                       <CircleNotch className="h-4 w-4 animate-spin" />
                       {stepStatus === "signing"
                         ? "Confirm wallet sign-in…"
-                        : stepStatus === "approving"
-                          ? "Approving USDT on Celo…"
-                          : stepStatus === "funding"
-                            ? "Depositing into VireVault…"
-                            : "Publishing campaign…"}
+                        : stepStatus === "swapping"
+                          ? `Swapping ${fundingToken} → USDT via Textile FX…`
+                          : stepStatus === "approving"
+                            ? "Approving USDT on Celo…"
+                            : stepStatus === "funding"
+                              ? "Depositing into VireVault…"
+                              : "Publishing campaign…"}
+                    </>
+                  ) : isSwapFunding ? (
+                    <>
+                      Swap {fundingToken} &amp; Fund (${depositUsdt.toFixed(2)} USDT)
+                      <ArrowRight weight="bold" className="h-4 w-4" />
                     </>
                   ) : needsApproval ? (
                     <>

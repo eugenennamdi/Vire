@@ -9,6 +9,14 @@ import {
 
 export const GITHUB_SESSION_COOKIE = "vire_gh_identity";
 export const WALLET_SESSION_COOKIE = "vire_wallet_session";
+export const FUNDING_RFQ_COOKIE = "vire_funding_rfq";
+
+export interface FundingRfqCookiePayload {
+  rfqId: string;
+  claimToken: string;
+  wallet: string;
+  iat: number;
+}
 
 export interface GitHubSessionPayload {
   login: string;
@@ -72,6 +80,15 @@ export function signWalletSession(payload: WalletSessionPayload): string {
 export function verifyWalletSessionCookie(raw: string | undefined): WalletSessionPayload | null {
   const parsed = verifyGeneric<WalletSessionPayload>(raw, 7 * 24 * 60 * 60 * 1000);
   return parsed?.wallet && parsed?.handle ? parsed : null;
+}
+
+export function signFundingRfqCookie(payload: FundingRfqCookiePayload): string {
+  return signGeneric({ ...payload, wallet: payload.wallet.toLowerCase() });
+}
+
+export function verifyFundingRfqCookie(raw: string | undefined): FundingRfqCookiePayload | null {
+  const parsed = verifyGeneric<FundingRfqCookiePayload>(raw, 5 * 60 * 1000);
+  return parsed?.rfqId && parsed?.claimToken && parsed?.wallet ? parsed : null;
 }
 
 interface PrivyJwk {

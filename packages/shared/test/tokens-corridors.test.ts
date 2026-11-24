@@ -6,6 +6,8 @@ import {
   computeImpliedRateLocalPerUsdt,
   DEFAULT_ATTRIBUTION_CODE,
   formatTokenAmount,
+  FUNDING_TOKEN_LIST,
+  FUNDING_TOKENS,
   isAllowedTextileTarget,
   parseTokenAmount,
   validateAttributionCode,
@@ -84,5 +86,14 @@ describe("Canonical Celo Mainnet token registry & decimals", () => {
     expect(isAllowedTextileTarget(CELO_CONTRACTS.TEXTILE_LIMIT_ORDER_REACTOR)).toBe(true);
     expect(isAllowedTextileTarget(CELO_CONTRACTS.TEXTILE_VAULT_ORDER_EXECUTOR)).toBe(true);
     expect(isAllowedTextileTarget("0x000000000000000000000000000000000000dead")).toBe(false);
+  });
+
+  it("exposes all 8 verified Textile FX funding tokens with exact decimals", () => {
+    expect(FUNDING_TOKEN_LIST).toEqual(["USDT", "USDC", "CELO", "cNGN", "wARS", "wBRL", "wMXN", "IDRX"]);
+    expect(FUNDING_TOKENS.CELO.decimals).toBe(18);
+    expect(FUNDING_TOKENS.IDRX.decimals).toBe(2);
+    expect(FUNDING_TOKENS.USDT.decimals).toBe(6);
+    expect(FUNDING_TOKENS.USDC.decimals).toBe(6);
+    expect(FUNDING_TOKENS.cNGN.decimals).toBe(6);
   });
 });
