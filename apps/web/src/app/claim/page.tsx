@@ -144,8 +144,10 @@ function ClaimFlowInner() {
   });
 
   useEffect(() => {
-    if (!selectedSlug && campData?.campaigns?.[0]?.slug) {
-      setSelectedSlug(campData.campaigns[0].slug);
+    const list = campData?.campaigns;
+    if (!list?.length) return;
+    if (!selectedSlug || !list.some((c) => c.slug === selectedSlug)) {
+      setSelectedSlug(list[0]!.slug);
     }
   }, [campData, selectedSlug]);
 

@@ -176,7 +176,7 @@ export function ClearingTerminal({
       {/* Main Two-Column Asymmetric Clearing Desk */}
       <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
         {/* Left Column: Sculptural Corridor Cards OR Campaign Ledger */}
-        <div className="space-y-4 lg:col-span-7">
+        <div className="min-w-0 space-y-4 lg:col-span-7">
           {view === "corridors" ? (
             orderedCampaigns.map((camp) => {
               const live = liveMap.get(camp.corridor);
@@ -194,22 +194,22 @@ export function ClearingTerminal({
                     }
                   }}
                   className={cn(
-                    "surface-card vire-interactive-card cursor-pointer rounded-2xl p-5 sm:p-6",
+                    "surface-card vire-interactive-card min-w-0 cursor-pointer overflow-hidden rounded-2xl p-4 sm:p-6",
                     isSelectedCard && "border-black/[0.22]"
                   )}
                 >
                   {/* Card Top Row: Currency Glyph + Title Left, Live Spot Rate Right */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-3.5">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/[0.08] bg-[#F4F4F5] font-mono text-xs font-semibold text-foreground">
+                  <div className="flex items-start justify-between gap-2.5 sm:gap-4">
+                    <div className="flex min-w-0 items-center gap-3 sm:gap-3.5">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/[0.08] bg-[#F4F4F5] font-mono text-[11px] font-semibold text-foreground sm:h-10 sm:w-10 sm:text-xs">
                         {CURRENCY_GLYPHS[camp.corridor] ?? camp.corridor}
                       </span>
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-mono text-[15px] font-semibold tracking-[-0.02em] text-foreground">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <h3 className="font-mono text-sm font-semibold tracking-[-0.02em] text-foreground sm:text-[15px]">
                             USD₮ / {camp.corridor}
                           </h3>
-                          <span className="inline-flex items-center gap-1 font-mono text-[10.5px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground sm:text-[10.5px]">
                             <span
                               className={cn(
                                 "h-1.5 w-1.5 rounded-full",
@@ -219,8 +219,8 @@ export function ClearingTerminal({
                             {isLoading ? "…" : isLive ? "ACTIVE" : "NO MAKERS"}
                           </span>
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {live?.countryName ?? camp.partnerLocation} · Textile FX v2 ·{" "}
+                        <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground sm:text-xs">
+                          {live?.countryName ?? camp.partnerLocation} · Textile FX ·{" "}
                           <span className="font-mono">{camp.localTokenDecimals}dp</span>
                         </p>
                       </div>
@@ -229,22 +229,22 @@ export function ClearingTerminal({
                     <div className="shrink-0 text-right">
                       {isLoading ? (
                         <div className="space-y-1.5">
-                          <Skeleton className="ml-auto h-6 w-24" />
-                          <Skeleton className="ml-auto h-3 w-16" />
+                          <Skeleton className="ml-auto h-6 w-20 sm:w-24" />
+                          <Skeleton className="ml-auto h-3 w-14 sm:w-16" />
                         </div>
                       ) : (
                         <>
-                          <div className="font-mono text-xl font-semibold tracking-[-0.025em] text-foreground tabular-nums">
+                          <div className="font-mono text-base font-semibold tracking-[-0.025em] text-foreground tabular-nums sm:text-xl">
                             {live?.impliedRateLocalPerUsdt !== null && live?.impliedRateLocalPerUsdt !== undefined
                               ? live.impliedRateLocalPerUsdt.toLocaleString(undefined, {
                                   maximumFractionDigits: live.impliedRateLocalPerUsdt < 50 ? 3 : 2,
                                 })
                               : "—"}
-                            <span className="ml-1 text-xs font-normal text-muted-foreground">
+                            <span className="ml-1 text-[11px] font-normal text-muted-foreground sm:text-xs">
                               {live?.fiatCode ?? ""}
                             </span>
                           </div>
-                          <div className="mt-0.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+                          <div className="mt-0.5 font-mono text-[10.5px] text-muted-foreground tabular-nums sm:text-[11px]">
                             {depth > 0 ? `${formatCompactUsd(depth)} depth` : "$0 depth"}
                           </div>
                         </>
@@ -358,8 +358,8 @@ export function ClearingTerminal({
 
         {/* Right Column: Sticky Elevated Exact-Output Clearing Ticket */}
         {activeCampaign && activeStage && (
-          <div className="lg:sticky lg:top-20 lg:col-span-5">
-            <div className="surface-elevated rounded-2xl p-6">
+          <div className="min-w-0 lg:sticky lg:top-20 lg:col-span-5">
+            <div className="surface-elevated overflow-hidden rounded-2xl p-5 sm:p-6">
               {/* Ticket Header */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">

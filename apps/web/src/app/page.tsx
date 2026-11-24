@@ -86,7 +86,7 @@ export default async function HomePage() {
     <div className="space-y-12">
       {/* Asymmetric Editorial Hero + Live Sculptural Vault Card */}
       <section className="vire-enter grid gap-8 pt-2 lg:grid-cols-12 lg:items-center">
-        <div className="space-y-4 lg:col-span-7">
+        <div className="min-w-0 space-y-4 lg:col-span-7">
           <h1 className="max-w-[16ch] text-4xl font-semibold tracking-[-0.04em] text-foreground leading-[1.05] sm:text-[46px]">
             Verify work. Settle exact local FX.
           </h1>
@@ -106,7 +106,7 @@ export default async function HomePage() {
         </div>
 
         {/* Right: Sculptural Live VireVault Instrument */}
-        <div className="surface-card rounded-2xl p-6 lg:col-span-5">
+        <div className="surface-card min-w-0 rounded-2xl p-5 sm:p-6 lg:col-span-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
