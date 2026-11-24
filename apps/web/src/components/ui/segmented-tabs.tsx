@@ -23,7 +23,7 @@ export function SegmentedTabs<T extends string>({
     <div
       role="tablist"
       className={cn(
-        "inline-flex flex-wrap items-center gap-1 rounded-lg border border-white/[0.08] bg-[#0B0D10] p-1",
+        "inline-flex flex-wrap items-center gap-0.5 rounded-md border border-[#E5E5E5] bg-[#FAFAFA] p-0.5",
         className
       )}
     >
@@ -37,18 +37,18 @@ export function SegmentedTabs<T extends string>({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "vire-pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium",
+              "vire-pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded px-2.5 py-1.5 text-xs font-medium",
               active
-                ? "bg-[#1C2028] text-[#F4F5F6] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(0,0,0,0.4)]"
-                : "text-[#8A8F98] hover:text-[#D5D8DE]"
+                ? "border border-[#E5E5E5] bg-white text-[#111111]"
+                : "border border-transparent text-[#737373] hover:text-[#111111]"
             )}
           >
             <span>{opt.label}</span>
             {opt.count !== undefined && (
               <span
                 className={cn(
-                  "rounded px-1.5 py-0.25 font-mono text-[10px] tabular-nums",
-                  active ? "bg-white/[0.08] text-[#F4F5F6]" : "bg-white/[0.04] text-[#6B7280]"
+                  "font-mono text-[10px] tabular-nums",
+                  active ? "text-[#111111]" : "text-[#A3A3A3]"
                 )}
               >
                 {opt.count}

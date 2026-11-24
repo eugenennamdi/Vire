@@ -4,7 +4,6 @@ import { ArrowClockwise, ArrowUpRight } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { CorridorLiveStatus } from "@vire/shared";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +20,7 @@ export function CorridorStrip() {
     queryKey: ["live-corridors"],
     queryFn: async () => {
       const res = await fetch("/api/corridors/live");
-      if (!res.ok) throw new Error("Unable to load live Textile FX corridors");
+      if (!res.ok) throw new Error("Unable to load Textile FX corridors");
       return (await res.json()) as { asOf: string; corridors: CorridorLiveStatus[] };
     },
     refetchInterval: 20_000,
@@ -35,23 +34,20 @@ export function CorridorStrip() {
 
   return (
     <section
-      aria-label="Live Textile FX Corridors"
-      className="vire-surface vire-enter vire-delay-1 overflow-hidden rounded-xl"
+      aria-label="Textile FX Corridors"
+      className="vire-surface vire-enter vire-delay-1 overflow-hidden rounded-lg"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.07] bg-[#0C0E11] px-4 py-2.5 sm:px-5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2.5 sm:px-5">
         <div className="flex items-center gap-2.5">
-          <span className="h-2 w-2 rounded-full bg-emerald-400" />
-          <h2 className="text-xs font-medium text-[#E5E7EB]">
-            Live Textile FX v2 Corridors
-          </h2>
-          <span className="hidden font-mono text-[11px] text-[#6B7280] sm:inline">
-            Exact-output buyAmount preview · Celo 42220
+          <h2 className="text-xs font-medium text-[#111111]">Textile FX Corridors</h2>
+          <span className="hidden font-mono text-[11px] text-[#737373] sm:inline">
+            Exact-output buyAmount preview
           </span>
         </div>
 
         <div className="flex items-center gap-3">
           {data?.asOf && (
-            <span className="font-mono text-[11px] text-[#6B7280] tabular-nums">
+            <span className="font-mono text-[11px] text-[#737373] tabular-nums">
               {new Date(data.asOf).toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -62,8 +58,8 @@ export function CorridorStrip() {
           <button
             type="button"
             onClick={() => refetch()}
-            aria-label="Refresh live FX rates"
-            className="vire-pressable inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-[#B4BAC5] hover:border-white/[0.15] hover:text-[#F4F5F6]"
+            aria-label="Refresh FX rates"
+            className="vire-pressable inline-flex items-center gap-1.5 rounded border border-[#E5E5E5] bg-white px-2 py-1 font-mono text-[11px] text-[#525252] hover:border-[#A3A3A3] hover:text-[#111111]"
           >
             <ArrowClockwise
               weight="regular"
@@ -74,16 +70,16 @@ export function CorridorStrip() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 divide-y divide-white/[0.06] sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-5 lg:divide-x">
+      <div className="grid grid-cols-1 divide-y divide-[#E5E5E5] sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-5 lg:divide-x">
         {isLoading
           ? DISPLAY_ORDER.map((sym) => (
               <div key={sym} className="space-y-3 p-4 sm:p-5">
                 <div className="flex items-center justify-between">
                   <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-12" />
+                  <Skeleton className="h-3.5 w-10" />
                 </div>
-                <Skeleton className="h-7 w-32" />
-                <Skeleton className="h-1 w-full" />
+                <Skeleton className="h-6 w-28" />
+                <Skeleton className="h-0.5 w-full" />
                 <div className="flex justify-between">
                   <Skeleton className="h-3 w-16" />
                   <Skeleton className="h-3 w-14" />
@@ -95,62 +91,55 @@ export function CorridorStrip() {
               const depthNum = parseDepthUsd(c.maxSellUsdtFormatted);
               const depthPct =
                 isLive && depthNum > 0
-                  ? Math.max(14, Math.min(100, Math.round((Math.log10(Math.max(10, depthNum)) / maxDepthLog) * 100)))
+                  ? Math.max(
+                      12,
+                      Math.min(100, Math.round((Math.log10(Math.max(10, depthNum)) / maxDepthLog) * 100))
+                    )
                   : 0;
 
               return (
                 <Link
                   key={c.corridor}
                   href={`/campaigns?corridor=${encodeURIComponent(c.corridor)}`}
-                  className="group block p-4 transition-colors duration-150 hover:bg-white/[0.025] sm:p-5"
+                  className="group block p-4 transition-colors duration-150 hover:bg-[#FAFAFA] sm:p-5"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 font-mono text-xs font-medium text-[#E5E7EB]">
-                      <span>USD₮</span>
-                      <span className="text-[#5C626D]">/</span>
-                      <span>{c.corridor}</span>
+                    <div className="font-mono text-xs font-medium text-[#111111]">
+                      USD₮ / {c.corridor}
                     </div>
-                    <Badge tone={isLive ? "emerald" : "amber"}>
-                      {isLive ? "LIVE" : "DARK"}
-                    </Badge>
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-[#737373]">
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          isLive ? "bg-[#111111]" : "border border-[#A3A3A3] bg-transparent"
+                        )}
+                      />
+                      {isLive ? "Active" : "No makers"}
+                    </span>
                   </div>
 
-                  <div className="mt-3 flex items-baseline gap-1.5 font-mono text-xl font-semibold tracking-[-0.02em] text-[#F4F5F6] tabular-nums">
+                  <div className="mt-3 flex items-baseline gap-1.5 font-mono text-xl font-semibold tracking-[-0.02em] text-[#111111] tabular-nums">
                     {c.impliedRateLocalPerUsdt !== null
                       ? c.impliedRateLocalPerUsdt.toLocaleString(undefined, {
                           maximumFractionDigits: c.impliedRateLocalPerUsdt < 50 ? 3 : 2,
                         })
                       : "—"}
-                    <span className="text-[11px] font-normal text-[#6B7280]">{c.fiatCode}</span>
+                    <span className="text-[11px] font-normal text-[#737373]">{c.fiatCode}</span>
                   </div>
 
-                  {/* Subtle liquidity depth bar */}
-                  <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                  <div className="mt-3 h-[2px] w-full bg-[#EAEAEA]">
                     <div
-                      className={cn(
-                        "h-full rounded-full transition-[width] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]",
-                        isLive ? "bg-emerald-400/80" : "bg-amber-400/40"
-                      )}
+                      className="h-full bg-[#111111] transition-[width] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]"
                       style={{ width: `${depthPct}%` }}
                     />
                   </div>
 
-                  <div className="mt-2.5 flex items-center justify-between font-mono text-[11px] text-[#8A8F98] tabular-nums">
-                    <span className="flex items-center gap-1">
-                      <span>{c.countryName}</span>
-                      <span
-                        className={cn(
-                          "rounded px-1 text-[10px]",
-                          c.decimals === 2
-                            ? "bg-amber-500/15 text-amber-300"
-                            : "bg-white/[0.05] text-[#8A8F98]"
-                        )}
-                      >
-                        {c.decimals}dp
-                      </span>
+                  <div className="mt-2.5 flex items-center justify-between font-mono text-[11px] text-[#737373] tabular-nums">
+                    <span>
+                      {c.countryName} · {c.decimals}dp
                     </span>
-                    <span className="inline-flex items-center gap-0.5 text-[#A1A7B3] group-hover:text-[#F4F5F6]">
-                      {c.maxSellUsdtFormatted ? `$${c.maxSellUsdtFormatted}` : "0 depth"}
+                    <span className="inline-flex items-center gap-0.5 text-[#525252] group-hover:text-[#111111]">
+                      {c.maxSellUsdtFormatted ? `$${c.maxSellUsdtFormatted}` : "$0"}
                       <ArrowUpRight className="h-3 w-3 opacity-60 transition-transform duration-150 group-hover:-translate-y-[1px] group-hover:translate-x-[1px] group-hover:opacity-100" />
                     </span>
                   </div>

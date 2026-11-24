@@ -1,6 +1,6 @@
 "use client";
 
-import { SignOut, ShieldCheck, Wallet, Warning } from "@phosphor-icons/react";
+import { SignOut, Wallet, Warning } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import { cn, truncateMiddle } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { href: "/", label: "Overview", shortLabel: "Overview" },
-  { href: "/campaigns", label: "Campaigns", shortLabel: "Campaigns" },
-  { href: "/claim", label: "Claim", shortLabel: "Claim" },
-  { href: "/ledger", label: "Audit Ledger", shortLabel: "Ledger" },
-  { href: "/console", label: "Console", shortLabel: "Console" },
+  { href: "/", label: "Overview" },
+  { href: "/campaigns", label: "Campaigns" },
+  { href: "/claim", label: "Claim" },
+  { href: "/ledger", label: "Ledger" },
+  { href: "/console", label: "Console" },
 ];
 
 export function Navbar() {
@@ -41,38 +41,37 @@ export function Navbar() {
   const wrongChain = isConnected && chainId !== celo.id;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#08090A]/82 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        {/* Left: Brand Mark + Desktop Navigation */}
+    <header className="sticky top-0 z-40 border-b border-[#E5E5E5] bg-white/90 backdrop-blur-sm">
+      <div className="mx-auto flex h-14 max-w-[1160px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-6">
           <Link
             href="/"
-            className="vire-pressable flex items-center gap-2.5 rounded-lg py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+            className="vire-pressable flex items-center gap-2 rounded-md py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/25"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.12] bg-[#14171C] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <span className="flex h-6 w-6 items-center justify-center rounded bg-[#111111]">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path
                   d="M4.5 6.5L12 19L19.5 6.5"
-                  stroke="#10B981"
-                  strokeWidth="2.4"
+                  stroke="#FFFFFF"
+                  strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
                 <path
                   d="M9 6.5L12 11.5L15 6.5"
-                  stroke="#F4F5F6"
+                  stroke="#A3A3A3"
                   strokeWidth="1.9"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
               </svg>
             </span>
-            <span className="text-[15px] font-semibold tracking-[-0.02em] text-[#F4F5F6]">
+            <span className="text-[15px] font-semibold tracking-[-0.02em] text-[#111111]">
               Vire
             </span>
           </Link>
 
-          <nav aria-label="Main navigation" className="hidden items-center gap-0.5 md:flex">
+          <nav aria-label="Main navigation" className="hidden items-center gap-1 md:flex">
             {NAV_LINKS.map((item) => {
               const active = pathname === item.href;
               return (
@@ -83,8 +82,8 @@ export function Navbar() {
                   className={cn(
                     "vire-pressable rounded-md px-2.5 py-1.5 text-[13px] font-medium whitespace-nowrap",
                     active
-                      ? "bg-white/[0.08] text-[#F4F5F6] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                      : "text-[#8A8F98] hover:bg-white/[0.04] hover:text-[#E5E7EB]"
+                      ? "bg-[#F4F4F5] text-[#111111]"
+                      : "text-[#737373] hover:text-[#111111]"
                   )}
                 >
                   {item.label}
@@ -94,23 +93,17 @@ export function Navbar() {
           </nav>
         </div>
 
-        {/* Right: Network / ERC-8004 Telemetry + Wallet Control */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Link
             href="/api/agent-card.json"
-            className="hidden items-center gap-2 rounded-md border border-white/[0.08] bg-[#0F1114] px-2.5 py-1.5 font-mono text-[11px] text-[#B4BAC5] transition-colors hover:border-white/[0.15] hover:text-[#F4F5F6] lg:inline-flex"
-            title="Inspect live ERC-8004 agent registration manifest"
+            className="hidden items-center gap-2 rounded-md border border-[#E5E5E5] bg-[#FAFAFA] px-2.5 py-1.5 font-mono text-[11px] text-[#525252] transition-colors hover:border-[#A3A3A3] hover:text-[#111111] lg:inline-flex"
+            title="Inspect ERC-8004 agent registration manifest"
           >
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-            </span>
-            <span>Celo 42220</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-[#111111]" />
+            <span>42220</span>
             {rep?.registered && rep.agentId && (
-              <span className="inline-flex items-center gap-1 border-l border-white/[0.1] pl-2 text-emerald-300">
-                <ShieldCheck weight="fill" className="h-3.5 w-3.5" />
+              <span className="border-l border-[#E5E5E5] pl-2 text-[#111111]">
                 #{rep.agentId}
-                {rep.summary?.averageScore ? ` · ${rep.summary.averageScore}` : ""}
               </span>
             )}
           </Link>
@@ -118,23 +111,22 @@ export function Navbar() {
           {wrongChain ? (
             <Button
               size="sm"
-              variant="secondary"
+              variant="outlineStrong"
               onClick={() => switchChain({ chainId: celo.id })}
-              className="border-amber-500/30 bg-amber-500/12 text-amber-300 hover:bg-amber-500/20"
             >
               <Warning weight="regular" className="h-3.5 w-3.5" />
               Switch to Celo
             </Button>
           ) : isConnected && address ? (
-            <div className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#12151A] pl-2.5 pr-1 font-mono text-xs text-[#F4F5F6]">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <div className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#E5E5E5] bg-[#FAFAFA] pl-2.5 pr-1 font-mono text-xs text-[#111111]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#111111]" />
               <span className="tabular-nums">{truncateMiddle(address, 6, 4)}</span>
               <button
                 type="button"
                 onClick={() => disconnect()}
                 aria-label="Disconnect wallet"
                 title="Disconnect wallet"
-                className="vire-pressable ml-0.5 flex h-6 w-6 items-center justify-center rounded-md text-[#8A8F98] hover:bg-white/[0.08] hover:text-[#F4F5F6]"
+                className="vire-pressable ml-0.5 flex h-6 w-6 items-center justify-center rounded text-[#737373] hover:bg-[#EAEAEA] hover:text-[#111111]"
               >
                 <SignOut weight="regular" className="h-3.5 w-3.5" />
               </button>
@@ -156,8 +148,11 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile navigation strip */}
-      <div className="flex items-center justify-between gap-1 border-t border-white/[0.06] px-3 py-1.5 md:hidden">
+      {/* Mobile navigation strip — all 5 concise links fit inside 390px without clipping */}
+      <nav
+        aria-label="Mobile navigation"
+        className="flex items-center justify-between border-t border-[#E5E5E5] px-3 py-1.5 md:hidden"
+      >
         {NAV_LINKS.map((item) => {
           const active = pathname === item.href;
           return (
@@ -166,15 +161,15 @@ export function Navbar() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "vire-pressable whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium",
-                active ? "bg-white/[0.1] text-[#F4F5F6]" : "text-[#8A8F98]"
+                "vire-pressable whitespace-nowrap rounded px-2 py-1 text-xs font-medium",
+                active ? "bg-[#F4F4F5] text-[#111111]" : "text-[#737373]"
               )}
             >
-              {item.shortLabel}
+              {item.label}
             </Link>
           );
         })}
-      </div>
+      </nav>
     </header>
   );
 }

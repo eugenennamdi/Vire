@@ -7,15 +7,15 @@ import type {
 import { cn } from "@/lib/utils";
 
 const FIELD_BASE =
-  "w-full rounded-lg border border-white/[0.1] bg-[#0B0D10] px-3 text-[13px] text-[#F4F5F6] placeholder:text-[#5C626D] " +
-  "transition-[border-color,box-shadow,background-color] duration-150 " +
-  "focus:border-white/[0.28] focus:bg-[#0E1014] focus:outline-none focus:ring-2 focus:ring-white/[0.08] " +
-  "disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full rounded-md border border-[#E5E5E5] bg-white px-3 text-[13px] text-[#111111] placeholder:text-[#A3A3A3] " +
+  "transition-[border-color,box-shadow] duration-150 " +
+  "hover:border-[#D4D4D4] focus:border-[#111111] focus:outline-none focus:ring-2 focus:ring-black/[0.06] " +
+  "disabled:cursor-not-allowed disabled:bg-[#FAFAFA] disabled:text-[#A3A3A3]";
 
 export function FieldLabel({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={cn("block text-xs font-medium text-[#B4BAC5]", className)}
+      className={cn("block text-xs font-medium text-[#525252]", className)}
       {...props}
     />
   );
@@ -40,7 +40,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
         aria-hidden="true"
         viewBox="0 0 16 16"
         fill="none"
-        className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#6B7280]"
+        className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#737373]"
       >
         <path
           d="M4.5 6.5L8 10L11.5 6.5"

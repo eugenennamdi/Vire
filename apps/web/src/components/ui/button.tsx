@@ -4,23 +4,21 @@ import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
   [
-    "vire-pressable inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium",
-    "select-none cursor-pointer disabled:pointer-events-none disabled:opacity-40",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090A]",
+    "vire-pressable inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium",
+    "select-none cursor-pointer disabled:pointer-events-none",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
   ].join(" "),
   {
     variants: {
       variant: {
         primary:
-          "bg-[#F4F5F6] text-[#08090A] hover:bg-white shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.6)] disabled:opacity-100 disabled:border disabled:border-white/[0.08] disabled:bg-white/[0.06] disabled:text-[#6B7280] disabled:shadow-none",
+          "bg-[#111111] text-white hover:bg-[#262626] disabled:border disabled:border-[#E5E5E5] disabled:bg-[#F4F4F5] disabled:text-[#A3A3A3]",
         secondary:
-          "bg-[#15181D] text-[#F4F5F6] border border-white/[0.1] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:bg-[#1B1F26] hover:border-white/[0.16]",
-        emerald:
-          "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/22 hover:border-emerald-400/45",
+          "border border-[#E5E5E5] bg-white text-[#111111] hover:border-[#A3A3A3] hover:bg-[#FAFAFA] disabled:bg-[#FAFAFA] disabled:text-[#A3A3A3]",
+        outlineStrong:
+          "border border-[#111111] bg-white text-[#111111] hover:bg-[#111111] hover:text-white disabled:border-[#E5E5E5] disabled:text-[#A3A3A3]",
         ghost:
-          "bg-transparent text-[#A1A7B3] hover:bg-white/[0.06] hover:text-[#F4F5F6]",
-        danger:
-          "bg-rose-500/12 text-rose-300 border border-rose-500/30 hover:bg-rose-500/20",
+          "bg-transparent text-[#525252] hover:bg-[#F4F4F5] hover:text-[#111111] disabled:text-[#A3A3A3]",
       },
       size: {
         sm: "h-8 px-3 text-xs",

@@ -3,15 +3,15 @@ import { cn } from "@/lib/utils";
 
 export function Card({
   className,
-  elevated = false,
+  muted = false,
   interactive = false,
   ...props
-}: HTMLAttributes<HTMLDivElement> & { elevated?: boolean; interactive?: boolean }) {
+}: HTMLAttributes<HTMLDivElement> & { muted?: boolean; interactive?: boolean }) {
   return (
     <div
       className={cn(
-        "rounded-xl",
-        elevated ? "vire-surface-elevated" : "vire-surface",
+        "rounded-lg",
+        muted ? "vire-surface-muted" : "vire-surface",
         interactive && "vire-interactive-card",
         className
       )}
