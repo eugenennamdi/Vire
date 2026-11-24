@@ -6,30 +6,34 @@ import {
   Check,
   CircleNotch,
   GithubLogo,
+  PaperPlaneTilt,
   Signature,
   WarningCircle,
-  X,
 } from "@phosphor-icons/react";
 import { usePrivy, useSignMessage as usePrivySignMessage } from "@privy-io/react-auth";
 import { useQuery } from "@tanstack/react-query";
 import {
   CELO_CONTRACTS,
+  CELO_TOKENS,
   celoscanTxUrl,
   type BuyPaymentReceipt,
+  type CorridorSymbol,
   type OfframpPackage,
   type PolicyGateDecision,
   type VerificationVerdict,
 } from "@vire/shared";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { zeroHash, type Address } from "viem";
+import { erc20Abi, getAddress, isAddress, parseUnits, zeroHash, type Address } from "viem";
 import { useAccount, useConnect, useSignMessage, useWriteContract } from "wagmi";
+import { celo } from "wagmi/chains";
 import { useIsMiniPay } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CopyButton } from "@/components/ui/copy-button";
+import { ConfettiBurst } from "@/components/ui/confetti-burst";
 import { FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TokenIcon } from "@/components/ui/token-icon";
@@ -137,8 +141,35 @@ function ClaimFlowInner({
   const [isBinding, setIsBinding] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<SubmissionResponse | null>(null);
+  const [confettiKey, setConfettiKey] = useState<string | null>(null);
+  const [cashOutOpen, setCashOutOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferTo, setTransferTo] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferTxHash, setTransferTxHash] = useState<string | null>(null);
+  const [isTransferring, setIsTransferring] = useState(false);
   const [ratingTxHash, setRatingTxHash] = useState<string | null>(null);
   const [ratingScore, setRatingScore] = useState(95);
+  const cashOutRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!cashOutOpen) return;
+    const onOutside = (e: MouseEvent) => {
+      if (cashOutRef.current && !cashOutRef.current.contains(e.target as Node)) {
+        setCashOutOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCashOutOpen(false);
+    };
+    document.addEventListener("mousedown", onOutside);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [cashOutOpen]);
 
   const { data: campData } = useQuery({
     queryKey: ["campaigns-claim"],
@@ -292,12 +323,35 @@ function ClaimFlowInner({
       });
       const json = (await res.json()) as SubmissionResponse;
       setResult(json);
+      setCashOutOpen(false);
+      setTransferOpen(false);
+      setTransferError(null);
+      setTransferTxHash(null);
       if (json.status === "COMPLETED") {
-        toast.success(`Exact ${activeCampaign?.corridor ?? "FX"} payout settled on Celo Mainnet`);
+        const paidLabel = activeStage && activeCampaign
+          ? `${activeStage.rewardLocalFormatted} ${activeCampaign.corridor}`
+          : activeCampaign?.corridor ?? "your payout";
+        setConfettiKey(json.txHashes?.localPayout ?? String(Date.now()));
+        if (json.offramp?.humanAmount) {
+          setTransferAmount(json.offramp.humanAmount);
+        }
+        toast.success(`${paidLabel} paid to your wallet`, {
+          description: "Your work was verified and settled on Celo.",
+          ...(json.txHashes?.localPayout
+            ? {
+                action: {
+                  label: "View tx",
+                  onClick: () =>
+                    window.open(celoscanTxUrl(json.txHashes!.localPayout), "_blank", "noopener"),
+                },
+              }
+            : {}),
+        });
+        void refetchIdentity();
       } else if (json.status === "REJECTED") {
-        toast.error(`Rejected: ${json.policyDecision?.failedRule ?? "Policy Gate"}`);
+        toast.error(friendlyFailureMessage(json));
       } else if (json.error) {
-        toast.message(json.error);
+        toast.error(json.error);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Network error submitting deliverable.";
@@ -306,6 +360,72 @@ function ClaimFlowInner({
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  async function handleTransferPayout(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeCampaign) return;
+    setTransferError(null);
+    setTransferTxHash(null);
+
+    const recipient = transferTo.trim();
+    if (!isAddress(recipient)) {
+      setTransferError("Enter a valid Celo 0x wallet or exchange deposit address.");
+      return;
+    }
+
+    const tokenMeta = CELO_TOKENS[activeCampaign.corridor as CorridorSymbol];
+    if (!tokenMeta) return;
+
+    let atomic: bigint;
+    try {
+      atomic = parseUnits(transferAmount.trim(), tokenMeta.decimals);
+      if (atomic <= 0n) throw new Error("zero");
+    } catch {
+      setTransferError(`Enter a valid ${activeCampaign.corridor} amount.`);
+      return;
+    }
+
+    setIsTransferring(true);
+    try {
+      const hash = await writeContractAsync({
+        address: tokenMeta.address,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [getAddress(recipient), atomic],
+        chainId: celo.id,
+      });
+      setTransferTxHash(hash);
+      setTransferTo("");
+      toast.success(`Sent ${transferAmount.trim()} ${activeCampaign.corridor}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Transfer cancelled.";
+      setTransferError(msg.slice(0, 140));
+    } finally {
+      setIsTransferring(false);
+    }
+  }
+
+  function friendlyFailureMessage(res: SubmissionResponse): string {
+    const rule = res.policyDecision?.failedRule;
+    if (rule === "UNIQUE_DELIVERABLE_HASH") {
+      return "This post link has already been claimed.";
+    }
+    if (rule === "VERIFIED_EXTERNAL_IDENTITY") {
+      return res.policyDecision?.failedReason?.includes("team")
+        ? "This wallet is restricted to team administration. Please sign in with a personal wallet or social account."
+        : "Please link your profile in Step 01 before submitting.";
+    }
+    if (rule === "STAGE_CAP_AND_COOLDOWN") {
+      return res.policyDecision?.failedReason || "This stage isn't unlocked yet.";
+    }
+    if (rule === "CAMPAIGN_ACTIVE_AND_FUNDED") {
+      return "This campaign's active pool doesn't have enough funds left for another payout right now.";
+    }
+    if (rule === "VERIFICATION_SCORE_THRESHOLD") {
+      return res.verdict?.reason || "Your post didn't meet all campaign requirements yet.";
+    }
+    return res.policyDecision?.failedReason || res.error || "Unable to complete payout right now.";
   }
 
   async function handleRateOnchain() {
@@ -342,6 +462,8 @@ function ClaimFlowInner({
 
   return (
     <div className="space-y-8">
+      <ConfettiBurst triggerKey={confettiKey} />
+
       <div className="vire-enter">
         <h1 className="text-[28px] font-medium tracking-[-0.03em] text-[#0A0A0C]">
           Submit work
@@ -599,10 +721,10 @@ function ClaimFlowInner({
 
         {/* Right Sticky Payout Progress */}
         <div className="min-w-0 lg:sticky lg:top-20 lg:col-span-5">
-          <Card className="vire-enter vire-delay-2 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
+          <Card className="vire-enter vire-delay-2 overflow-visible">
+            <div className="flex items-center justify-between rounded-t-2xl border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
               <h2 className="text-[13px] font-medium text-[#0A0A0C]">
-                Payout steps
+                {result?.status === "COMPLETED" ? "Payout receipt" : "How payout works"}
               </h2>
               {activeCampaign && (
                 <div className="flex items-center gap-1.5">
@@ -617,11 +739,11 @@ function ClaimFlowInner({
               {!result && !isSubmitting && (
                 <ol className="divide-y divide-black/[0.06]">
                   {[
-                    ["01", "Automatic check", "Reviews your link against the campaign requirements"],
-                    ["02", "Safety & limits", "Checks uniqueness, quality score, and campaign budget"],
+                    ["01", "Automatic check", "Reviews your post against the campaign requirements"],
+                    ["02", "Safety & limits", "Confirms uniqueness and available campaign budget"],
                     ["03", "Local currency swap", "Converts USDT into your exact local payout"],
-                    ["04", "Direct transfer", "Sends local currency straight to your connected wallet"],
-                    ["05", "Cash-out & rating", "Local bank cash-out links + optional onchain rating"],
+                    ["04", "Direct transfer", "Sends local currency straight to your wallet"],
+                    ["05", "Cash out", "Withdraw directly to your local bank or wallet"],
                   ].map(([num, title, desc]) => (
                     <li key={num} className="flex items-start gap-3.5 py-3.5 first:pt-0 last:pb-0">
                       <span className="mt-0.5 font-mono text-[11.5px] text-[#A1A1AA]">{num}</span>
@@ -645,225 +767,277 @@ function ClaimFlowInner({
                 </div>
               )}
 
-              {result && (
-                <div className="space-y-4">
-                  <div
-                    className={cn(
-                      "rounded-xl p-4 text-[12.5px]",
-                      result.status === "COMPLETED"
-                        ? "bg-[#0A0A0C] text-white"
-                        : "bg-[#FEF2F2] text-[#0A0A0C] ring-1 ring-[#DC2626]/20"
-                    )}
-                  >
-                    <div className="flex items-center justify-between font-mono text-[11.5px] font-medium">
-                      <span>STATUS · {result.status}</span>
-                      {result.verdict && <span>SCORE {result.verdict.score}/100</span>}
+              {result && result.status === "COMPLETED" && (
+                <div className="space-y-5">
+                  {/* Celebratory Success Hero — crisp, calm, zero jargon */}
+                  <div className="space-y-3 text-center">
+                    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#16A34A]/10 text-[#16A34A]">
+                      <Check weight="bold" className="h-5 w-5" />
                     </div>
-                    {result.error && (
-                      <p className="mt-1.5 break-words leading-relaxed [overflow-wrap:anywhere]">
-                        {result.error}
+                    <div>
+                      <div className="text-[12px] font-medium text-[#16A34A]">Payout sent</div>
+                      <div className="mt-1 inline-flex items-center justify-center gap-2 text-[28px] font-medium tracking-[-0.03em] text-[#0A0A0C] tabular-nums">
+                        {activeCampaign && <TokenIcon symbol={activeCampaign.corridor} size={24} />}
+                        <span>
+                          {activeStage?.rewardLocalFormatted ?? result.offramp?.humanAmount}{" "}
+                          {activeCampaign?.corridor}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[13px] text-[#71717A]">
+                        Verified and sent directly to your wallet
+                        {address ? ` (${truncateMiddle(address, 6, 4)})` : ""}.
                       </p>
-                    )}
-                    {result.policyDecision?.failedReason && (
-                      <p className="mt-1.5 break-words font-medium text-[#B91C1C] [overflow-wrap:anywhere]">
-                        {result.policyDecision.failedRule}: {result.policyDecision.failedReason}
-                      </p>
+                    </div>
+
+                    {result.txHashes?.localPayout && (
+                      <div className="pt-0.5">
+                        <a
+                          href={celoscanTxUrl(result.txHashes.localPayout)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-full bg-[#F5F5F7] px-3 py-1 font-mono text-[11.5px] text-[#3F3F46] transition-colors hover:bg-[#ECECEF] hover:text-[#0A0A0C]"
+                        >
+                          View transaction
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </a>
+                      </div>
                     )}
                   </div>
 
-                  {result.buyReceipts && result.buyReceipts.length > 0 && (
-                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-[#71717A]">
-                        01 · Verification receipts
-                      </div>
-                      <div className="mt-2 space-y-1.5">
-                        {result.buyReceipts.map((r, i) => (
-                          <div key={i} className="flex items-center justify-between font-mono text-[11.5px]">
-                            <span className="text-[#0A0A0C]">{r.capabilityId}</span>
-                            {r.paymentTxHash ? (
-                              <a
-                                href={celoscanTxUrl(r.paymentTxHash)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[#0A0A0C] underline underline-offset-2"
-                              >
-                                {truncateMiddle(r.paymentTxHash, 8, 6)}
-                                <ArrowUpRight className="h-3 w-3" />
-                              </a>
-                            ) : (
-                              <span className="text-[#71717A]">
-                                {r.dryRun ? "dry-run" : "settled"}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {result.policyDecision && (
-                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-[#71717A]">
-                        02 · Safety &amp; limit checks
-                      </div>
-                      <ul className="mt-2 space-y-2">
-                        {result.policyDecision.checks.map((chk) => (
-                          <li key={chk.rule} className="flex items-start gap-2 text-[11.5px]">
-                            {chk.passed ? (
-                              <Check
-                                weight="bold"
-                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#16A34A]"
-                              />
-                            ) : (
-                              <X
-                                weight="bold"
-                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#DC2626]"
-                              />
-                            )}
-                            <div className="min-w-0">
-                              <span className="font-mono font-medium text-[#0A0A0C]">
-                                {chk.rule}
-                              </span>
-                              <p className="text-[#71717A]">{chk.detail}</p>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {result.txHashes && (
-                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-[#71717A]">
-                        03 &amp; 04 · Onchain settlement proofs
-                      </div>
-                      <div className="mt-2.5 space-y-2 font-mono text-[11.5px]">
-                        {[
-                          ["Vault Release", result.txHashes.vaultRelease],
-                          ["Textile Swap", result.txHashes.textileSwap],
-                          ["Local Payout", result.txHashes.localPayout],
-                          ["Audit Receipt", result.txHashes.vaultReceipt],
-                          ...(result.txHashes.gasDrip
-                            ? [["Welcome Gas (CELO)", result.txHashes.gasDrip]]
-                            : []),
-                        ].map(([label, hash]) => (
-                          <div key={label} className="flex items-center justify-between gap-2">
-                            <span className="text-[#71717A]">{label}</span>
-                            <div className="flex items-center gap-1.5">
-                              <a
-                                href={celoscanTxUrl(hash!)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-0.5 text-[#0A0A0C] underline underline-offset-2"
-                              >
-                                {truncateMiddle(hash!, 8, 6)}
-                                <ArrowUpRight className="h-3 w-3" />
-                              </a>
-                              <CopyButton value={hash!} toastMessage={`${label} hash copied`} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
+                  {/* Primary Cash-Out CTA Dropdown */}
                   {result.offramp && (
-                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-[#71717A]">
-                        05 · Cash-out &amp; rating
-                      </div>
-                      <h3 className="mt-1 text-sm font-medium text-[#0A0A0C]">
-                        {result.offramp.headline}
-                      </h3>
-                      <ul className="mt-2 space-y-1 text-[#52525B]">
-                        {result.offramp.instructions.map((line, idx) => (
-                          <li key={idx}>· {line}</li>
-                        ))}
-                      </ul>
-
-                      <div className="vire-well mt-3 flex items-center justify-between gap-2 rounded-xl px-3 py-2 font-mono text-[11px]">
-                        <span className="truncate text-[#52525B]">
-                          {result.offramp.tokenAddress}
+                    <div ref={cashOutRef} className="relative">
+                      <button
+                        type="button"
+                        aria-expanded={cashOutOpen}
+                        aria-haspopup="menu"
+                        onClick={() => setCashOutOpen((prev) => !prev)}
+                        className="vire-pressable flex h-11 w-full items-center justify-between rounded-full bg-[#0A0A0C] px-5 text-[13.5px] font-medium text-white shadow-[0_1px_2px_rgba(10,10,12,0.14)] hover:bg-[#1C1C21]"
+                      >
+                        <span>
+                          {activeCampaign?.corridor === "cNGN"
+                            ? "Cash out to Naira"
+                            : "Cash out to local bank"}
                         </span>
-                        <CopyButton
-                          value={result.offramp.tokenAddress}
-                          label="Copy"
-                          toastMessage="Token contract address copied"
-                        />
-                      </div>
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          className={cn(
+                            "h-4 w-4 text-white/75 transition-transform duration-150 ease-[var(--ease-out)]",
+                            cashOutOpen && "rotate-180"
+                          )}
+                        >
+                          <path
+                            d="M4 6.25L8 10.25L12 6.25"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
 
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {result.offramp.venues.map((v) => (
-                          <a
-                            key={v.name}
-                            href={v.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={buttonVariants({ variant: "secondary", size: "sm" })}
+                      {cashOutOpen && (
+                        <div
+                          role="menu"
+                          className="absolute left-0 right-0 z-40 mt-2 overflow-hidden rounded-2xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(10,10,12,0.08),0_16px_36px_-10px_rgba(10,10,12,0.16)]"
+                        >
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setCashOutOpen(false);
+                              setTransferOpen(true);
+                            }}
+                            className="flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 text-left transition-colors hover:bg-[#F5F5F7]"
                           >
-                            {v.name}
-                            <ArrowUpRight className="h-3.5 w-3.5" />
-                          </a>
-                        ))}
-                      </div>
-
-                      <div className="mt-4 border-t border-black/[0.06] pt-3.5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-[#0A0A0C]">
-                            Rate this payout
-                          </span>
-                          <span className="font-mono text-[10.5px] text-[#71717A]">
-                            onchain feedback
-                          </span>
-                        </div>
-
-                        {ratingTxHash ? (
-                          <a
-                            href={celoscanTxUrl(ratingTxHash)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-2 inline-flex items-center gap-1 font-mono text-xs text-[#0A0A0C] underline underline-offset-2"
-                          >
-                            Confirmed: {truncateMiddle(ratingTxHash, 10, 6)}
-                            <ArrowUpRight className="h-3 w-3" />
-                          </a>
-                        ) : repData?.registered && repData.agentId ? (
-                          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                            <div className="vire-well inline-flex items-center rounded-full p-0.5">
-                              {[80, 90, 95, 100].map((val) => (
-                                <button
-                                  key={val}
-                                  type="button"
-                                  onClick={() => setRatingScore(val)}
-                                  className={cn(
-                                    "vire-pressable rounded-full px-2.5 py-1 font-mono text-[11px]",
-                                    ratingScore === val
-                                      ? "bg-[#0A0A0C] text-white"
-                                      : "text-[#71717A] hover:text-[#0A0A0C]"
-                                  )}
-                                >
-                                  {val}
-                                </button>
-                              ))}
+                            <div className="min-w-0">
+                              <div className="text-[13px] font-medium text-[#0A0A0C]">
+                                Send to wallet or exchange
+                              </div>
+                              <div className="truncate text-[11.5px] text-[#71717A]">
+                                Transfer {activeCampaign?.corridor} straight to MiniPay, Busha, or Quidax
+                              </div>
                             </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="primary"
-                              disabled={isRatingTxPending}
-                              onClick={handleRateOnchain}
+                            <PaperPlaneTilt className="h-4 w-4 shrink-0 text-[#52525B]" />
+                          </button>
+
+                          <div className="my-1 border-t border-black/[0.06]" />
+
+                          {result.offramp.venues.map((v) => (
+                            <a
+                              key={v.name}
+                              role="menuitem"
+                              href={v.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={() => setCashOutOpen(false)}
+                              className="flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 transition-colors hover:bg-[#F5F5F7]"
                             >
-                              {isRatingTxPending ? "Confirm in wallet…" : "Submit rating"}
-                            </Button>
-                          </div>
-                        ) : (
-                          <p className="mt-1.5 text-[11.5px] text-[#71717A]">
-                            Onchain rating registration pending.
-                          </p>
-                        )}
-                      </div>
+                              <div className="min-w-0">
+                                <div className="text-[13px] font-medium text-[#0A0A0C]">
+                                  {v.name}
+                                </div>
+                                <div className="truncate text-[11.5px] text-[#71717A]">
+                                  {v.note}
+                                </div>
+                              </div>
+                              <ArrowUpRight className="h-4 w-4 shrink-0 text-[#71717A]" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  {/* Inline Direct Transfer Form (triggered from Cash Out dropdown) */}
+                  {transferOpen && activeCampaign && (
+                    <form
+                      onSubmit={handleTransferPayout}
+                      className="vire-well space-y-2.5 rounded-xl p-4"
+                    >
+                      <div className="flex items-center justify-between text-[12px] font-medium text-[#0A0A0C]">
+                        <span>Send {activeCampaign.corridor}</span>
+                        <button
+                          type="button"
+                          onClick={() => setTransferOpen(false)}
+                          className="text-[11.5px] font-normal text-[#71717A] hover:text-[#0A0A0C]"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <Input
+                        type="text"
+                        value={transferTo}
+                        onChange={(e) => setTransferTo(e.target.value)}
+                        placeholder="Paste MiniPay, Busha, or Quidax 0x… address"
+                        className="h-9 bg-white font-mono text-[12px]"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={transferAmount}
+                          onChange={(e) => setTransferAmount(e.target.value)}
+                          placeholder="Amount"
+                          className="h-9 bg-white font-mono text-[12px]"
+                        />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="primary"
+                          disabled={isTransferring}
+                          className="h-9 shrink-0 px-4"
+                        >
+                          {isTransferring ? (
+                            <CircleNotch className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            "Send"
+                          )}
+                        </Button>
+                      </div>
+                      {transferError && (
+                        <p className="text-[11.5px] text-[#DC2626]">{transferError}</p>
+                      )}
+                      {transferTxHash && (
+                        <a
+                          href={celoscanTxUrl(transferTxHash)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 font-mono text-[11.5px] text-[#16A34A] underline underline-offset-2"
+                        >
+                          Transfer sent · View tx
+                          <ArrowUpRight className="h-3 w-3" />
+                        </a>
+                      )}
+                    </form>
+                  )}
+
+                  {/* Subtle Optional Rating */}
+                  {repData?.registered && repData.agentId && (
+                    <div className="border-t border-black/[0.06] pt-4">
+                      <div className="text-[12.5px] font-medium text-[#0A0A0C]">
+                        How was your payout?
+                      </div>
+                      {ratingTxHash ? (
+                        <a
+                          href={celoscanTxUrl(ratingTxHash)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1.5 inline-flex items-center gap-1 text-[12px] text-[#16A34A] hover:underline"
+                        >
+                          Thanks — rating recorded
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </a>
+                      ) : (
+                        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                          <div className="vire-well inline-flex items-center rounded-full p-0.5">
+                            {[
+                              { label: "Good", val: 85 },
+                              { label: "Great", val: 95 },
+                              { label: "Instant", val: 100 },
+                            ].map((opt) => (
+                              <button
+                                key={opt.val}
+                                type="button"
+                                onClick={() => setRatingScore(opt.val)}
+                                className={cn(
+                                  "vire-pressable rounded-full px-3 py-1 text-[12px] font-medium",
+                                  ratingScore === opt.val
+                                    ? "bg-[#0A0A0C] text-white"
+                                    : "text-[#71717A] hover:text-[#0A0A0C]"
+                                )}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={isRatingTxPending}
+                            onClick={handleRateOnchain}
+                          >
+                            {isRatingTxPending ? "Confirming…" : "Submit"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Quiet link to Public Ledger for full technical audit trail */}
+                  <div className="border-t border-black/[0.06] pt-3 text-center">
+                    <Link
+                      href="/ledger"
+                      className="inline-flex items-center gap-1 text-[12px] text-[#71717A] transition-colors hover:text-[#0A0A0C]"
+                    >
+                      View full receipt in public ledger
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              {result && result.status !== "COMPLETED" && (
+                <div className="space-y-4">
+                  <div className="rounded-xl bg-[#FEF2F2] p-4 ring-1 ring-[#DC2626]/20">
+                    <div className="flex items-center gap-2 text-[13px] font-medium text-[#B91C1C]">
+                      <WarningCircle weight="bold" className="h-4 w-4 shrink-0" />
+                      <span>
+                        {result.policyDecision?.failedRule === "UNIQUE_DELIVERABLE_HASH"
+                          ? "Already claimed"
+                          : "Could not complete payout"}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 break-words text-[12.5px] leading-relaxed text-[#52525B] [overflow-wrap:anywhere]">
+                      {friendlyFailureMessage(result)}
+                    </p>
+                  </div>
+                  <p className="text-[12px] text-[#71717A]">
+                    Fix the issue above and click <span className="font-medium text-[#0A0A0C]">Verify &amp; get paid</span> again.
+                  </p>
                 </div>
               )}
             </div>
