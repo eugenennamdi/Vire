@@ -1,0 +1,35 @@
+{
+  "name": "vire",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.22.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @vire/web dev",
+    "build": "pnpm --filter @vire/shared build && pnpm --filter @vire/celo-infra build && pnpm --filter @vire/textile build && pnpm --filter @vire/agent build && pnpm --filter @vire/web build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:contracts": "PATH=\"$HOME/.foundry/bin:$PATH\" forge test --root contracts -vvv",
+    "doctor": "tsx scripts/doctor.ts",
+    "register-agent": "tsx scripts/register-agent.ts",
+    "seed": "tsx scripts/seed-campaigns.ts",
+    "db:push": "pnpm --filter @vire/web db:push"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "@vire/agent": "workspace:*",
+    "@vire/celo-infra": "workspace:*",
+    "@vire/shared": "workspace:*",
+    "@vire/textile": "workspace:*",
+    "viem": "^2.45.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.1.1"
+  }
+}

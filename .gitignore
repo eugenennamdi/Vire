@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+.next/
+.vercel/
+out/
+*.tsbuildinfo
+
+# Foundry artifacts & installed git libs (re-installed via `forge install`)
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
+
+# Local databases & env secrets
+.env
+.env.local
+.env.*.local
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# OS & logs
+.DS_Store
+*.log
+coverage/

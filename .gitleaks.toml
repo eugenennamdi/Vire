@@ -1,0 +1,12 @@
+title = "Vire Secret Detection Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow canonical public Celo mainnet contract addresses and example files"
+paths = [
+  '''\.env\.example$''',
+  '''pnpm-lock\.yaml$''',
+  '''contracts/lib/.*''',
+]
