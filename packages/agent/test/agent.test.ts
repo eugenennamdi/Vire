@@ -216,12 +216,12 @@ describe("SSRF & prompt-injection fail-closed guards", () => {
 
     // Author spoofing guard: @other_person submitting @promouser's tweet MUST reject BEFORE spending on `buy`
     const buyClient = new CeloBuyClient({ dryRun: true });
-    const inferSpy = vi.spyOn(buyClient, "callCencoriInference");
+    const tweetSpy = vi.spyOn(buyClient, "fetchTweetDetail");
     const spoofed = await verifyDeliverableWithBuy(buyClient, {
       deliverableUrl: "https://x.com/promouser/status/123456789",
       deliverableType: "promo_post",
       campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
-      criteria: "Post about swotgadgets.com",
+      criteria: "Post promoting swotgadgets.com tagging @swotgadgets with #SWOTBlackFriday",
       contributorHandle: "other_person",
       fetchImpl: mockFetch,
     });
@@ -229,7 +229,33 @@ describe("SSRF & prompt-injection fail-closed guards", () => {
     expect(spoofed.verdict.score).toBe(0);
     expect(spoofed.verdict.reason).toContain("Author mismatch");
     expect(spoofed.buyReceipts).toHaveLength(0);
-    expect(inferSpy).not.toHaveBeenCalled();
+    expect(tweetSpy).not.toHaveBeenCalled();
+
+    // Legitimate author submitting valid SWOT Gadgets tweet MUST pass & record paid Celo `buy` receipt
+    const valid = await verifyDeliverableWithBuy(buyClient, {
+      deliverableUrl: "https://x.com/promouser/status/123456789",
+      deliverableType: "promo_post",
+      campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
+      criteria: "Post promoting swotgadgets.com tagging @swotgadgets with #SWOTBlackFriday",
+      contributorHandle: "promouser",
+      fetchImpl: mockFetch,
+    });
+    expect(valid.verdict.verdict).toBe("pass");
+    expect(valid.verdict.score).toBeGreaterThanOrEqual(88);
+    expect(valid.buyReceipts.length).toBeGreaterThanOrEqual(1);
+    expect(tweetSpy).toHaveBeenCalledWith("123456789");
+
+    // Missing required hashtag MUST reject deterministically
+    const missingTag = await verifyDeliverableWithBuy(buyClient, {
+      deliverableUrl: "https://x.com/promouser/status/123456789",
+      deliverableType: "promo_post",
+      campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
+      criteria: "Post promoting swotgadgets.com tagging @swotgadgets with #DifferentRequiredTag",
+      contributorHandle: "promouser",
+      fetchImpl: mockFetch,
+    });
+    expect(missingTag.verdict.verdict).toBe("reject");
+    expect(missingTag.verdict.reason).toContain("#differentrequiredtag");
   });
 });
 

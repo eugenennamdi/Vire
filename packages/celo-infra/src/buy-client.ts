@@ -42,6 +42,14 @@ export interface ChainstackRpcResult<T = unknown> {
   receipt: BuyPaymentReceipt;
 }
 
+export interface BuyTweetDetailResult {
+  tweetId: string;
+  text: string | null;
+  authorHandle: string | null;
+  raw: unknown;
+  receipt: BuyPaymentReceipt;
+}
+
 export interface BuyCatalogCapability {
   id: string;
   platform: string;
@@ -130,7 +138,10 @@ export class CeloBuyClient {
         policies: [
           (_version, requirements) => {
             const preferred = requirements.filter(
-              (r) => r.asset.toLowerCase() === targetAssetLower
+              (r) =>
+                r.asset.toLowerCase() === targetAssetLower &&
+                (r.network === `eip155:${CELO_MAINNET_CHAIN_ID}` ||
+                  String(r.network) === "celo")
             );
             return preferred.length > 0 ? preferred : requirements;
           },
@@ -308,6 +319,84 @@ export class CeloBuyClient {
         endpointUrl,
         paymentToken: this.paymentToken,
         paymentAmountAtomic: "10000",
+        paymentTxHash: paymentInfo.txHash,
+        dryRun: false,
+        settledAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  /**
+   * Paid X (Twitter) single-tweet detail fetch via Celo `buy` gateway ($0.005/call).
+   * Capability: `monid.x.tikhub.api-v1-twitter-web-fetch-tweet-detail`.
+   */
+  async fetchTweetDetail(tweetId: string): Promise<BuyTweetDetailResult> {
+    const endpointUrl = `${this.gatewayUrl}/v1/social/x/tools/tikhub-api-v1-twitter-web-fetch-tweet-detail`;
+
+    if (this.dryRun) {
+      return {
+        tweetId,
+        text: null,
+        authorHandle: null,
+        raw: { dryRun: true, tweet_id: tweetId },
+        receipt: {
+          capabilityId: "monid.x.tikhub.api-v1-twitter-web-fetch-tweet-detail",
+          endpointUrl,
+          paymentToken: this.paymentToken,
+          paymentAmountAtomic: "5000",
+          paymentTxHash: null,
+          dryRun: true,
+          settledAt: new Date().toISOString(),
+        },
+      };
+    }
+
+    if (!this.paidFetch) {
+      throw new Error("CeloBuyClient requires agentPrivateKey for paid X tweet detail lookups.");
+    }
+
+    const res = await this.paidFetch(endpointUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ queryParams: { tweet_id: tweetId } }),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    const paymentHeader = res.headers.get("payment-response") ?? res.headers.get("x-payment-response");
+    const paymentInfo = parseX402PaymentResponseHeader(paymentHeader);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Celo buy X tweet detail failed (${res.status}): ${errText.slice(0, 400)}`);
+    }
+
+    const raw = (await res.json()) as Record<string, unknown>;
+    const outerData = (raw.data as Record<string, unknown> | undefined) ?? raw;
+    const innerData = (outerData.data as Record<string, unknown> | undefined) ?? outerData;
+    const textCandidate =
+      (typeof innerData.text === "string" && innerData.text) ||
+      (typeof innerData.full_text === "string" && innerData.full_text) ||
+      (typeof (innerData.legacy as Record<string, unknown> | undefined)?.full_text === "string"
+        ? String((innerData.legacy as Record<string, unknown>).full_text)
+        : null);
+    const authorObj = (innerData.author as Record<string, unknown> | undefined) ??
+      (innerData.user as Record<string, unknown> | undefined);
+    const authorCandidate =
+      (typeof authorObj?.screen_name === "string" && authorObj.screen_name) ||
+      (typeof authorObj?.userName === "string" && authorObj.userName) ||
+      (typeof innerData.screen_name === "string" && innerData.screen_name) ||
+      null;
+
+    return {
+      tweetId,
+      text: textCandidate,
+      authorHandle: authorCandidate,
+      raw,
+      receipt: {
+        capabilityId: "monid.x.tikhub.api-v1-twitter-web-fetch-tweet-detail",
+        endpointUrl,
+        paymentToken: this.paymentToken,
+        paymentAmountAtomic: "5000", // $0.005 atomic in 6-dec USDT/USDC
         paymentTxHash: paymentInfo.txHash,
         dryRun: false,
         settledAt: new Date().toISOString(),
