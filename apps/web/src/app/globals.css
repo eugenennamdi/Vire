@@ -123,6 +123,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Suppress native browser select arrow and reserve right clearance for custom chevron */
+select.vire-select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: none;
+  padding-left: 0.75rem;
+  padding-right: 2.25rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

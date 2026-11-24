@@ -15,6 +15,13 @@ function parseDepthUsd(formatted: string | null): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function formatCompactUsd(amount: number): string {
+  if (amount <= 0) return "$0";
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}k`;
+  return `$${Math.round(amount)}`;
+}
+
 export function CorridorStrip() {
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["live-corridors"],
@@ -134,12 +141,15 @@ export function CorridorStrip() {
                     />
                   </div>
 
-                  <div className="mt-2.5 flex items-center justify-between font-mono text-[11px] text-[#737373] tabular-nums">
-                    <span>
+                  <div className="mt-2.5 flex items-center justify-between gap-2 font-mono text-[11px] text-[#737373] tabular-nums">
+                    <span className="truncate whitespace-nowrap">
                       {c.countryName} · {c.decimals}dp
                     </span>
-                    <span className="inline-flex items-center gap-0.5 text-[#525252] group-hover:text-[#111111]">
-                      {c.maxSellUsdtFormatted ? `$${c.maxSellUsdtFormatted}` : "$0"}
+                    <span
+                      title={c.maxSellUsdtFormatted ? `$${c.maxSellUsdtFormatted} USD₮ depth` : "$0 depth"}
+                      className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-[#525252] group-hover:text-[#111111]"
+                    >
+                      {formatCompactUsd(depthNum)}
                       <ArrowUpRight className="h-3 w-3 opacity-60 transition-transform duration-150 group-hover:-translate-y-[1px] group-hover:translate-x-[1px] group-hover:opacity-100" />
                     </span>
                   </div>

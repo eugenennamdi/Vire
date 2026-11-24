@@ -31,7 +31,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
       <select
         className={cn(
           FIELD_BASE,
-          "h-9 cursor-pointer appearance-none truncate whitespace-nowrap py-0 pr-8 leading-[34px]",
+          "vire-select h-9 cursor-pointer truncate whitespace-nowrap py-0 leading-[34px]",
           className
         )}
         {...props}

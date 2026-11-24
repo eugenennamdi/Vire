@@ -117,7 +117,10 @@ import { privateKeyToAccount } from "viem/accounts";
 
 const client = new x402Client();
 client.setSpendControls({ maxAmountPerPayment: "$1" });
-client.register("eip155:*", new ExactEvmScheme(privateKeyToAccount(process.env.BUYER_KEY)));
+client.register(
+  "eip155:*",
+  new ExactEvmScheme(privateKeyToAccount(process.env.BUYER_KEY))
+);
 
 const payFetch = wrapFetchWithPayment(fetch, client);
 const res = await payFetch("${origin}/api/x402/verify", {
