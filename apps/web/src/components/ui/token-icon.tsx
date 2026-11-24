@@ -54,7 +54,7 @@ export function TokenIcon({
         className={cn(
           "inline-flex h-full w-full items-center justify-center overflow-hidden ring-1 ring-black/[0.08]",
           asset.square ? "rounded-[26%]" : "rounded-full",
-          asset.padded ? "bg-white p-[10%]" : "bg-white"
+          asset.padded ? "bg-white p-[6%]" : "bg-white"
         )}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}

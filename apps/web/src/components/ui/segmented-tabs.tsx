@@ -28,7 +28,7 @@ export function SegmentedTabs<T extends string>({
     <div
       role="tablist"
       className={cn(
-        "vire-well inline-flex flex-wrap items-center gap-0.5 rounded-full p-1",
+        "vire-well inline-flex max-w-full flex-nowrap items-center gap-0.5 overflow-x-auto rounded-full p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
     >

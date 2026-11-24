@@ -172,13 +172,15 @@ console.log(await res.json());`;
                 { label: "Agent", value: vault?.settlementAgent, copy: true },
                 {
                   label: "USDT balance",
-                  value: vault?.usdtBalanceFormatted ? `$${vault.usdtBalanceFormatted} USDT` : "—",
+                  value: vault?.usdtBalanceFormatted
+                    ? `$${Number(vault.usdtBalanceFormatted.replace(/,/g, "")).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`
+                    : "—",
                   copy: false,
                 },
                 {
                   label: "Committed",
                   value: vault?.totalCommittedBudgetFormatted
-                    ? `$${vault.totalCommittedBudgetFormatted} USDT`
+                    ? `$${Number(vault.totalCommittedBudgetFormatted.replace(/,/g, "")).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`
                     : "—",
                   copy: false,
                 },

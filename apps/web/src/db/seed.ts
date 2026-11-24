@@ -82,7 +82,7 @@ export function buildDefaultCampaignBlueprints(): CampaignSeedBlueprint[] {
       isLaunchPartner: false,
       title: "Vire Open-Source QA & Multi-Corridor Bug Bounty",
       description:
-        "Reproducible QA bug reports or verified patch PRs on github.com/eugenennamdi/Vire, settled in exact 18-decimal wARS on Celo Mainnet via Textile FX.",
+        "Reproducible QA bug reports or verified patch PRs on github.com/eugenennamdi/Vire, paid in exact Argentine Peso (wARS) on Celo Mainnet.",
       criteria:
         "Public GitHub issue or pull request on eugenennamdi/Vire with clear reproduction steps, environment details, expected vs actual behavior, or a tested code fix.",
       deliverableType: "qa_bug",

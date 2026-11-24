@@ -179,12 +179,12 @@ export default function LedgerPage() {
         />
 
         {(tab === "settled" || tab === "rejected") && (
-          <div className="w-48">
+          <div className="w-full sm:w-48">
             <Select
               aria-label="Filter by currency"
               value={corridor}
               onChange={(e) => setCorridor(e.target.value)}
-              className="h-9 rounded-full font-mono text-xs"
+              className="h-[38px] rounded-full pl-4 text-[12.5px] font-medium"
             >
               <option value="">All currencies</option>
               <option value="cNGN">cNGN · Nigeria</option>
