@@ -7,6 +7,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
+import type { CorridorLiveStatus } from "@vire/shared";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -34,20 +35,6 @@ export interface InspectorCampaign {
   maxSpreadBps: number;
   minPassScore: number;
   offrampRail: string;
-}
-
-interface LiveCorridorItem {
-  symbol: string;
-  name: string;
-  countryName: string;
-  fiatCode: string;
-  decimals: number;
-  maxSellUsdtFormatted: string | null;
-  sampleBuyHuman: string;
-  sampleTakerPaysUsdtFormatted: string | null;
-  impliedRateLocalPerUsdt: number | null;
-  previewStatus: string;
-  feedStatus: string | null;
 }
 
 interface ScenarioConfig {
@@ -189,15 +176,15 @@ export function ClearingInspector({
     queryFn: async () => {
       const res = await fetch("/api/corridors/live");
       if (!res.ok) throw new Error("Failed to load Textile FX quotes");
-      return (await res.json()) as { fetchedAt: string; corridors: LiveCorridorItem[] };
+      return (await res.json()) as { asOf: string; corridors: CorridorLiveStatus[] };
     },
     refetchInterval: 30_000,
   });
 
   const liveBySymbol = useMemo(() => {
-    const map = new Map<string, LiveCorridorItem>();
+    const map = new Map<string, CorridorLiveStatus>();
     for (const c of liveData?.corridors ?? []) {
-      map.set(c.symbol, c);
+      map.set(c.corridor, c);
     }
     return map;
   }, [liveData]);
@@ -270,7 +257,8 @@ export function ClearingInspector({
 
   const visibleCorridors = DISPLAY_CORRIDORS.filter((sym) => {
     if (corridorFilter === "all") return true;
-    return liveBySymbol.get(sym)?.previewStatus === "preview";
+    const st = liveBySymbol.get(sym)?.status;
+    return st === "live" || st === "degraded";
   });
 
   return (
@@ -669,12 +657,20 @@ export function ClearingInspector({
             <table className="w-full text-left">
               <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                 <tr>
-                  <th className="px-4 py-3.5 sm:px-6">Asset</th>
-                  <th className="px-4 py-3.5 text-right">Live Rate (1 USDT)</th>
-                  <th className="hidden px-4 py-3.5 text-right sm:table-cell">Maker Depth</th>
-                  <th className="hidden px-4 py-3.5 md:table-cell">Off-Ramp Rail</th>
-                  <th className="px-4 py-3.5">Status</th>
-                  <th className="hidden px-6 py-3.5 text-right sm:table-cell">Action</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 sm:px-6">Asset</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 text-right">
+                    <span className="hidden sm:inline">Live </span>Rate (1 USDT)
+                  </th>
+                  <th className="hidden whitespace-nowrap px-4 py-3.5 text-right sm:table-cell">
+                    Maker Depth
+                  </th>
+                  <th className="hidden whitespace-nowrap px-4 py-3.5 md:table-cell">
+                    Off-Ramp Rail
+                  </th>
+                  <th className="hidden whitespace-nowrap px-4 py-3.5 sm:table-cell">Status</th>
+                  <th className="hidden whitespace-nowrap px-6 py-3.5 text-right sm:table-cell">
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/[0.055]">
@@ -710,7 +706,7 @@ export function ClearingInspector({
                   : visibleCorridors.map((sym) => {
                       const c = liveBySymbol.get(sym);
                       const meta = ALL_CORRIDOR_META[sym];
-                      const isLive = c?.previewStatus === "preview";
+                      const isLive = c?.status === "live" || c?.status === "degraded";
                       const depthRaw = c?.maxSellUsdtFormatted;
                       const depthNum = depthRaw ? Number(depthRaw.replace(/,/g, "")) : 0;
                       const depthPct =
@@ -731,10 +727,18 @@ export function ClearingInspector({
                               <TokenIcon symbol={sym} size={32} showChainBadge />
                               <div className="min-w-0">
                                 <div className="text-[13.5px] font-medium text-[#0A0A0C] group-hover:underline">
-                                  {meta?.name ?? c?.name ?? sym}
+                                  {meta?.name ?? sym}
                                 </div>
-                                <div className="font-mono text-[11.5px] text-[#71717A] tabular-nums">
-                                  {sym} · {c?.decimals ?? meta?.decimals ?? "—"}dp
+                                <div className="flex items-center gap-1.5 font-mono text-[11.5px] text-[#71717A] tabular-nums">
+                                  <span
+                                    className={cn(
+                                      "h-1.5 w-1.5 rounded-full sm:hidden",
+                                      isLive ? "bg-[#16A34A]" : "bg-[#D4D4D8]"
+                                    )}
+                                  />
+                                  <span>
+                                    {sym} · {c?.decimals ?? meta?.decimals ?? "—"}dp
+                                  </span>
                                 </div>
                               </div>
                             </Link>
@@ -775,7 +779,7 @@ export function ClearingInspector({
                             {meta?.rail ?? "—"}
                           </td>
 
-                          <td className="whitespace-nowrap px-4 py-4">
+                          <td className="hidden whitespace-nowrap px-4 py-4 sm:table-cell">
                             <span className="inline-flex items-center gap-2 text-[12.5px] font-medium text-[#3F3F46]">
                               <span
                                 className={cn(
