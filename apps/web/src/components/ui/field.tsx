@@ -6,11 +6,13 @@ import type {
 } from "react";
 import { cn } from "@/lib/utils";
 
-const FIELD_BASE =
-  "w-full rounded-[10px] border border-black/[0.10] bg-white px-3.5 text-[13.5px] text-[#0A0A0C] placeholder:text-[#A1A1AA] " +
+const FIELD_CHROME =
+  "w-full rounded-[10px] border border-black/[0.10] bg-white text-[13.5px] text-[#0A0A0C] placeholder:text-[#A1A1AA] " +
   "transition-[border-color,box-shadow,background-color] duration-150 " +
   "hover:border-black/[0.20] focus:border-black/[0.35] focus:outline-none focus:ring-[3px] focus:ring-black/[0.05] " +
   "disabled:cursor-not-allowed disabled:bg-[#F4F4F6] disabled:text-[#A1A1AA]";
+
+const FIELD_BASE = `${FIELD_CHROME} px-3.5`;
 
 export function FieldLabel({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
   return (
@@ -25,13 +27,19 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return <input className={cn(FIELD_BASE, "h-10", className)} {...props} />;
 }
 
-export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({ className, style, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <div className="relative w-full min-w-0">
       <select
+        style={{
+          WebkitAppearance: "none",
+          MozAppearance: "none",
+          appearance: "none",
+          ...style,
+        }}
         className={cn(
-          FIELD_BASE,
-          "h-10 min-w-0 max-w-full cursor-pointer appearance-none truncate py-0 pr-9 leading-normal",
+          FIELD_CHROME,
+          "h-10 min-w-0 max-w-full cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap py-[9px] pl-3.5 pr-10 leading-5",
           className
         )}
         {...props}

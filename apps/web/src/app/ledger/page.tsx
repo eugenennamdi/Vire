@@ -174,7 +174,7 @@ export default function LedgerPage() {
             { value: "settled", label: "Payouts", count: data?.completedSettlements.length ?? 0 },
             { value: "rejected", label: "Blocked", count: data?.rejectedClaims.length ?? 0 },
             { value: "buy", label: "Reviews", count: data?.buyPayments.length ?? 0 },
-            { value: "x402", label: "API Payments", count: data?.x402Inflows.length ?? 0 },
+            { value: "x402", label: "API", count: data?.x402Inflows.length ?? 0 },
           ]}
         />
 
@@ -184,7 +184,7 @@ export default function LedgerPage() {
               aria-label="Filter by currency"
               value={corridor}
               onChange={(e) => setCorridor(e.target.value)}
-              className="h-[38px] rounded-full pl-4 text-[12.5px] font-medium"
+              className="h-[38px] rounded-full py-[8px] pl-4 pr-10 text-[12.5px] font-medium leading-5"
             >
               <option value="">All currencies</option>
               <option value="cNGN">cNGN · Nigeria</option>

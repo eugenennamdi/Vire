@@ -42,7 +42,7 @@ export function SegmentedTabs<T extends string>({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "vire-pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-medium",
+              "vire-pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[12px] font-medium sm:px-3 sm:text-[12.5px]",
               active
                 ? "bg-white text-[#0A0A0C] shadow-[0_0_0_1px_rgba(10,10,12,0.07),0_1px_2px_rgba(10,10,12,0.06)]"
                 : "text-[#71717A] hover:text-[#0A0A0C]"

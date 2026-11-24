@@ -457,7 +457,7 @@ function ClaimFlowInner() {
                   required
                   value={deliverableUrl}
                   onChange={(e) => setDeliverableUrl(e.target.value)}
-                  placeholder="https://x.com/handle/status/... or GitHub URL"
+                  placeholder="Paste X post or GitHub URL"
                   className="font-mono"
                 />
               </div>
