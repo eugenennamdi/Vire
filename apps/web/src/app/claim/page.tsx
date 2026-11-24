@@ -281,23 +281,23 @@ function ClaimFlowInner() {
     <div className="space-y-8">
       <div className="vire-enter">
         <h1 className="text-[28px] font-medium tracking-[-0.03em] text-[#0A0A0C]">
-          Submit deliverable
+          Submit work
         </h1>
         <p className="mt-1 max-w-[60ch] text-[14px] leading-relaxed text-[#71717A]">
-          Connect an external Celo wallet, bind your handle, and submit proof for automated x402
-          verification and exact-output local stablecoin settlement.
+          Connect your Celo wallet, link your profile, and submit your link to get automatically
+          verified and paid in local currency.
         </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
         {/* Left Action Column */}
         <div className="min-w-0 space-y-5 lg:col-span-7">
-          {/* Step 1: Identity Binding */}
+          {/* Step 1: Link Profile */}
           <Card className="vire-enter vire-delay-1 p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
                 <span className="font-mono text-[12px] text-[#A1A1AA]">01</span>
-                <h2 className="text-[15px] font-medium text-[#0A0A0C]">Identity binding</h2>
+                <h2 className="text-[15px] font-medium text-[#0A0A0C]">Link your profile</h2>
               </div>
 
               {identityData?.contributor ? (
@@ -307,21 +307,21 @@ function ClaimFlowInner() {
                   {identityData.contributor.identityHandle}
                 </Badge>
               ) : (
-                <Badge tone="neutral">Unlinked</Badge>
+                <Badge tone="neutral">Not linked</Badge>
               )}
             </div>
 
             {!isConnected ? (
               <div className="vire-well mt-4 flex items-center gap-2.5 rounded-xl px-4 py-3 text-[13px] text-[#52525B]">
                 <WarningCircle weight="regular" className="h-4 w-4 shrink-0 text-[#0A0A0C]" />
-                <span>Connect a Celo Mainnet wallet in the header to bind your identity.</span>
+                <span>Connect your Celo wallet in the header to link your profile.</span>
               </div>
             ) : (
               <div className="mt-4 space-y-3">
                 <div className="grid gap-3 sm:grid-cols-12">
                   <div className="min-w-0 sm:col-span-4">
                     <FieldLabel htmlFor="identity-provider" className="mb-1.5">
-                      Provider
+                      Platform
                     </FieldLabel>
                     <Select
                       id="identity-provider"
@@ -330,7 +330,7 @@ function ClaimFlowInner() {
                     >
                       <option value="github">GitHub</option>
                       <option value="x">X (Twitter)</option>
-                      <option value="signed_proof">Wallet Proof</option>
+                      <option value="signed_proof">Wallet signature</option>
                     </Select>
                   </div>
 
@@ -369,7 +369,7 @@ function ClaimFlowInner() {
                       className={buttonVariants({ variant: "ghost", size: "sm" })}
                     >
                       <GithubLogo weight="regular" className="h-3.5 w-3.5" />
-                      Sign in with GitHub OAuth
+                      Sign in with GitHub
                     </a>
                   </div>
                 )}
@@ -383,13 +383,13 @@ function ClaimFlowInner() {
             )}
           </Card>
 
-          {/* Step 2: Deliverable Form */}
+          {/* Step 2: Work Proof Form */}
           <Card className="vire-enter vire-delay-2 p-6">
             <form onSubmit={handleSubmitDeliverable} className="space-y-4">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
                   <span className="font-mono text-[12px] text-[#A1A1AA]">02</span>
-                  <h2 className="text-[15px] font-medium text-[#0A0A0C]">Deliverable proof</h2>
+                  <h2 className="text-[15px] font-medium text-[#0A0A0C]">Work proof</h2>
                 </div>
                 {activeCampaign && (
                   <span className="inline-flex items-center gap-1.5 font-mono text-[12px] text-[#52525B]">
@@ -470,13 +470,13 @@ function ClaimFlowInner() {
                     type="text"
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value)}
-                    placeholder="TECHHUB-BF26"
+                    placeholder="SWOT-BF26"
                     className="font-mono"
                   />
                 </div>
 
                 <div className="min-w-0 space-y-1.5">
-                  <FieldLabel htmlFor="recipient-wallet">Recipient wallet</FieldLabel>
+                  <FieldLabel htmlFor="recipient-wallet">Payout wallet</FieldLabel>
                   <Input
                     id="recipient-wallet"
                     type="text"
@@ -508,11 +508,11 @@ function ClaimFlowInner() {
                 {isSubmitting ? (
                   <>
                     <CircleNotch className="h-4 w-4 animate-spin" />
-                    Verifying and settling…
+                    Verifying and paying…
                   </>
                 ) : (
                   <>
-                    Verify &amp; settle exact local FX
+                    Verify &amp; get paid
                     <ArrowRight weight="bold" className="h-4 w-4" />
                   </>
                 )}
@@ -521,12 +521,12 @@ function ClaimFlowInner() {
           </Card>
         </div>
 
-        {/* Right Sticky Clearing Execution Trace */}
+        {/* Right Sticky Payout Progress */}
         <div className="min-w-0 lg:sticky lg:top-20 lg:col-span-5">
           <Card className="vire-enter vire-delay-2 overflow-hidden">
             <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
               <h2 className="text-[13px] font-medium text-[#0A0A0C]">
-                Execution trace
+                Payout steps
               </h2>
               {activeCampaign && (
                 <div className="flex items-center gap-1.5">
@@ -541,11 +541,11 @@ function ClaimFlowInner() {
               {!result && !isSubmitting && (
                 <ol className="divide-y divide-black/[0.06]">
                   {[
-                    ["01", "x402 verification", "usebuy.ai · Cencori LLM & Chainstack ($0.01)"],
-                    ["02", "Policy Gate", "7 deterministic rules + VireVault limits"],
-                    ["03", "Textile FX swap", "Exact buyAmount RFQ + ERC-8021 builderCodes"],
-                    ["04", "Local payout", "Direct transfer in cNGN / wFIAT / IDRX"],
-                    ["05", "Off-ramp & ERC-8004", "Local ramp links + onchain giveFeedback()"],
+                    ["01", "Automatic check", "Reviews your link against the campaign requirements"],
+                    ["02", "Safety & limits", "Checks uniqueness, quality score, and campaign budget"],
+                    ["03", "Local currency swap", "Converts USDT into your exact local payout"],
+                    ["04", "Direct transfer", "Sends local currency straight to your connected wallet"],
+                    ["05", "Cash-out & rating", "Local bank cash-out links + optional onchain rating"],
                   ].map(([num, title, desc]) => (
                     <li key={num} className="flex items-start gap-3.5 py-3.5 first:pt-0 last:pb-0">
                       <span className="mt-0.5 font-mono text-[11.5px] text-[#A1A1AA]">{num}</span>
@@ -562,7 +562,7 @@ function ClaimFlowInner() {
                 <div className="space-y-3">
                   <div className="vire-well flex items-center gap-2.5 rounded-xl p-3.5 text-[13px] text-[#0A0A0C]">
                     <CircleNotch className="h-4 w-4 animate-spin" />
-                    <span>Running x402 verification, Textile quote, and Policy Gate…</span>
+                    <span>Reviewing your link, checking limits, and locking exchange rate…</span>
                   </div>
                   <Skeleton className="h-20 w-full" />
                   <Skeleton className="h-28 w-full" />
@@ -687,7 +687,7 @@ function ClaimFlowInner() {
                   {result.offramp && (
                     <div className="border-t border-black/[0.06] pt-3.5 text-xs">
                       <div className="font-mono text-[11px] text-[#71717A]">
-                        05 · Off-ramp &amp; ERC-8004 rating
+                        05 · Cash-out &amp; rating
                       </div>
                       <h3 className="mt-1 text-sm font-medium text-[#0A0A0C]">
                         {result.offramp.headline}
@@ -700,7 +700,7 @@ function ClaimFlowInner() {
 
                       <div className="vire-well mt-3 flex items-center justify-between gap-2 rounded-xl px-3 py-2 font-mono text-[11px]">
                         <span className="truncate text-[#52525B]">
-                          {result.offramp.tokenDecimals}dp · {result.offramp.tokenAddress}
+                          {result.offramp.tokenAddress}
                         </span>
                         <CopyButton
                           value={result.offramp.tokenAddress}
@@ -727,10 +727,10 @@ function ClaimFlowInner() {
                       <div className="mt-4 border-t border-black/[0.06] pt-3.5">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-[#0A0A0C]">
-                            Rate onchain (ERC-8004)
+                            Rate this payout
                           </span>
                           <span className="font-mono text-[10.5px] text-[#71717A]">
-                            tag: settlement
+                            onchain feedback
                           </span>
                         </div>
 
@@ -770,12 +770,12 @@ function ClaimFlowInner() {
                               disabled={isRatingTxPending}
                               onClick={handleRateOnchain}
                             >
-                              {isRatingTxPending ? "Confirm in wallet…" : "Submit giveFeedback()"}
+                              {isRatingTxPending ? "Confirm in wallet…" : "Submit rating"}
                             </Button>
                           </div>
                         ) : (
                           <p className="mt-1.5 text-[11.5px] text-[#71717A]">
-                            Agent registration ID pending configuration.
+                            Onchain rating registration pending.
                           </p>
                         )}
                       </div>

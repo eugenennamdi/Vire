@@ -141,12 +141,11 @@ console.log(await res.json());`;
     <div className="space-y-8">
       <div className="vire-enter">
         <h1 className="text-[28px] font-medium tracking-[-0.03em] text-[#0A0A0C]">
-          Console &amp; x402 playground
+          Developer console
         </h1>
         <p className="mt-1 max-w-[60ch] text-[14px] leading-relaxed text-[#71717A]">
-          Live <code className="font-mono text-[13px] text-[#0A0A0C]">VireVault</code> custody state,
-          verified Celo Mainnet token decimals, and interactive HTTP 402 testing against{" "}
-          <code className="font-mono text-[13px] text-[#0A0A0C]">api.x402.celo.org</code>.
+          Live treasury status, supported Celo Mainnet token contracts, and interactive API payment
+          testing.
         </p>
       </div>
 
@@ -158,11 +157,11 @@ console.log(await res.json());`;
               <div className="flex items-center gap-2">
                 <TokenIcon symbol="USDT" size={20} showChainBadge />
                 <h2 className="text-[13.5px] font-medium text-[#0A0A0C]">
-                  VireVault custody
+                  Treasury vault
                 </h2>
               </div>
               <Badge tone={vault?.deployed && !vault.paused ? "positive" : "neutral"}>
-                {vault?.deployed ? (vault.paused ? "Paused" : "Active · 42220") : "Unconfigured"}
+                {vault?.deployed ? (vault.paused ? "Paused" : "Active") : "Unconfigured"}
               </Badge>
             </div>
 
@@ -237,11 +236,11 @@ console.log(await res.json());`;
           <Card className="vire-enter vire-delay-2 overflow-hidden">
             <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#FAFAFB] px-5 py-3.5">
               <h3 className="text-[13.5px] font-medium text-[#0A0A0C]">
-                Verified token decimals
+                Supported tokens
               </h3>
               <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-[#71717A]">
                 <TokenIcon symbol="CELO" size={14} />
-                42220
+                Celo Mainnet
               </span>
             </div>
             <div className="divide-y divide-black/[0.055] font-mono text-[12px]">
@@ -252,7 +251,7 @@ console.log(await res.json());`;
                     {t.symbol}
                   </span>
                   <span className="text-[#71717A]">{truncateMiddle(t.address, 8, 5)}</span>
-                  <span className="text-[#3F3F46] tabular-nums">{t.decimals}dp</span>
+                  <span className="text-[#3F3F46] tabular-nums">{t.decimals} decimals</span>
                 </div>
               ))}
             </div>

@@ -128,16 +128,16 @@ export default async function HomePage() {
           {/* Left: Ultra-light Editorial Display + Button-in-Button CTA */}
           <div className="min-w-0 lg:col-span-7">
             <div className="font-mono text-[12px] tracking-[0.02em] text-[#6E6E78]">
-              Autonomous FX Clearing
+              Automated Local Payouts
             </div>
 
             <h1 className="mt-5 max-w-[15ch] text-[36px] font-light leading-[1.04] tracking-[-0.04em] text-[#0A0A0C] sm:text-[48px] lg:text-[54px]">
               Pay verified work in exact local currency.
             </h1>
 
-            <p className="mt-5 max-w-[45ch] text-[15px] leading-[1.6] text-[#5C5C66]">
-              Verify off-chain deliverables autonomously, enforce onchain vault limits, and settle
-              exact local stablecoins over Textile FX.
+            <p className="mt-5 max-w-[44ch] text-[15px] leading-[1.6] text-[#5C5C66]">
+              Automatically verify completed work, enforce onchain spending limits, and send exact
+              payouts in local currencies.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -145,7 +145,7 @@ export default async function HomePage() {
                 href="/claim"
                 className="group vire-pressable inline-flex h-11 items-center gap-3 rounded-full bg-[#0A0A0C] pl-5 pr-1.5 text-[14px] font-medium text-white shadow-[0_1px_2px_rgba(10,10,12,0.16)] hover:bg-[#19191F]"
               >
-                <span>Submit deliverable</span>
+                <span>Submit work</span>
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.14] transition-[transform,background-color] duration-200 ease-[var(--ease-out)] group-hover:translate-x-0.5 group-hover:bg-white/[0.2]">
                   <ArrowRight weight="bold" className="h-3.5 w-3.5" />
                 </span>
@@ -163,7 +163,7 @@ export default async function HomePage() {
           <div className="flex flex-col gap-7 border-t border-black/[0.06] pt-7 lg:col-span-5 lg:items-end lg:border-t-0 lg:pb-1 lg:pt-0 lg:text-right">
             <div className="flex flex-col lg:items-end">
               <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#7A7A86]">
-                Live Textile FX Depth
+                Available FX Liquidity
               </div>
               <div className="mt-1.5 text-[36px] font-light leading-none tracking-[-0.035em] text-[#0A0A0C] tabular-nums sm:text-[42px]">
                 {fxDepthFormatted}
@@ -205,14 +205,14 @@ export default async function HomePage() {
                 id="recent-settlements-heading"
                 className="text-[22px] font-medium tracking-[-0.03em] text-[#0A0A0C]"
               >
-                Recent settlements
+                Recent payouts
               </h2>
               <p className="mt-0.5 text-[13.5px] text-[#71717A]">
-                Latest verified payouts cleared on Celo Mainnet.
+                Latest verified payouts sent on Celo Mainnet.
               </p>
             </div>
             <Link href="/ledger" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-              Full audit ledger
+              Public ledger
             </Link>
           </div>
 
@@ -221,11 +221,11 @@ export default async function HomePage() {
               <table className="w-full text-left text-[13px]">
                 <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                   <tr>
-                    <th className="px-5 py-3">Timestamp</th>
-                    <th className="px-5 py-3">Corridor</th>
+                    <th className="px-5 py-3">Time</th>
+                    <th className="px-5 py-3">Currency</th>
                     <th className="px-5 py-3">Recipient</th>
-                    <th className="px-5 py-3 text-right">Exact Output</th>
-                    <th className="px-5 py-3 text-right">Proof</th>
+                    <th className="px-5 py-3 text-right">Amount Paid</th>
+                    <th className="px-5 py-3 text-right">Receipt</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/[0.055]">

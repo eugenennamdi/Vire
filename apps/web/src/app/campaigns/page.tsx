@@ -97,10 +97,10 @@ function CampaignsInner() {
       <div className="vire-enter flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
           <h1 className="text-[28px] font-medium tracking-[-0.03em] text-[#0A0A0C]">
-            Clearing campaigns
+            Campaigns
           </h1>
           <p className="mt-1 max-w-[58ch] text-[14px] leading-relaxed text-[#71717A]">
-            Multi-stage mandates settled in exact local stablecoins over Textile FX and bounded onchain by VireVault.
+            Complete verified tasks and get paid the exact promised amount in your local currency.
           </p>
         </div>
 
@@ -133,11 +133,10 @@ function CampaignsInner() {
       ) : filtered.length === 0 ? (
         <Card className="p-12 text-center">
           <p className="text-[14px] font-medium text-[#0A0A0C]">
-            No campaigns configured for {corridorFilter}.
+            No active campaigns for {corridorFilter} yet.
           </p>
           <p className="mt-1 text-[13px] text-[#71717A]">
-            Create one permissionlessly via{" "}
-            <code className="font-mono text-[#0A0A0C]">POST /api/x402/campaigns</code>.
+            Launch a new local-currency campaign anytime from the developer console.
           </p>
           <div className="mt-5 flex justify-center gap-2">
             <button
@@ -148,7 +147,7 @@ function CampaignsInner() {
               Show all
             </button>
             <Link href="/console" className={buttonVariants({ variant: "primary", size: "sm" })}>
-              Open Console
+              Developer console
             </Link>
           </div>
         </Card>
@@ -180,7 +179,7 @@ function CampaignsInner() {
                         <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#71717A]">
                           {camp.isLaunchPartner && <Badge tone="ink">Launch Partner</Badge>}
                           <span className="font-mono font-medium text-[#0A0A0C]">
-                            {camp.corridor} · {camp.localTokenDecimals}dp
+                            {camp.corridor}
                           </span>
                           <span>·</span>
                           <span>{camp.partnerName}</span>
@@ -227,7 +226,7 @@ function CampaignsInner() {
                           className: "w-full",
                         })}
                       >
-                        Submit deliverable
+                        Submit work
                         <ArrowRight weight="bold" className="h-3.5 w-3.5" />
                       </Link>
                     </div>
@@ -271,36 +270,35 @@ function CampaignsInner() {
                   ))}
                 </div>
 
-                {/* Guardrails strip */}
+                {/* Plain-English limits strip */}
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-black/[0.06] bg-[#FAFAFB] px-6 py-2.5 font-mono text-[11.5px] text-[#71717A] tabular-nums">
-                  <span className="font-medium text-[#0A0A0C]">Policy Caps</span>
-                  <span>maxSpread {camp.maxSpreadBps} bps</span>
-                  <span>maxPerPayout ${camp.maxPerPayoutUsdtFormatted}</span>
-                  <span>dailyCap ${camp.dailyLimitUsdtFormatted}/24h</span>
-                  <span>repeatCap {camp.maxPayoutsPerRecipient}x</span>
-                  <span>minScore {camp.minPassScore}/100</span>
+                  <span className="font-medium text-[#0A0A0C]">Limits</span>
+                  <span>Up to ${camp.maxPerPayoutUsdtFormatted}/payout</span>
+                  <span>${camp.dailyLimitUsdtFormatted}/day max</span>
+                  <span>Max {camp.maxPayoutsPerRecipient} payouts/person</span>
+                  <span>Min score {camp.minPassScore}/100</span>
+                  <span>{(camp.maxSpreadBps / 100).toFixed(1).replace(/\.0$/, "")}% max spread</span>
                 </div>
               </Card>
             );
           })}
 
-          {/* Permissionless multi-corridor x402 onboarding strip */}
+          {/* Multi-currency campaign launch strip */}
           <Card className="flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
             <div className="space-y-1.5">
               <div className="flex items-center gap-2.5">
                 <TokenStack symbols={["wBRL", "IDRX", "wMXN"]} size={20} />
                 <h2 className="text-[14.5px] font-medium text-[#0A0A0C]">
-                  Launch in any Textile FX corridor
+                  Launch a campaign in any supported currency
                 </h2>
               </div>
               <p className="max-w-[56ch] text-[13px] text-[#71717A]">
-                Merchants and protocols can spin up verified local-currency campaigns across{" "}
-                <span className="font-mono text-[#0A0A0C]">cNGN, wARS, wBRL, IDRX, wMXN</span> via{" "}
-                <code className="font-mono text-[#0A0A0C]">POST /api/x402/campaigns</code>.
+                Brands and teams can fund automated local-currency payout campaigns in{" "}
+                <span className="font-mono text-[#0A0A0C]">cNGN, wARS, wBRL, IDRX, or wMXN</span>.
               </p>
             </div>
             <Link href="/console" className={buttonVariants({ variant: "secondary", size: "md" })}>
-              Open x402 Console
+              Developer console
               <ArrowRight weight="bold" className="h-3.5 w-3.5" />
             </Link>
           </Card>

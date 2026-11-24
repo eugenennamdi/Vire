@@ -109,11 +109,11 @@ export default function LedgerPage() {
       <div className="vire-enter flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-medium tracking-[-0.03em] text-[#0A0A0C]">
-            Audit ledger
+            Public ledger
           </h1>
           <p className="mt-1 max-w-[62ch] text-[14px] leading-relaxed text-[#71717A]">
-            Public record of Celo Mainnet settlements, Policy Gate rejections, paid{" "}
-            <code className="font-mono text-[13px] text-[#0A0A0C]">usebuy.ai</code> calls, and x402 inflows.
+            Transparent record of every payout sent, blocked claim, and automated review on Celo
+            Mainnet.
           </p>
         </div>
 
@@ -127,27 +127,27 @@ export default function LedgerPage() {
       <Card className="vire-enter vire-delay-1 overflow-hidden">
         <div className="grid grid-cols-2 divide-x divide-y divide-black/[0.06] sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
           {[
-            { label: "Recipients", value: m?.totalExternalRecipients ?? 0, sub: "external wallets" },
-            { label: "Repeat", value: m?.repeatContributorsCount ?? 0, sub: "2+ stages" },
+            { label: "Contributors", value: m?.totalExternalRecipients ?? 0, sub: "unique wallets" },
+            { label: "Returning", value: m?.repeatContributorsCount ?? 0, sub: "2+ payouts" },
             {
-              label: "Textile swaps",
+              label: "Payouts",
               value: m?.totalCompletedSettlements ?? 0,
               sub: `$${m?.totalUsdtSettledFormatted ?? "0"} USDT`,
             },
             {
-              label: "Corridors",
+              label: "Currencies",
               value: m?.corridorsClearedCount ?? 0,
               sub: m?.corridorsCleared.join(", ") || "ready",
             },
             {
-              label: "x402 calls",
+              label: "Reviews",
               value: m?.totalPaidBuyCalls ?? 0,
               sub: `${m?.totalBuyCallsRecorded ?? 0} logged`,
             },
             {
-              label: "x402 inflows",
+              label: "API payments",
               value: m?.totalX402Inflows ?? 0,
-              sub: "api.x402.celo.org",
+              sub: "x402 verified",
             },
           ].map((kpi) => (
             <div key={kpi.label} className="p-5">
@@ -165,28 +165,28 @@ export default function LedgerPage() {
         </div>
       </Card>
 
-      {/* Capsule Tabs + Corridor Filter */}
+      {/* Capsule Tabs + Currency Filter */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SegmentedTabs
           value={tab}
           onChange={setTab}
           options={[
-            { value: "settled", label: "Settlements", count: data?.completedSettlements.length ?? 0 },
-            { value: "rejected", label: "Rejected", count: data?.rejectedClaims.length ?? 0 },
-            { value: "buy", label: "x402 Calls", count: data?.buyPayments.length ?? 0 },
-            { value: "x402", label: "x402 Inflows", count: data?.x402Inflows.length ?? 0 },
+            { value: "settled", label: "Payouts", count: data?.completedSettlements.length ?? 0 },
+            { value: "rejected", label: "Blocked", count: data?.rejectedClaims.length ?? 0 },
+            { value: "buy", label: "Reviews", count: data?.buyPayments.length ?? 0 },
+            { value: "x402", label: "API Payments", count: data?.x402Inflows.length ?? 0 },
           ]}
         />
 
         {(tab === "settled" || tab === "rejected") && (
           <div className="w-48">
             <Select
-              aria-label="Filter by corridor"
+              aria-label="Filter by currency"
               value={corridor}
               onChange={(e) => setCorridor(e.target.value)}
               className="h-9 rounded-full font-mono text-xs"
             >
-              <option value="">All corridors</option>
+              <option value="">All currencies</option>
               <option value="cNGN">cNGN · Nigeria</option>
               <option value="wARS">wARS · Argentina</option>
               <option value="wBRL">wBRL · Brazil</option>
@@ -211,11 +211,11 @@ export default function LedgerPage() {
               <table className="w-full text-left text-[13px]">
                 <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                   <tr>
-                    <th className="px-5 py-3.5">Timestamp</th>
-                    <th className="px-5 py-3.5">Campaign / Recipient</th>
-                    <th className="px-5 py-3.5">Local output</th>
-                    <th className="px-5 py-3.5">USDT spent</th>
-                    <th className="px-5 py-3.5">Proofs</th>
+                    <th className="px-5 py-3.5">Time</th>
+                    <th className="px-5 py-3.5">Campaign / Wallet</th>
+                    <th className="px-5 py-3.5">Amount paid</th>
+                    <th className="px-5 py-3.5">Treasury cost</th>
+                    <th className="px-5 py-3.5">Onchain receipts</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/[0.055]">
@@ -293,17 +293,17 @@ export default function LedgerPage() {
               </table>
             ) : (
               <div className="px-6 py-16 text-center">
-                <p className="text-[14px] font-medium text-[#0A0A0C]">No settlements recorded yet</p>
+                <p className="text-[14px] font-medium text-[#0A0A0C]">No payouts sent yet</p>
                 <p className="mx-auto mt-1.5 max-w-sm text-[13px] leading-relaxed text-[#71717A]">
-                  Verified payouts appear here with Celoscan links once cleared through VireVault
-                  and Textile FX.
+                  Verified payouts appear here with public Celo Mainnet transaction links as soon as
+                  they are sent.
                 </p>
                 <div className="mt-5 flex justify-center gap-2">
                   <Link href="/claim" className={buttonVariants({ variant: "primary", size: "sm" })}>
-                    Submit deliverable
+                    Submit work
                   </Link>
                   <Link href="/console" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                    Inspect vault
+                    View treasury
                   </Link>
                 </div>
               </div>
@@ -347,9 +347,9 @@ export default function LedgerPage() {
               </table>
             ) : (
               <div className="px-6 py-16 text-center">
-                <p className="text-[14px] font-medium text-[#0A0A0C]">No rejected claims</p>
+                <p className="text-[14px] font-medium text-[#0A0A0C]">No blocked claims</p>
                 <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-[#71717A]">
-                  Submissions blocked by the 7-rule Policy Gate are logged here.
+                  Submissions stopped by safety or budget checks are logged here.
                 </p>
               </div>
             )

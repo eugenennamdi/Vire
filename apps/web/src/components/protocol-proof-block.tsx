@@ -202,7 +202,8 @@ export function ProtocolProofBlock() {
           Open by default, verifiable onchain.
         </h2>
         <p className="mt-2 text-[14.5px] leading-relaxed text-[#71717A]">
-          Every custody limit, policy check, and FX fill is auditable on Celo Mainnet.
+          Every spending limit, safety check, and currency exchange is open and verifiable on Celo
+          Mainnet.
         </p>
       </div>
 
@@ -276,16 +277,16 @@ export function ProtocolProofBlock() {
       <div className="mx-auto grid max-w-[960px] divide-y divide-black/[0.08] pt-3 md:grid-cols-3 md:divide-x md:divide-y-0">
         {[
           {
-            title: "Non-Custodial Separation",
-            desc: "Owner funds, pauses, and withdraws VireVault. Agent executes bounded external payouts.",
+            title: "Owner-Controlled Treasury",
+            desc: "Campaign owners fund, pause, and withdraw anytime. The agent only sends capped payouts.",
           },
           {
-            title: "Exact-Output Precision",
-            desc: "Clears 2dp IDRX, 6dp cNGN, and 18dp wFIAT cleanly while refunding unused USDT dust.",
+            title: "Exact Local Payouts",
+            desc: "Converts USDT into the exact local currency amount promised and returns leftover change.",
           },
           {
-            title: "ERC-8021 Native Attribution",
-            desc: "Every vault release, FX swap, and payout carries verifiable builder attribution on Celo.",
+            title: "Public Onchain Proof",
+            desc: "Every payout, exchange rate, and safety check is permanently verifiable on Celo Mainnet.",
           },
         ].map((item) => (
           <div key={item.title} className="px-4 py-5 text-center md:px-8 md:py-2">

@@ -124,11 +124,11 @@ export const metadata: Metadata = {
 };
 
 const FOOTER_RAILS = [
-  { symbol: "cNGN", label: "cNGN · NG · 6dp" },
-  { symbol: "wARS", label: "wARS · AR · 18dp" },
-  { symbol: "wBRL", label: "wBRL · BR · 18dp" },
-  { symbol: "IDRX", label: "IDRX · ID · 2dp" },
-  { symbol: "wMXN", label: "wMXN · MX · 18dp" },
+  { symbol: "cNGN", label: "cNGN · Nigeria" },
+  { symbol: "wARS", label: "wARS · Argentina" },
+  { symbol: "wBRL", label: "wBRL · Brazil" },
+  { symbol: "IDRX", label: "IDRX · Indonesia" },
+  { symbol: "wMXN", label: "wMXN · Mexico" },
 ] as const;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -202,8 +202,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                       <span>Vire</span>
                     </Link>
                     <p className="max-w-xs text-[13px] leading-[1.6] text-[#71717A]">
-                      Autonomous proof-of-work verification, bounded onchain USDT custody, and
-                      exact-output local stablecoin settlement on Celo Mainnet.
+                      Automated work verification, onchain spending limits, and exact local-currency
+                      payouts on Celo Mainnet.
                     </p>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 text-[12px] text-[#71717A]">
                       <a
@@ -240,17 +240,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                       </li>
                       <li>
                         <Link href="/claim" className="transition-colors hover:text-[#0A0A0C]">
-                          Submit claim
+                          Submit work
                         </Link>
                       </li>
                       <li>
                         <Link href="/ledger" className="transition-colors hover:text-[#0A0A0C]">
-                          Audit ledger
+                          Public ledger
                         </Link>
                       </li>
                       <li>
                         <Link href="/console" className="transition-colors hover:text-[#0A0A0C]">
-                          x402 Console
+                          Developer console
                         </Link>
                       </li>
                     </ul>
@@ -308,7 +308,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
                   <div className="space-y-3 md:col-span-2">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#A1A1AA]">
-                      Local Rails
+                      Currencies
                     </div>
                     <ul className="space-y-2 whitespace-nowrap font-mono text-[11.5px] text-[#52525B]">
                       {FOOTER_RAILS.map((r) => (
@@ -323,12 +323,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
                 <div className="flex flex-col items-start justify-between gap-2 pt-6 font-mono text-[11.5px] text-[#71717A] sm:flex-row sm:items-center">
                   <span>
-                    Non-custodial USDT treasury · ERC-8021{" "}
+                    Owner-controlled USDT treasury · Attribution{" "}
                     <span className="text-[#0A0A0C]">{attributionCode}</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5 tabular-nums">
                     <TokenIcon symbol="CELO" size={14} />
-                    Celo Mainnet · 42220
+                    Celo Mainnet
                   </span>
                 </div>
               </div>

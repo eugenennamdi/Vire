@@ -80,7 +80,7 @@ const SCENARIOS: ScenarioConfig[] = [
     slug: "brazil-ptbr-localization-wbrl",
     corridor: "wBRL",
     tokenName: "Brazilian Real",
-    deliverableLabel: "Simulated x402 PT-BR localization mandate settling exact 18-decimal wBRL",
+    deliverableLabel: "Portuguese translation pull request on GitHub paid in exact Brazilian Real (wBRL)",
     deliverableUrl: "https://github.com/eugenennamdi/Vire/pull/18",
     aiScore: 94,
     localAmount: "12",
@@ -92,7 +92,7 @@ const SCENARIOS: ScenarioConfig[] = [
     slug: "indonesia-bahasa-qa-idrx",
     corridor: "IDRX",
     tokenName: "Indonesian Rupiah",
-    deliverableLabel: "Simulated x402 Bahasa QA mandate verifying 2-decimal IDRX precision",
+    deliverableLabel: "Indonesian QA review on GitHub paid in exact Indonesian Rupiah (IDRX)",
     deliverableUrl: "https://github.com/eugenennamdi/Vire/pull/21",
     aiScore: 91,
     localAmount: "35,000",
@@ -162,10 +162,9 @@ function formatRate(rate: number | null | undefined): string {
 
 export function ClearingInspector({
   campaigns,
-  attributionCode,
 }: {
   campaigns: InspectorCampaign[];
-  attributionCode: string;
+  attributionCode?: string;
 }) {
   const [selectedId, setSelectedId] = useState<ScenarioConfig["id"]>("cNGN");
   const [mode, setMode] = useState<"valid" | "blocked">("valid");
@@ -226,28 +225,28 @@ export function ClearingInspector({
     : scenario.fallbackUsdt;
   const impliedRate = liveQuote?.impliedRateLocalPerUsdt ?? null;
   const makerDepth = liveQuote?.maxSellUsdtFormatted ?? null;
-  const tokenDecimals =
-    liveQuote?.decimals ??
-    matchedCampaign?.localTokenDecimals ??
-    ALL_CORRIDOR_META[scenario.corridor]?.decimals ??
-    6;
+
+  const maxSpreadPct = ((matchedCampaign?.maxSpreadBps ?? 250) / 100)
+    .toFixed(1)
+    .replace(/\.0$/, "");
+  const scenarioMeta = ALL_CORRIDOR_META[scenario.corridor];
 
   const policyChecks = isBlocked
     ? [
-        { label: "Deliverable replay hash", passed: false },
-        { label: "External wallet guard", passed: false },
-        { label: `Score >= ${matchedCampaign?.minPassScore ?? 75}/100`, passed: false },
-        { label: `Spread <= ${matchedCampaign?.maxSpreadBps ?? 250} bps`, passed: true },
-        { label: `Per-payout <= $${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"}`, passed: true },
-        { label: `24h cap <= $${matchedCampaign?.dailyLimitUsdtFormatted ?? "20"}`, passed: true },
+        { label: "Unique submission", passed: false },
+        { label: "External recipient wallet", passed: false },
+        { label: `Quality score ≥ ${matchedCampaign?.minPassScore ?? 75}/100`, passed: false },
+        { label: `Exchange spread ≤ ${maxSpreadPct}%`, passed: true },
+        { label: `Per-payout limit ≤ $${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"}`, passed: true },
+        { label: `Daily limit ≤ $${matchedCampaign?.dailyLimitUsdtFormatted ?? "20"}`, passed: true },
       ]
     : [
-        { label: "Deliverable replay hash", passed: true },
-        { label: "External wallet guard", passed: true },
-        { label: `Score >= ${matchedCampaign?.minPassScore ?? 75}/100`, passed: true },
-        { label: `Spread <= ${matchedCampaign?.maxSpreadBps ?? 250} bps`, passed: true },
-        { label: `Per-payout <= $${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"}`, passed: true },
-        { label: `24h cap <= $${matchedCampaign?.dailyLimitUsdtFormatted ?? "20"}`, passed: true },
+        { label: "Unique submission", passed: true },
+        { label: "External recipient wallet", passed: true },
+        { label: `Quality score ≥ ${matchedCampaign?.minPassScore ?? 75}/100`, passed: true },
+        { label: `Exchange spread ≤ ${maxSpreadPct}%`, passed: true },
+        { label: `Per-payout limit ≤ $${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"}`, passed: true },
+        { label: `Daily limit ≤ $${matchedCampaign?.dailyLimitUsdtFormatted ?? "20"}`, passed: true },
       ];
 
   const probeCurl = `curl -i -X POST https://usevire.xyz/api/x402/verify \\
@@ -262,7 +261,7 @@ export function ClearingInspector({
 
   return (
     <div className="space-y-16">
-      {/* SECTION 1: Interactive Autonomous Clearing Flow (Aave Pro × Morpho Precision) */}
+      {/* SECTION 1: Interactive Payout Flow */}
       <section aria-labelledby="clearing-flow-heading" className="vire-enter vire-delay-1 space-y-5">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
@@ -270,10 +269,10 @@ export function ClearingInspector({
               id="clearing-flow-heading"
               className="text-[24px] font-medium tracking-[-0.03em] text-[#0A0A0C] sm:text-[26px]"
             >
-              How Vire clears a payout
+              How a payout works
             </h2>
             <p className="mt-1 text-[14px] text-[#71717A]">
-              Select a corridor or simulate a Policy Gate block to inspect live execution guardrails.
+              Pick a currency or test a blocked claim to see how each payout is verified and sent.
             </p>
           </div>
 
@@ -303,20 +302,19 @@ export function ClearingInspector({
               )}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-[#DC2626]" />
-              Policy blocked
+              Blocked claim
             </button>
           </div>
         </div>
 
-        {/* Corridor Selector Pills with Official Colored Token Icons */}
+        {/* Currency Selector Pills with Official Colored Token Icons */}
         <div
           role="tablist"
-          aria-label="Corridor scenarios"
+          aria-label="Currency scenarios"
           className="flex flex-wrap items-center gap-2"
         >
           {SCENARIOS.map((s) => {
             const active = s.id === scenario.id;
-            const meta = ALL_CORRIDOR_META[s.corridor];
             return (
               <button
                 key={s.id}
@@ -333,23 +331,15 @@ export function ClearingInspector({
               >
                 <TokenIcon symbol={s.corridor} size={20} />
                 <span>{s.corridor}</span>
-                <span
-                  className={cn(
-                    "font-mono text-[11px] tabular-nums",
-                    active ? "text-white/65" : "text-[#A1A1AA]"
-                  )}
-                >
-                  {meta?.decimals}dp
-                </span>
               </button>
             );
           })}
         </div>
 
-        {/* Unified Institutional Clearing Workspace */}
+        {/* Unified Payout Flow Workspace */}
         <div className="vire-card overflow-hidden rounded-2xl">
           <div className="grid divide-y divide-black/[0.06] lg:grid-cols-12 lg:divide-x lg:divide-y-0">
-            {/* LEFT (7 cols): 4-Stage Autonomous Clearing Pipeline */}
+            {/* LEFT (7 cols): 4-Step Verification & Payout Pipeline */}
             <div className="divide-y divide-black/[0.06] lg:col-span-7">
               {/* Stage 01 */}
               <div className="p-5 sm:p-6">
@@ -357,7 +347,7 @@ export function ClearingInspector({
                   <div className="flex items-center gap-2.5">
                     <span className="font-mono text-[11.5px] text-[#A1A1AA]">01</span>
                     <h3 className="text-[14px] font-medium text-[#0A0A0C]">
-                      Deliverable audit via paid x402
+                      Automatic work check
                     </h3>
                   </div>
                   <Badge tone={isBlocked ? "destructive" : "positive"}>
@@ -366,13 +356,13 @@ export function ClearingInspector({
                 </div>
                 <p className="mt-2 text-[13.5px] leading-relaxed text-[#52525B]">
                   {isBlocked
-                    ? "Duplicate claim hash detected on an unlinked internal wallet; halted before any vault release."
+                    ? "Duplicate link or unverified wallet detected — stopped before any funds moved."
                     : scenario.deliverableLabel}
                 </p>
                 <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11.5px] text-[#71717A]">
                   <span className="truncate">{scenario.deliverableUrl}</span>
                   <span>·</span>
-                  <span>usebuy.ai ($0.01 USDT)</span>
+                  <span>Automated review ($0.01)</span>
                 </div>
               </div>
 
@@ -382,11 +372,11 @@ export function ClearingInspector({
                   <div className="flex items-center gap-2.5">
                     <span className="font-mono text-[11.5px] text-[#A1A1AA]">02</span>
                     <h3 className="text-[14px] font-medium text-[#0A0A0C]">
-                      Deterministic Policy Gate
+                      Safety &amp; budget checks
                     </h3>
                   </div>
                   <Badge tone={isBlocked ? "destructive" : "neutral"}>
-                    {isBlocked ? "3 Rules Failed" : "7/7 Passed"}
+                    {isBlocked ? "3 Checks Failed" : "All Checks Passed"}
                   </Badge>
                 </div>
 
@@ -415,35 +405,33 @@ export function ClearingInspector({
                   <div className="flex items-center gap-2.5">
                     <span className="font-mono text-[11.5px] text-[#A1A1AA]">03</span>
                     <h3 className="text-[14px] font-medium text-[#0A0A0C]">
-                      Exact-output Textile FX v2 swap
+                      Exact local currency swap
                     </h3>
                   </div>
                   <Badge tone={isBlocked ? "neutral" : "outline"}>
-                    {isBlocked ? "Skipped" : `Exact · ${tokenDecimals}dp`}
+                    {isBlocked ? "Skipped" : "Exact amount"}
                   </Badge>
                 </div>
 
                 {isBlocked ? (
                   <p className="mt-2 text-[13px] text-[#71717A]">
-                    No firm RFQ requested and no USDT pulled from VireVault. Zero onchain movement.
+                    No currency swap requested and no funds pulled from the treasury.
                   </p>
                 ) : (
                   <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 font-mono text-[12px] text-[#52525B] tabular-nums">
                     <span>
                       Rate:{" "}
                       <strong className="font-medium text-[#0A0A0C]">
-                        {impliedRate ? `1 USDT = ${formatRate(impliedRate)} ${scenario.corridor}` : "Live RFQ"}
+                        {impliedRate ? `1 USDT = ${formatRate(impliedRate)} ${scenario.corridor}` : "Live quote"}
                       </strong>
                     </span>
                     <span>
                       Max spread:{" "}
-                      <strong className="font-medium text-[#0A0A0C]">
-                        {matchedCampaign?.maxSpreadBps ?? 250} bps
-                      </strong>
+                      <strong className="font-medium text-[#0A0A0C]">{maxSpreadPct}%</strong>
                     </span>
                     <span>
-                      Dust refund:{" "}
-                      <strong className="font-medium text-[#0A0A0C]">Auto</strong>
+                      Leftover change:{" "}
+                      <strong className="font-medium text-[#0A0A0C]">Auto-returned</strong>
                     </span>
                   </div>
                 )}
@@ -455,30 +443,30 @@ export function ClearingInspector({
                   <div className="flex items-center gap-2.5">
                     <span className="font-mono text-[11.5px] text-[#A1A1AA]">04</span>
                     <h3 className="text-[14px] font-medium text-[#0A0A0C]">
-                      Tagged settlement &amp; audit receipt
+                      Instant payout &amp; receipt
                     </h3>
                   </div>
                   <span className="font-mono text-[11px] text-[#71717A]">
-                    ERC-8021 · {attributionCode}
+                    Celo Mainnet · Public receipt
                   </span>
                 </div>
                 <p className="mt-2 text-[13px] text-[#71717A]">
                   {isBlocked
-                    ? "Rejection reason is logged immutably to the public audit ledger for merchant review."
-                    : `Transfers exact ${localAmountDisplay} ${scenario.corridor} to the external contributor and records an immutable VireVault receipt.`}
+                    ? "The rejection reason is saved to the public ledger so campaign owners can review it."
+                    : `Sends exact ${localAmountDisplay} ${scenario.corridor} directly to the contributor's wallet with a permanent onchain receipt.`}
                 </p>
               </div>
             </div>
 
-            {/* RIGHT (5 cols): Visual Token-to-Token Clearing Ticket */}
+            {/* RIGHT (5 cols): Visual Token-to-Token Payout Ticket */}
             <div className="flex flex-col justify-between bg-[#FAFAFB] p-5 sm:p-6 lg:col-span-5">
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
                   <span className="text-[12.5px] font-medium text-[#52525B]">
-                    Clearing preview
+                    Payout preview
                   </span>
                   <Badge tone={isBlocked ? "destructive" : "positive"}>
-                    {isBlocked ? "Blocked · $0 moved" : "Ready to clear"}
+                    {isBlocked ? "Blocked · $0 sent" : "Ready to pay"}
                   </Badge>
                 </div>
 
@@ -488,7 +476,7 @@ export function ClearingInspector({
                     <div className="flex items-center gap-2">
                       <TokenIcon symbol="USDT" size={26} showChainBadge />
                       <div className="min-w-0">
-                        <div className="text-[11px] text-[#71717A]">Vault debit</div>
+                        <div className="text-[11px] text-[#71717A]">Treasury cost</div>
                         <div className="text-[12.5px] font-medium text-[#0A0A0C]">USDT</div>
                       </div>
                     </div>
@@ -538,32 +526,31 @@ export function ClearingInspector({
                 {/* Clean Key-Value Spec Rows */}
                 <dl className="divide-y divide-black/[0.06] text-[12.5px]">
                   <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Partner</dt>
+                    <dt className="text-[#71717A]">Campaign</dt>
                     <dd className="truncate font-medium text-[#0A0A0C]">
-                      {matchedCampaign?.partnerName ?? "Textile FX Rail (x402 API)"}
+                      {matchedCampaign?.partnerName ?? "Open Currency Network"}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Token precision</dt>
+                    <dt className="text-[#71717A]">Local currency</dt>
+                    <dd className="truncate text-[#0A0A0C]">
+                      {scenarioMeta?.name ?? scenario.tokenName} ({scenarioMeta?.country ?? "Global"})
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 py-2.5">
+                    <dt className="text-[#71717A]">Available liquidity</dt>
                     <dd className="font-mono text-[#0A0A0C] tabular-nums">
-                      {tokenDecimals} decimals ({scenario.corridor})
+                      {makerDepth ? formatCompactUsd(makerDepth) : "Checking…"}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Live maker depth</dt>
+                    <dt className="text-[#71717A]">Spending limits</dt>
                     <dd className="font-mono text-[#0A0A0C] tabular-nums">
-                      {makerDepth ? `${formatCompactUsd(makerDepth)} USDT` : "Checking…"}
+                      Up to ${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"} · {maxSpreadPct}% max spread
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Vault limits</dt>
-                    <dd className="font-mono text-[#0A0A0C] tabular-nums">
-                      &lt;= ${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"}/tx · &lt;={" "}
-                      {matchedCampaign?.maxSpreadBps ?? 250} bps
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Off-ramp rail</dt>
+                    <dt className="text-[#71717A]">Cash-out options</dt>
                     <dd className="truncate text-[#0A0A0C]">{scenario.offrampRail}</dd>
                   </div>
                 </dl>
@@ -575,7 +562,7 @@ export function ClearingInspector({
                     href="/ledger"
                     className={buttonVariants({ variant: "primary", size: "lg", className: "w-full" })}
                   >
-                    Inspect rejected ledger
+                    View blocked claims
                     <ArrowRight weight="bold" className="h-4 w-4" />
                   </Link>
                 ) : matchedCampaign ? (
@@ -583,7 +570,7 @@ export function ClearingInspector({
                     href={`/claim?campaign=${encodeURIComponent(matchedCampaign.slug)}`}
                     className={buttonVariants({ variant: "primary", size: "lg", className: "w-full" })}
                   >
-                    Submit {scenario.corridor} claim
+                    Claim in {scenario.corridor}
                     <ArrowRight weight="bold" className="h-4 w-4" />
                   </Link>
                 ) : (
@@ -591,15 +578,15 @@ export function ClearingInspector({
                     href="/console"
                     className={buttonVariants({ variant: "primary", size: "lg", className: "w-full" })}
                   >
-                    Launch {scenario.corridor} campaign via x402
+                    Create {scenario.corridor} campaign
                     <ArrowRight weight="bold" className="h-4 w-4" />
                   </Link>
                 )}
 
                 <CopyButton
                   value={probeCurl}
-                  label="Copy x402 verification probe"
-                  toastMessage="x402 cURL copied"
+                  label="Copy API check command"
+                  toastMessage="API command copied"
                   className="h-9 w-full justify-center text-[12px]"
                 />
               </div>
@@ -608,7 +595,7 @@ export function ClearingInspector({
         </div>
       </section>
 
-      {/* SECTION 2: Aave Pro-Style Live FX Corridors Market Table */}
+      {/* SECTION 2: Live Exchange Rates Table */}
       <section aria-labelledby="live-rates-heading" className="vire-enter vire-delay-2 space-y-5">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
@@ -616,11 +603,11 @@ export function ClearingInspector({
               id="live-rates-heading"
               className="text-[24px] font-medium tracking-[-0.03em] text-[#0A0A0C] sm:text-[26px]"
             >
-              Live FX corridors
+              Live exchange rates
             </h2>
             <p className="mt-1 text-[14px] text-[#71717A]">
-              Real-time Textile FX v2 orderbooks on Celo Mainnet
-              {totalDepthUsd > 0 ? ` · ${formatCompactUsd(String(totalDepthUsd))} aggregate maker depth` : ""}.
+              Real-time local currency rates on Celo Mainnet
+              {totalDepthUsd > 0 ? ` · ${formatCompactUsd(String(totalDepthUsd))} available liquidity` : ""}.
             </p>
           </div>
 
@@ -664,15 +651,15 @@ export function ClearingInspector({
             <table className="w-full text-left">
               <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-3.5 sm:px-6">Asset</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 sm:px-6">Currency</th>
                   <th className="whitespace-nowrap px-4 py-3.5 text-right">
                     <span className="hidden sm:inline">Live </span>Rate (1 USDT)
                   </th>
                   <th className="hidden whitespace-nowrap px-4 py-3.5 text-right sm:table-cell">
-                    Maker Depth
+                    Liquidity
                   </th>
                   <th className="hidden whitespace-nowrap px-4 py-3.5 md:table-cell">
-                    Off-Ramp Rail
+                    Cash-Out Options
                   </th>
                   <th className="hidden whitespace-nowrap px-4 py-3.5 sm:table-cell">Status</th>
                   <th className="hidden whitespace-nowrap px-6 py-3.5 text-right sm:table-cell">
@@ -744,7 +731,7 @@ export function ClearingInspector({
                                     )}
                                   />
                                   <span>
-                                    {sym} · {c?.decimals ?? meta?.decimals ?? "—"}dp
+                                    {sym} · {meta?.country ?? ""}
                                   </span>
                                 </div>
                               </div>
@@ -765,7 +752,7 @@ export function ClearingInspector({
                           </td>
 
                           <td
-                            title={depthRaw ? `$${depthRaw} USDT available` : "No active depth"}
+                            title={depthRaw ? `$${depthRaw} USDT available` : "Currently unavailable"}
                             className="hidden whitespace-nowrap px-4 py-4 text-right sm:table-cell"
                           >
                             <div className="inline-flex items-center gap-2.5 font-mono text-[13px] text-[#3F3F46] tabular-nums">
@@ -797,7 +784,7 @@ export function ClearingInspector({
                                 )}
                               />
                               <span className={isLive ? "text-[#0A0A0C]" : "text-[#71717A]"}>
-                                {isLive ? "Active" : "No makers"}
+                                {isLive ? "Active" : "Unavailable"}
                               </span>
                             </span>
                           </td>
@@ -807,7 +794,7 @@ export function ClearingInspector({
                               href={`/campaigns?corridor=${encodeURIComponent(sym)}`}
                               className={buttonVariants({ variant: "secondary", size: "sm" })}
                             >
-                              Missions
+                              Campaigns
                             </Link>
                           </td>
                         </tr>
