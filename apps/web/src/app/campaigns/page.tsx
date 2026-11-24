@@ -10,6 +10,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TokenIcon } from "@/components/ui/token-icon";
 import { cn } from "@/lib/utils";
 
 interface CampaignStageView {
@@ -80,6 +81,7 @@ function CampaignsInner() {
   const tabOptions = CORRIDOR_KEYS.map((key) => ({
     value: key,
     label: key === "ALL" ? "All" : key,
+    icon: key === "ALL" ? undefined : <TokenIcon symbol={key} size={16} />,
     count:
       key === "ALL"
         ? allCampaigns.length
@@ -88,17 +90,13 @@ function CampaignsInner() {
 
   return (
     <div className="space-y-8">
-      <div className="vire-enter flex flex-col justify-between gap-4 border-b border-[#E4E2DC] pb-6 lg:flex-row lg:items-end">
+      <div className="vire-enter flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
-            Active Missions · Celo 42220
-          </p>
-          <h1 className="mt-1.5 font-serif text-3xl font-normal tracking-[-0.025em] text-[#121210] sm:text-[36px]">
+          <h1 className="text-[28px] font-medium tracking-[-0.03em] text-[#0A0A0C]">
             Clearing campaigns
           </h1>
-          <p className="mt-1.5 max-w-[58ch] text-sm leading-relaxed text-[#4F4E4A]">
-            Multi-stage work mandates settled with exact local output via Textile FX and bounded onchain by{" "}
-            <code className="font-mono text-xs text-[#121210]">VireVault</code>.
+          <p className="mt-1 max-w-[58ch] text-[14px] leading-relaxed text-[#71717A]">
+            Multi-stage mandates settled in exact local stablecoins over Textile FX and bounded onchain by VireVault.
           </p>
         </div>
 
@@ -118,7 +116,7 @@ function CampaignsInner() {
                   <Skeleton className="h-4 w-44" />
                   <Skeleton className="h-6 w-80" />
                 </div>
-                <Skeleton className="h-9 w-36" />
+                <Skeleton className="h-9 w-36 rounded-full" />
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <Skeleton className="h-24 w-full" />
@@ -130,12 +128,12 @@ function CampaignsInner() {
         </div>
       ) : filtered.length === 0 ? (
         <Card className="p-12 text-center">
-          <p className="text-sm font-medium text-[#121210]">
+          <p className="text-[14px] font-medium text-[#0A0A0C]">
             No campaigns configured for {corridorFilter}.
           </p>
-          <p className="mt-1 text-xs text-[#68665F]">
+          <p className="mt-1 text-[13px] text-[#71717A]">
             Create one permissionlessly via{" "}
-            <code className="font-mono text-[#121210]">POST /api/x402/campaigns</code>.
+            <code className="font-mono text-[#0A0A0C]">POST /api/x402/campaigns</code>.
           </p>
           <div className="mt-5 flex justify-center gap-2">
             <button
@@ -171,43 +169,47 @@ function CampaignsInner() {
               >
                 <div className="p-6">
                   <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-[#68665F]">
-                        {camp.isLaunchPartner && <Badge tone="ink">Launch Partner</Badge>}
-                        <span className="font-semibold text-[#121210]">
-                          {camp.corridor} · {camp.localTokenDecimals}dp
-                        </span>
-                        <span>/</span>
-                        <span>{camp.deliverableType.replace("_", " ")}</span>
-                        <span>/</span>
-                        <span>
-                          {camp.partnerName} ({camp.partnerLocation})
-                        </span>
-                      </div>
+                    <div className="flex min-w-0 flex-1 items-start gap-4">
+                      <TokenIcon symbol={camp.corridor} size={36} showChainBadge className="mt-0.5" />
 
-                      <h2 className="mt-2.5 font-serif text-xl font-normal tracking-[-0.015em] text-[#121210]">
-                        {camp.title}
-                      </h2>
-                      <p className="mt-1.5 max-w-[66ch] text-[13.5px] leading-[1.6] text-[#4F4E4A]">
-                        {camp.description}
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#71717A]">
+                          {camp.isLaunchPartner && <Badge tone="ink">Launch Partner</Badge>}
+                          <span className="font-mono font-medium text-[#0A0A0C]">
+                            {camp.corridor} · {camp.localTokenDecimals}dp
+                          </span>
+                          <span>·</span>
+                          <span>{camp.partnerName}</span>
+                          <span className="hidden sm:inline">({camp.partnerLocation})</span>
+                        </div>
+
+                        <h2 className="mt-2 text-[18px] font-medium tracking-[-0.02em] text-[#0A0A0C]">
+                          {camp.title}
+                        </h2>
+                        <p className="mt-1.5 max-w-[66ch] text-[13.5px] leading-[1.6] text-[#52525B]">
+                          {camp.description}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center lg:w-64 lg:flex-col lg:items-stretch">
-                      <div className="vire-band space-y-1.5 rounded-[4px] px-3.5 py-2.5">
-                        <div className="flex items-baseline justify-between font-mono text-xs tabular-nums">
-                          <span className="text-[#68665F]">Remaining USDT</span>
-                          <span className="font-semibold text-[#121210]">
+                      <div className="vire-well space-y-2 rounded-xl px-4 py-3">
+                        <div className="flex items-center justify-between text-[12px]">
+                          <span className="inline-flex items-center gap-1.5 text-[#71717A]">
+                            <TokenIcon symbol="USDT" size={14} />
+                            Budget
+                          </span>
+                          <span className="font-mono font-medium text-[#0A0A0C] tabular-nums">
                             ${camp.remainingUsdtFormatted}
-                            <span className="font-normal text-[#68665F]">
+                            <span className="font-normal text-[#71717A]">
                               {" "}
                               / ${camp.budgetUsdtFormatted}
                             </span>
                           </span>
                         </div>
-                        <div className="h-[2px] w-full bg-[#DEDBD3]">
+                        <div className="h-1 w-full overflow-hidden rounded-full bg-black/[0.08]">
                           <div
-                            className="h-full bg-[#121210]"
+                            className="h-full rounded-full bg-[#0A0A0C]"
                             style={{ width: `${remainingPct}%` }}
                           />
                         </div>
@@ -229,28 +231,29 @@ function CampaignsInner() {
                 </div>
 
                 {/* Hairline 3-column stage divider row */}
-                <div className="grid grid-cols-1 divide-y divide-[#E4E2DC] border-t border-[#E4E2DC] md:grid-cols-3 md:divide-x md:divide-y-0">
+                <div className="grid grid-cols-1 divide-y divide-black/[0.06] border-t border-black/[0.06] md:grid-cols-3 md:divide-x md:divide-y-0">
                   {camp.stages.map((st) => (
                     <Link
                       key={st.stageIndex}
                       href={`/claim?campaign=${encodeURIComponent(camp.slug)}&stage=${st.stageIndex}`}
-                      className="group flex flex-col justify-between p-5 transition-colors hover:bg-[#FAF9F6]"
+                      className="group flex flex-col justify-between p-5 transition-colors hover:bg-[#FAFAFB]"
                     >
                       <div>
-                        <div className="flex items-center justify-between gap-2 font-mono text-[11px]">
-                          <span className="text-[#68665F]">STAGE 0{st.stageIndex}</span>
-                          <span className="font-semibold text-[#121210] tabular-nums">
+                        <div className="flex items-center justify-between gap-2 font-mono text-[11.5px]">
+                          <span className="text-[#A1A1AA]">STAGE 0{st.stageIndex}</span>
+                          <span className="inline-flex items-center gap-1.5 font-medium text-[#0A0A0C] tabular-nums">
+                            <TokenIcon symbol={camp.corridor} size={15} />
                             {st.rewardLocalFormatted} {camp.corridor}
                           </span>
                         </div>
-                        <h3 className="mt-2 text-[13.5px] font-medium text-[#121210] group-hover:underline">
+                        <h3 className="mt-2 text-[14px] font-medium text-[#0A0A0C] group-hover:underline">
                           {st.title.replace(/^Stage \d+\s*[—-]\s*/i, "")}
                         </h3>
-                        <p className="mt-1 text-xs leading-relaxed text-[#68665F]">
+                        <p className="mt-1 text-[12.5px] leading-relaxed text-[#71717A]">
                           {st.instructions}
                         </p>
                       </div>
-                      <div className="mt-3 font-mono text-[10.5px] text-[#787670]">
+                      <div className="mt-3 font-mono text-[11px] text-[#A1A1AA]">
                         {st.cooldownHours === 0
                           ? "Immediate entry"
                           : `${st.cooldownHours}h cooldown after Stage ${st.stageIndex - 1}`}
@@ -260,8 +263,8 @@ function CampaignsInner() {
                 </div>
 
                 {/* Guardrails strip */}
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-[#E4E2DC] bg-[#F3F1EC]/70 px-6 py-2.5 font-mono text-[11px] text-[#68665F] tabular-nums">
-                  <span className="font-medium text-[#121210]">Policy Guardrails</span>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-black/[0.06] bg-[#FAFAFB] px-6 py-2.5 font-mono text-[11.5px] text-[#71717A] tabular-nums">
+                  <span className="font-medium text-[#0A0A0C]">Policy Caps</span>
                   <span>maxSpread {camp.maxSpreadBps} bps</span>
                   <span>maxPerPayout ${camp.maxPerPayoutUsdtFormatted}</span>
                   <span>dailyCap ${camp.dailyLimitUsdtFormatted}/24h</span>

@@ -13,9 +13,9 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-[6px]",
-        muted ? "vire-band" : "vire-sheet",
-        interactive && "vire-interactive-sheet",
+        "rounded-2xl",
+        muted ? "vire-well" : "vire-card",
+        interactive && "vire-card-interactive",
         className
       )}
       {...props}
@@ -24,9 +24,9 @@ export function Card({
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-1 p-5", className)} {...props} />;
+  return <div className={cn("flex flex-col gap-1 p-6", className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-5 pb-5", className)} {...props} />;
+  return <div className={cn("px-6 pb-6", className)} {...props} />;
 }

@@ -38,11 +38,11 @@ export function Providers({ children }: { children: ReactNode }) {
           toastOptions={{
             style: {
               background: "#FFFFFF",
-              border: "1px solid #D5D2C9",
-              color: "#121210",
+              border: "1px solid rgba(10, 10, 12, 0.09)",
+              color: "#0A0A0C",
               fontSize: "13px",
-              borderRadius: "6px",
-              boxShadow: "0 2px 10px rgba(18, 18, 16, 0.06)",
+              borderRadius: "12px",
+              boxShadow: "0 8px 24px -8px rgba(10, 10, 12, 0.14)",
             },
           }}
         />

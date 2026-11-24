@@ -12,7 +12,7 @@ export const VIRE_MARK_PATHS = {
 } as const;
 
 interface VireMarkProps extends Omit<SVGProps<SVGSVGElement>, "children"> {
-  /** "badge" renders the white mark inside a #111111 squircle; "bare" renders currentColor. */
+  /** "badge" renders the white mark inside a #0A0A0C squircle; "bare" renders currentColor. */
   variant?: "badge" | "bare";
   size?: number;
 }
@@ -52,7 +52,7 @@ export function VireMark({
       className={cn("shrink-0", className)}
       {...props}
     >
-      <rect width="64" height="64" rx="14" fill="#111111" />
+      <rect width="64" height="64" rx="16" fill="#0A0A0C" />
       <path d={VIRE_MARK_PATHS.leftBlade} fill="#FFFFFF" />
       <path d={VIRE_MARK_PATHS.rightWing} fill="#FFFFFF" />
     </svg>
@@ -60,7 +60,7 @@ export function VireMark({
 }
 
 export function VireLogo({
-  size = 24,
+  size = 26,
   className,
 }: {
   size?: number;
@@ -69,7 +69,7 @@ export function VireLogo({
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <VireMark variant="badge" size={size} />
-      <span className="text-[15px] font-semibold tracking-[-0.035em] text-[#111111]">
+      <span className="text-[15.5px] font-semibold tracking-[-0.03em] text-[#0A0A0C]">
         Vire
       </span>
     </span>

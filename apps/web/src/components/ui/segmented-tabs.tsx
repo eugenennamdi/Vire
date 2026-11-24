@@ -1,15 +1,17 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export interface TabOption<T extends string> {
   value: T;
   label: string;
   count?: number;
+  icon?: ReactNode;
 }
 
 /**
- * Architectural square-tab ledger switcher (flat 1px container, crisp black active state).
+ * Institutional capsule switcher — cool recessed well with crisp elevated white active thumb.
  */
 export function SegmentedTabs<T extends string>({
   options,
@@ -26,7 +28,7 @@ export function SegmentedTabs<T extends string>({
     <div
       role="tablist"
       className={cn(
-        "inline-flex flex-wrap items-center border border-[#E4E2DC] bg-white p-0.5 rounded-[6px]",
+        "vire-well inline-flex flex-wrap items-center gap-0.5 rounded-full p-1",
         className
       )}
     >
@@ -40,18 +42,19 @@ export function SegmentedTabs<T extends string>({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "vire-pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded-[4px] px-3 py-1.5 text-xs font-medium",
+              "vire-pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-medium",
               active
-                ? "bg-[#121210] text-[#FAF9F6]"
-                : "text-[#68665F] hover:bg-[#F3F1EC] hover:text-[#121210]"
+                ? "bg-white text-[#0A0A0C] shadow-[0_0_0_1px_rgba(10,10,12,0.07),0_1px_2px_rgba(10,10,12,0.06)]"
+                : "text-[#71717A] hover:text-[#0A0A0C]"
             )}
           >
+            {opt.icon}
             <span>{opt.label}</span>
             {opt.count !== undefined && (
               <span
                 className={cn(
-                  "font-mono text-[10.5px] tabular-nums",
-                  active ? "text-[#FAF9F6]/75" : "text-[#8D8A82]"
+                  "font-mono text-[11px] tabular-nums",
+                  active ? "text-[#71717A]" : "text-[#A1A1AA]"
                 )}
               >
                 {opt.count}

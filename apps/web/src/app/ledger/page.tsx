@@ -11,6 +11,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { Select } from "@/components/ui/field";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TokenIcon } from "@/components/ui/token-icon";
 import { cn, truncateMiddle } from "@/lib/utils";
 
 interface LedgerData {
@@ -105,18 +106,14 @@ export default function LedgerPage() {
 
   return (
     <div className="space-y-8">
-      <div className="vire-enter flex flex-wrap items-end justify-between gap-4 border-b border-[#E4E2DC] pb-6">
+      <div className="vire-enter flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
-            Public Verification · Celo 42220
-          </p>
-          <h1 className="mt-1.5 font-serif text-3xl font-normal tracking-[-0.025em] text-[#121210] sm:text-[36px]">
+          <h1 className="text-[28px] font-medium tracking-[-0.03em] text-[#0A0A0C]">
             Audit ledger
           </h1>
-          <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-[#4F4E4A]">
-            Onchain settlements, Policy Gate rejections, paid{" "}
-            <code className="font-mono text-xs text-[#121210]">usebuy.ai</code> calls, and x402
-            inflows with direct Celoscan proofs.
+          <p className="mt-1 max-w-[62ch] text-[14px] leading-relaxed text-[#71717A]">
+            Public record of Celo Mainnet settlements, Policy Gate rejections, paid{" "}
+            <code className="font-mono text-[13px] text-[#0A0A0C]">usebuy.ai</code> calls, and x402 inflows.
           </p>
         </div>
 
@@ -126,9 +123,9 @@ export default function LedgerPage() {
         </Button>
       </div>
 
-      {/* 6-Cell Ledger Statement Metrics */}
+      {/* 6-Cell Calm Statement Metrics */}
       <Card className="vire-enter vire-delay-1 overflow-hidden">
-        <div className="grid grid-cols-2 divide-x divide-y divide-[#E4E2DC] sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+        <div className="grid grid-cols-2 divide-x divide-y divide-black/[0.06] sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
           {[
             { label: "Recipients", value: m?.totalExternalRecipients ?? 0, sub: "external wallets" },
             { label: "Repeat", value: m?.repeatContributorsCount ?? 0, sub: "2+ stages" },
@@ -154,13 +151,13 @@ export default function LedgerPage() {
             },
           ].map((kpi) => (
             <div key={kpi.label} className="p-5">
-              <div className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                 {kpi.label}
               </div>
-              <div className="mt-1.5 font-mono text-2xl font-semibold tracking-[-0.03em] text-[#121210] tabular-nums">
+              <div className="mt-1.5 text-[24px] font-normal tracking-[-0.03em] text-[#0A0A0C] tabular-nums">
                 {kpi.value}
               </div>
-              <div className="mt-1 truncate font-mono text-[10.5px] text-[#787670]">
+              <div className="mt-1 truncate font-mono text-[11px] text-[#A1A1AA]">
                 {kpi.sub}
               </div>
             </div>
@@ -168,7 +165,7 @@ export default function LedgerPage() {
         </div>
       </Card>
 
-      {/* Square Tabs + Corridor Filter */}
+      {/* Capsule Tabs + Corridor Filter */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SegmentedTabs
           value={tab}
@@ -187,7 +184,7 @@ export default function LedgerPage() {
               aria-label="Filter by corridor"
               value={corridor}
               onChange={(e) => setCorridor(e.target.value)}
-              className="font-mono text-xs"
+              className="h-9 rounded-full font-mono text-xs"
             >
               <option value="">All corridors</option>
               <option value="cNGN">cNGN · Nigeria</option>
@@ -211,50 +208,53 @@ export default function LedgerPage() {
             </div>
           ) : tab === "settled" ? (
             data?.completedSettlements.length ? (
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
+              <table className="w-full text-left text-[13px]">
+                <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                   <tr>
-                    <th className="px-5 py-3 font-medium">Timestamp</th>
-                    <th className="px-5 py-3 font-medium">Campaign / Recipient</th>
-                    <th className="px-5 py-3 font-medium">Local output</th>
-                    <th className="px-5 py-3 font-medium">USDT spent</th>
-                    <th className="px-5 py-3 font-medium">Proofs</th>
+                    <th className="px-5 py-3.5">Timestamp</th>
+                    <th className="px-5 py-3.5">Campaign / Recipient</th>
+                    <th className="px-5 py-3.5">Local output</th>
+                    <th className="px-5 py-3.5">USDT spent</th>
+                    <th className="px-5 py-3.5">Proofs</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E4E2DC]">
+                <tbody className="divide-y divide-black/[0.055]">
                   {data.completedSettlements.map((s) => (
                     <tr
                       key={s.id}
-                      className="transition-colors duration-150 hover:bg-[#FAF9F6]"
+                      className="transition-colors duration-150 hover:bg-[#FAFAFB]"
                     >
-                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-[#68665F] tabular-nums">
+                      <td className="whitespace-nowrap px-5 py-4 font-mono text-[11.5px] text-[#71717A] tabular-nums">
                         {new Date(s.settledAt).toLocaleString()}
                       </td>
-                      <td className="px-5 py-3.5">
-                        <div className="font-medium text-[#121210]">{s.campaignTitle}</div>
-                        <div className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-[#68665F]">
+                      <td className="px-5 py-4">
+                        <div className="font-medium text-[#0A0A0C]">{s.campaignTitle}</div>
+                        <div className="mt-1 flex items-center gap-1.5 font-mono text-[11.5px] text-[#71717A]">
                           <span>{truncateMiddle(s.recipientWallet, 8, 6)}</span>
                           <CopyButton value={s.recipientWallet} toastMessage="Recipient copied" />
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 font-mono font-semibold text-[#121210] tabular-nums">
-                        {s.localAmountFormatted} {s.corridor}
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <span className="inline-flex items-center gap-2 font-mono font-medium text-[#0A0A0C] tabular-nums">
+                          <TokenIcon symbol={s.corridor} size={22} showChainBadge />
+                          {s.localAmountFormatted} {s.corridor}
+                        </span>
                       </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[#4F4E4A] tabular-nums">
+                      <td className="whitespace-nowrap px-5 py-4 font-mono text-[#52525B] tabular-nums">
                         ${s.usdtSpentFormatted}
                         {s.usdtRefundedFormatted !== "0" && (
-                          <span className="block text-[10px] text-[#787670]">
+                          <span className="block text-[10.5px] text-[#A1A1AA]">
                             +${s.usdtRefundedFormatted} refunded
                           </span>
                         )}
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-5 py-4">
                         <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
                           <a
                             href={s.vaultReleaseUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-[4px] border border-[#D5D2C9] bg-white px-2 py-0.5 text-[#4F4E4A] hover:border-[#121210] hover:text-[#121210]"
+                            className="vire-pill-surface inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[#3F3F46] hover:text-[#0A0A0C]"
                           >
                             Vault <ArrowUpRight className="h-3 w-3" />
                           </a>
@@ -262,7 +262,7 @@ export default function LedgerPage() {
                             href={s.textileSwapUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-[4px] bg-[#121210] px-2 py-0.5 text-[#FAF9F6] hover:bg-[#292824]"
+                            className="inline-flex items-center gap-1 rounded-full bg-[#0A0A0C] px-2.5 py-0.5 text-white hover:bg-[#232327]"
                           >
                             Swap <ArrowUpRight className="h-3 w-3" />
                           </a>
@@ -270,7 +270,7 @@ export default function LedgerPage() {
                             href={s.payoutUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-[4px] border border-[#D5D2C9] bg-white px-2 py-0.5 text-[#4F4E4A] hover:border-[#121210] hover:text-[#121210]"
+                            className="vire-pill-surface inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[#3F3F46] hover:text-[#0A0A0C]"
                           >
                             Payout <ArrowUpRight className="h-3 w-3" />
                           </a>
@@ -279,12 +279,12 @@ export default function LedgerPage() {
                               href={s.buyPaymentUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 rounded-[4px] border border-[#D5D2C9] bg-[#F3F1EC] px-2 py-0.5 text-[#4F4E4A] hover:border-[#121210] hover:text-[#121210]"
+                              className="inline-flex items-center gap-1 rounded-full bg-[#F2F2F4] px-2.5 py-0.5 text-[#3F3F46] hover:text-[#0A0A0C]"
                             >
                               x402 <ArrowUpRight className="h-3 w-3" />
                             </a>
                           )}
-                          {s.erc8004Rated && <Badge tone="outline">Rated</Badge>}
+                          {s.erc8004Rated && <Badge tone="positive">Rated</Badge>}
                         </div>
                       </td>
                     </tr>
@@ -293,8 +293,8 @@ export default function LedgerPage() {
               </table>
             ) : (
               <div className="px-6 py-16 text-center">
-                <p className="text-sm font-medium text-[#121210]">No settlements recorded yet</p>
-                <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-[#68665F]">
+                <p className="text-[14px] font-medium text-[#0A0A0C]">No settlements recorded yet</p>
+                <p className="mx-auto mt-1.5 max-w-sm text-[13px] leading-relaxed text-[#71717A]">
                   Verified payouts appear here with Celoscan links once cleared through VireVault
                   and Textile FX.
                 </p>
@@ -310,32 +310,33 @@ export default function LedgerPage() {
             )
           ) : tab === "rejected" ? (
             data?.rejectedClaims.length ? (
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
+              <table className="w-full text-left text-[13px]">
+                <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                   <tr>
-                    <th className="px-5 py-3 font-medium">Timestamp</th>
-                    <th className="px-5 py-3 font-medium">Claim / Wallet</th>
-                    <th className="px-5 py-3 font-medium">Rule</th>
-                    <th className="px-5 py-3 font-medium">Verdict &amp; reason</th>
+                    <th className="px-5 py-3.5">Timestamp</th>
+                    <th className="px-5 py-3.5">Claim / Wallet</th>
+                    <th className="px-5 py-3.5">Rule</th>
+                    <th className="px-5 py-3.5">Verdict &amp; reason</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E4E2DC]">
+                <tbody className="divide-y divide-black/[0.055]">
                   {data.rejectedClaims.map((r) => (
-                    <tr key={r.id} className="hover:bg-[#FAF9F6]">
-                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-[#68665F] tabular-nums">
+                    <tr key={r.id} className="hover:bg-[#FAFAFB]">
+                      <td className="whitespace-nowrap px-5 py-4 font-mono text-[11.5px] text-[#71717A] tabular-nums">
                         {new Date(r.createdAt).toLocaleString()}
                       </td>
-                      <td className="px-5 py-3.5">
-                        <div className="font-medium text-[#121210]">{r.campaignTitle}</div>
-                        <div className="mt-0.5 font-mono text-[11px] text-[#68665F]">
+                      <td className="px-5 py-4">
+                        <div className="font-medium text-[#0A0A0C]">{r.campaignTitle}</div>
+                        <div className="mt-1 inline-flex items-center gap-1.5 font-mono text-[11.5px] text-[#71717A]">
+                          <TokenIcon symbol={r.corridor} size={14} />
                           {truncateMiddle(r.contributorWallet, 8, 6)} · {r.corridor}
                         </div>
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-5 py-4">
                         <Badge tone="destructive">{r.failedPolicyRule ?? "POLICY_REJECTED"}</Badge>
                       </td>
-                      <td className="max-w-md px-5 py-3.5 text-[#4F4E4A]">
-                        <span className="font-mono font-medium text-[#121210]">
+                      <td className="max-w-md px-5 py-4 text-[#52525B]">
+                        <span className="font-mono font-medium text-[#0A0A0C]">
                           {r.aiScore ?? 0}/100 ({r.aiVerdict ?? "n/a"})
                         </span>{" "}
                         — {r.aiReason ?? "Blocked before vault release."}
@@ -346,46 +347,49 @@ export default function LedgerPage() {
               </table>
             ) : (
               <div className="px-6 py-16 text-center">
-                <p className="text-sm font-medium text-[#121210]">No rejected claims</p>
-                <p className="mx-auto mt-1.5 max-w-sm text-xs text-[#68665F]">
+                <p className="text-[14px] font-medium text-[#0A0A0C]">No rejected claims</p>
+                <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-[#71717A]">
                   Submissions blocked by the 7-rule Policy Gate are logged here.
                 </p>
               </div>
             )
           ) : tab === "buy" ? (
             data?.buyPayments.length ? (
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
+              <table className="w-full text-left text-[13px]">
+                <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                   <tr>
-                    <th className="px-5 py-3 font-medium">Timestamp</th>
-                    <th className="px-5 py-3 font-medium">Capability</th>
-                    <th className="px-5 py-3 font-medium">Spend</th>
-                    <th className="px-5 py-3 font-medium">Receipt</th>
+                    <th className="px-5 py-3.5">Timestamp</th>
+                    <th className="px-5 py-3.5">Capability</th>
+                    <th className="px-5 py-3.5">Spend</th>
+                    <th className="px-5 py-3.5">Receipt</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E4E2DC]">
+                <tbody className="divide-y divide-black/[0.055]">
                   {data.buyPayments.map((b) => (
-                    <tr key={b.id} className="hover:bg-[#FAF9F6]">
-                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-[#68665F] tabular-nums">
+                    <tr key={b.id} className="hover:bg-[#FAFAFB]">
+                      <td className="whitespace-nowrap px-5 py-4 font-mono text-[11.5px] text-[#71717A] tabular-nums">
                         {new Date(b.createdAt).toLocaleString()}
                       </td>
-                      <td className="px-5 py-3.5 font-mono text-[#121210]">{b.capabilityId}</td>
-                      <td className="px-5 py-3.5 font-mono text-[#4F4E4A] tabular-nums">
-                        {b.paymentAmountFormatted} {b.paymentToken}
+                      <td className="px-5 py-4 font-mono text-[#0A0A0C]">{b.capabilityId}</td>
+                      <td className="px-5 py-4 font-mono text-[#52525B] tabular-nums">
+                        <span className="inline-flex items-center gap-1.5">
+                          <TokenIcon symbol={b.paymentToken} size={16} />
+                          {b.paymentAmountFormatted} {b.paymentToken}
+                        </span>
                       </td>
-                      <td className="px-5 py-3.5 font-mono text-[11px]">
+                      <td className="px-5 py-4 font-mono text-[11.5px]">
                         {b.txUrl && b.paymentTxHash ? (
                           <a
                             href={b.txUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-[#121210] underline underline-offset-2"
+                            className="inline-flex items-center gap-1 text-[#0A0A0C] underline underline-offset-2"
                           >
                             {truncateMiddle(b.paymentTxHash, 10, 6)}
                             <ArrowUpRight className="h-3 w-3" />
                           </a>
                         ) : (
-                          <span className="text-[#68665F]">
+                          <span className="text-[#71717A]">
                             {b.dryRun ? "dry-run" : "recorded"}
                           </span>
                         )}
@@ -396,44 +400,46 @@ export default function LedgerPage() {
               </table>
             ) : (
               <div className="px-6 py-16 text-center">
-                <p className="text-sm font-medium text-[#121210]">No x402 call receipts</p>
-                <p className="mx-auto mt-1.5 max-w-sm text-xs text-[#68665F]">
+                <p className="text-[14px] font-medium text-[#0A0A0C]">No x402 call receipts</p>
+                <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-[#71717A]">
                   Paid verification calls to{" "}
-                  <code className="font-mono text-[#121210]">gateway.usebuy.ai</code> are indexed
-                  here.
+                  <code className="font-mono text-[#0A0A0C]">gateway.usebuy.ai</code> are indexed here.
                 </p>
               </div>
             )
           ) : data?.x402Inflows.length ? (
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
+            <table className="w-full text-left text-[13px]">
+              <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                 <tr>
-                  <th className="px-5 py-3 font-medium">Timestamp</th>
-                  <th className="px-5 py-3 font-medium">Endpoint</th>
-                  <th className="px-5 py-3 font-medium">Payer → PayTo</th>
-                  <th className="px-5 py-3 font-medium">Amount</th>
-                  <th className="px-5 py-3 font-medium">Transaction</th>
+                  <th className="px-5 py-3.5">Timestamp</th>
+                  <th className="px-5 py-3.5">Endpoint</th>
+                  <th className="px-5 py-3.5">Payer → PayTo</th>
+                  <th className="px-5 py-3.5">Amount</th>
+                  <th className="px-5 py-3.5">Transaction</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E4E2DC]">
+              <tbody className="divide-y divide-black/[0.055]">
                 {data.x402Inflows.map((x) => (
-                  <tr key={x.id} className="hover:bg-[#FAF9F6]">
-                    <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[11px] text-[#68665F] tabular-nums">
+                  <tr key={x.id} className="hover:bg-[#FAFAFB]">
+                    <td className="whitespace-nowrap px-5 py-4 font-mono text-[11.5px] text-[#71717A] tabular-nums">
                       {new Date(x.createdAt).toLocaleString()}
                     </td>
-                    <td className="px-5 py-3.5 font-mono text-[#121210]">{x.endpoint}</td>
-                    <td className="px-5 py-3.5 font-mono text-[11px] text-[#68665F]">
+                    <td className="px-5 py-4 font-mono text-[#0A0A0C]">{x.endpoint}</td>
+                    <td className="px-5 py-4 font-mono text-[11.5px] text-[#71717A]">
                       {truncateMiddle(x.payerWallet, 6, 4)} → {truncateMiddle(x.payToWallet, 6, 4)}
                     </td>
-                    <td className="px-5 py-3.5 font-mono text-[#4F4E4A] tabular-nums">
-                      {x.amountAtomic} {x.assetSymbol}
+                    <td className="px-5 py-4 font-mono text-[#52525B] tabular-nums">
+                      <span className="inline-flex items-center gap-1.5">
+                        <TokenIcon symbol={x.assetSymbol} size={16} />
+                        {x.amountAtomic} {x.assetSymbol}
+                      </span>
                     </td>
-                    <td className="px-5 py-3.5 font-mono text-[11px]">
+                    <td className="px-5 py-4 font-mono text-[11.5px]">
                       <a
                         href={x.txUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[#121210] underline underline-offset-2"
+                        className="inline-flex items-center gap-1 text-[#0A0A0C] underline underline-offset-2"
                       >
                         {truncateMiddle(x.settlementTxHash, 10, 6)}
                         <ArrowUpRight className="h-3 w-3" />
@@ -445,11 +451,10 @@ export default function LedgerPage() {
             </table>
           ) : (
             <div className="px-6 py-16 text-center">
-              <p className="text-sm font-medium text-[#121210]">No x402 inflows yet</p>
-              <p className="mx-auto mt-1.5 max-w-sm text-xs text-[#68665F]">
-                Paid calls to <code className="font-mono text-[#121210]">/api/x402/verify</code>{" "}
-                or <code className="font-mono text-[#121210]">/api/x402/campaigns</code> appear
-                here.
+              <p className="text-[14px] font-medium text-[#0A0A0C]">No x402 inflows yet</p>
+              <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-[#71717A]">
+                Paid calls to <code className="font-mono text-[#0A0A0C]">/api/x402/verify</code>{" "}
+                or <code className="font-mono text-[#0A0A0C]">/api/x402/campaigns</code> appear here.
               </p>
               <div className="mt-5">
                 <Link href="/console" className={buttonVariants({ variant: "secondary", size: "sm" })}>

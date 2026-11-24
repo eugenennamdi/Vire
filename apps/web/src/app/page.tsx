@@ -11,8 +11,9 @@ import {
 import { desc } from "drizzle-orm";
 import Link from "next/link";
 import { ClearingInspector, type InspectorCampaign } from "@/components/clearing-inspector";
-import { Badge } from "@/components/ui/badge";
+import { ProtocolProofBlock } from "@/components/protocol-proof-block";
 import { buttonVariants } from "@/components/ui/button";
+import { TokenIcon, TokenStack } from "@/components/ui/token-icon";
 import { ensureDatabaseReady, getDb, schema } from "@/db";
 import { ensureDefaultCampaignsSeeded } from "@/db/seed";
 import { getLiveReputationSnapshot, getVaultSnapshot } from "@/lib/runtime";
@@ -27,22 +28,15 @@ export default async function HomePage() {
   const db = getDb();
   const attributionCode = process.env.VIRE_ATTRIBUTION_CODE || DEFAULT_ATTRIBUTION_CODE;
 
-  const [vault, rep, campaignRows, settlements, buyRows, x402Rows, rejectedRows] =
-    await Promise.all([
-      getVaultSnapshot(),
-      getLiveReputationSnapshot(),
-      db
-        .select()
-        .from(schema.campaigns)
-        .orderBy(desc(schema.campaigns.isLaunchPartner), desc(schema.campaigns.createdAt)),
-      db.select().from(schema.settlements).orderBy(desc(schema.settlements.settledAt)),
-      db.select().from(schema.buyPayments),
-      db.select().from(schema.x402Inflows),
-      db.select({ status: schema.submissions.status }).from(schema.submissions),
-    ]);
-
-  const rejectedCount = rejectedRows.filter((r) => r.status === "REJECTED").length;
-  const paidBuyCount = buyRows.filter((b) => !b.dryRun && b.paymentTxHash).length;
+  const [vault, rep, campaignRows, settlements] = await Promise.all([
+    getVaultSnapshot(),
+    getLiveReputationSnapshot(),
+    db
+      .select()
+      .from(schema.campaigns)
+      .orderBy(desc(schema.campaigns.isLaunchPartner), desc(schema.campaigns.createdAt)),
+    db.select().from(schema.settlements).orderBy(desc(schema.settlements.settledAt)),
+  ]);
 
   const inspectorCampaigns: InspectorCampaign[] = campaignRows.map((row) => {
     const corridor = row.corridor as CorridorSymbol;
@@ -71,7 +65,7 @@ export default async function HomePage() {
       minPassScore: row.minPassScore,
       offrampRail:
         meta?.offrampProvider === "cngn_venues"
-          ? "Busha / Quidax / Yellow Card"
+          ? "Busha · Quidax · Yellow Card"
           : meta?.offrampProvider === "idrx_guide"
             ? "IDRX Bank Redeem (IDR)"
             : "Ripio Portal (CBU / PIX / CLABE)",
@@ -79,245 +73,196 @@ export default async function HomePage() {
   });
 
   const recentSettlements = settlements.slice(0, 4);
+  const vaultFormatted =
+    vault.usdtBalanceAtomic !== null
+      ? Number(formatTokenAmount(vault.usdtBalanceAtomic, "USDT", 2)).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : null;
 
   return (
-    <div className="space-y-14">
-      {/* BAND 1: Editorial Clearinghouse Masthead + Live VireVault Custody Sheet */}
-      <section className="vire-enter grid gap-8 border-b border-[#E4E2DC] pb-12 pt-2 lg:grid-cols-12 lg:items-end">
-        <div className="min-w-0 space-y-5 lg:col-span-7">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] uppercase tracking-[0.06em] text-[#68665F]">
-            <span>Celo Mainnet · 42220</span>
-            <span>/</span>
-            <span>{rep.registered && rep.agentId ? `ERC-8004 #${rep.agentId}` : "ERC-8004"}</span>
-            <span>/</span>
-            <span>{attributionCode}</span>
+    <div className="space-y-16">
+      {/* BAND 1: Morpho-Inspired Architectural Monochrome Hero Frame */}
+      <section className="vire-enter vire-card vire-blueprint relative overflow-hidden rounded-2xl p-6 sm:p-10 lg:p-12">
+        {/* Corner Registration Ticks (Morpho Blueprint Precision) */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-3 h-2.5 w-2.5 border-l border-t border-black/20"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3 top-3 h-2.5 w-2.5 border-r border-t border-black/20"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-3 left-3 h-2.5 w-2.5 border-b border-l border-black/20"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-3 right-3 h-2.5 w-2.5 border-b border-r border-black/20"
+        />
+
+        <div className="relative grid gap-10 lg:grid-cols-12 lg:items-end">
+          {/* Left: Calm Institutional Display Copy */}
+          <div className="min-w-0 space-y-5 lg:col-span-7">
+            <div className="vire-pill-surface inline-flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1 text-[12px] font-medium text-[#3F3F46]">
+              <TokenIcon symbol="CELO" size={16} />
+              <span>Autonomous FX clearing on Celo</span>
+            </div>
+
+            <h1 className="max-w-[16ch] text-[36px] font-normal leading-[1.06] tracking-[-0.04em] text-[#0A0A0C] sm:text-[48px] lg:text-[52px]">
+              Pay verified work in exact local currency.
+            </h1>
+
+            <p className="max-w-[48ch] text-[15px] leading-[1.6] text-[#52525B] sm:text-[16px]">
+              Vire audits off-chain deliverables via paid x402, enforces onchain vault caps, and
+              settles exact local stablecoins over Textile FX.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <Link href="/claim" className={buttonVariants({ variant: "primary", size: "lg" })}>
+                Submit deliverable
+                <ArrowRight weight="bold" className="h-4 w-4" />
+              </Link>
+              <Link href="/campaigns" className={buttonVariants({ variant: "secondary", size: "lg" })}>
+                Explore campaigns
+              </Link>
+            </div>
           </div>
 
-          <h1 className="max-w-[16ch] font-serif text-[40px] font-normal tracking-[-0.03em] text-[#121210] leading-[1.04] sm:text-[52px]">
-            Verify off-chain work. Clear{" "}
-            <em className="italic">exact</em> local FX.
-          </h1>
-
-          <p className="max-w-[56ch] text-[15px] leading-[1.65] text-[#4F4E4A]">
-            Vire is an autonomous clearing agent for merchants and remote contributors. It audits
-            deliverables over paid{" "}
-            <code className="font-mono text-[13px] text-[#121210]">x402</code>, enforces onchain{" "}
-            <code className="font-mono text-[13px] text-[#121210]">VireVault</code> spending caps,
-            and converts USDT into exact local stablecoins on Textile FX.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3 pt-1">
-            <Link href="/claim" className={buttonVariants({ variant: "primary", size: "lg" })}>
-              Submit deliverable
-              <ArrowRight weight="bold" className="h-4 w-4" />
-            </Link>
-            <Link href="/campaigns" className={buttonVariants({ variant: "secondary", size: "lg" })}>
-              Browse campaigns
-            </Link>
-            <Link href="/ledger" className={buttonVariants({ variant: "ghost", size: "lg" })}>
-              Audit ledger
-            </Link>
-          </div>
-        </div>
-
-        {/* Right: Architectural VireVault Custody Sheet */}
-        <div className="vire-sheet min-w-0 overflow-hidden rounded-[6px] lg:col-span-5">
-          <div className="flex items-center justify-between border-b border-[#E4E2DC] bg-[#F3F1EC]/70 px-5 py-3">
-            <span className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#68665F]">
-              VireVault Custody Account
-            </span>
-            <Badge tone={vault.deployed && !vault.paused ? "ink" : "neutral"}>
-              {vault.deployed ? (vault.paused ? "PAUSED" : "ACTIVE") : "UNCONFIGURED"}
-            </Badge>
-          </div>
-
-          <div className="p-5">
-            <div className="flex items-baseline justify-between gap-3">
-              <div>
-                <div className="font-mono text-[11px] text-[#68665F]">Onchain USDT balance</div>
-                <div className="mt-1 font-mono text-3xl font-semibold tracking-[-0.03em] text-[#121210] tabular-nums">
-                  {vault.usdtBalanceAtomic !== null
-                    ? `$${formatTokenAmount(vault.usdtBalanceAtomic, "USDT")}`
-                    : "—"}
-                  <span className="ml-1.5 text-xs font-normal text-[#68665F]">USDT</span>
-                </div>
+          {/* Right: Calm Right-Aligned Protocol Telemetry (Morpho Scale + Official Token Icons) */}
+          <div className="flex flex-col gap-6 border-t border-black/[0.06] pt-6 lg:col-span-5 lg:items-end lg:border-t-0 lg:pt-0 lg:text-right">
+            <div>
+              <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-[#71717A] lg:justify-end">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A] ring-4 ring-[#16A34A]/15" />
+                <span>VireVault Custody</span>
+                {vault.address && (
+                  <a
+                    href={celoscanAddressUrl(vault.address)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-0.5 text-[#0A0A0C] hover:underline"
+                  >
+                    {truncateMiddle(vault.address, 6, 4)}
+                    <ArrowUpRight className="h-3 w-3" />
+                  </a>
+                )}
               </div>
-
-              {vault.address && (
-                <a
-                  href={celoscanAddressUrl(vault.address)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-mono text-xs text-[#4F4E4A] underline underline-offset-4 hover:text-[#121210]"
-                >
-                  {truncateMiddle(vault.address, 6, 4)}
-                  <ArrowUpRight className="h-3 w-3" />
-                </a>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 divide-x divide-[#E4E2DC] border-t border-[#E4E2DC] bg-[#FAF9F6] font-mono text-[11px] tabular-nums">
-            <div className="px-4 py-3">
-              <div className="text-[#68665F]">Settled</div>
-              <div className="mt-0.5 text-sm font-semibold text-[#121210]">{settlements.length}</div>
-            </div>
-            <div className="px-4 py-3">
-              <div className="text-[#68665F]">Rejected</div>
-              <div className="mt-0.5 text-sm font-semibold text-[#121210]">{rejectedCount}</div>
-            </div>
-            <div className="px-4 py-3">
-              <div className="text-[#68665F]">x402 calls</div>
-              <div className="mt-0.5 text-sm font-semibold text-[#121210]">
-                {x402Rows.length + paidBuyCount}
+              <div className="mt-2 inline-flex items-center gap-2.5 lg:justify-end">
+                <TokenIcon symbol="USDT" size={28} showChainBadge />
+                <span className="text-[32px] font-normal leading-none tracking-[-0.035em] text-[#0A0A0C] tabular-nums sm:text-[36px]">
+                  {vaultFormatted !== null ? `$${vaultFormatted}` : "—"}
+                </span>
+                <span className="font-mono text-[12px] text-[#71717A]">USDT</span>
               </div>
+            </div>
+
+            <div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#71717A]">
+                Supported Local Rails
+              </div>
+              <div className="mt-2 inline-flex items-center gap-3 lg:justify-end">
+                <TokenStack
+                  symbols={["cNGN", "wARS", "wBRL", "IDRX", "wMXN"]}
+                  size={24}
+                />
+                <span className="text-[14px] font-medium text-[#0A0A0C] tabular-nums">
+                  5 corridors
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11.5px] text-[#71717A] lg:justify-end">
+              <Link href="/api/agent-card.json" className="hover:text-[#0A0A0C]">
+                {rep.registered && rep.agentId ? `ERC-8004 #${rep.agentId}` : "ERC-8004"}
+              </Link>
+              <span>·</span>
+              <span>{attributionCode}</span>
+              <span>·</span>
+              <Link href="/ledger" className="inline-flex items-center gap-0.5 text-[#0A0A0C] hover:underline">
+                Audit ledger <ArrowUpRight className="h-3 w-3" />
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* BAND 2 & 3: Interactive 4-Stage Agent Clearing Inspector + Live Bank FX Rate Board */}
-      <ClearingInspector campaigns={inspectorCampaigns} />
+      {/* BAND 2 & 3: Interactive Clearing Flow + Aave Pro Live Corridors Table */}
+      <ClearingInspector campaigns={inspectorCampaigns} attributionCode={attributionCode} />
 
-      {/* BAND 4: Live Ledger Snapshot + Machine-Readable Agent Surfaces */}
-      <section className="grid gap-8 border-t border-[#E4E2DC] pt-12 lg:grid-cols-12">
-        {/* Left: Live Mainnet Settlement Feed */}
-        <div className="min-w-0 space-y-4 lg:col-span-7">
-          <div className="flex items-end justify-between gap-3">
+      {/* BAND 4: Morpho-Inspired Verifiable Code & Trust Architecture */}
+      <ProtocolProofBlock />
+
+      {/* BAND 5: Recent Onchain Settlements (Shown cleanly once live settlements exist) */}
+      {recentSettlements.length > 0 && (
+        <section aria-labelledby="recent-settlements-heading" className="space-y-4">
+          <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
-                Live Proof of Execution
-              </p>
-              <h2 className="mt-1 font-serif text-2xl font-normal tracking-[-0.02em] text-[#121210]">
-                Recent onchain settlements
+              <h2
+                id="recent-settlements-heading"
+                className="text-[22px] font-medium tracking-[-0.03em] text-[#0A0A0C]"
+              >
+                Recent settlements
               </h2>
+              <p className="mt-0.5 text-[13.5px] text-[#71717A]">
+                Latest verified payouts cleared on Celo Mainnet.
+              </p>
             </div>
-            <Link
-              href="/ledger"
-              className="inline-flex items-center gap-1 font-mono text-xs text-[#4F4E4A] hover:text-[#121210]"
-            >
-              Full ledger <ArrowRight className="h-3.5 w-3.5" />
+            <Link href="/ledger" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+              Full audit ledger
             </Link>
           </div>
 
-          <div className="vire-sheet overflow-hidden rounded-[6px]">
-            {recentSettlements.length > 0 ? (
-              <div className="divide-y divide-[#E4E2DC]">
-                {recentSettlements.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 text-xs"
-                  >
-                    <div className="min-w-0">
-                      <div className="font-mono font-semibold text-[#121210] tabular-nums">
+          <div className="vire-card overflow-hidden rounded-2xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[13px]">
+                <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
+                  <tr>
+                    <th className="px-5 py-3">Timestamp</th>
+                    <th className="px-5 py-3">Corridor</th>
+                    <th className="px-5 py-3">Recipient</th>
+                    <th className="px-5 py-3 text-right">Exact Output</th>
+                    <th className="px-5 py-3 text-right">Proof</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/[0.055]">
+                  {recentSettlements.map((s) => (
+                    <tr key={s.id} className="hover:bg-[#FAFAFB]">
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[12px] text-[#71717A] tabular-nums">
+                        {new Date(s.settledAt).toLocaleString()}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5">
+                        <span className="inline-flex items-center gap-2 font-medium text-[#0A0A0C]">
+                          <TokenIcon symbol={s.corridor} size={20} />
+                          {s.corridor}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[12px] text-[#52525B]">
+                        {truncateMiddle(s.recipientWallet, 8, 6)}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-right font-mono font-medium text-[#0A0A0C] tabular-nums">
                         {formatTokenAmount(s.localAmountAtomic, s.corridor as CorridorSymbol, 2)}{" "}
                         {s.corridor}
-                      </div>
-                      <div className="mt-0.5 font-mono text-[11px] text-[#68665F]">
-                        {truncateMiddle(s.recipientWallet, 8, 6)} ·{" "}
-                        {new Date(s.settledAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <a
-                      href={celoscanTxUrl(s.textileSwapTxHash)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 font-mono text-[11px] text-[#121210] underline underline-offset-4"
-                    >
-                      Textile tx <ArrowUpRight className="h-3 w-3" />
-                    </a>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-6">
-                <p className="text-sm font-medium text-[#121210]">
-                  Zero synthetic entries — awaiting live mainnet payouts.
-                </p>
-                <p className="mt-1.5 text-xs leading-relaxed text-[#68665F]">
-                  Every verified settlement posts 4 immutable Celo Mainnet proofs (VireVault
-                  release, ERC-8021 tagged Textile FX swap, direct local payout, and audit receipt)
-                  directly to the public ledger.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2.5">
-                  <Link href="/claim" className={buttonVariants({ variant: "primary", size: "sm" })}>
-                    Run first claim
-                  </Link>
-                  <Link href="/console" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                    Test x402 HTTP 402
-                  </Link>
-                </div>
-              </div>
-            )}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-right">
+                        <a
+                          href={celoscanTxUrl(s.textileSwapTxHash)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 font-mono text-[12px] text-[#0A0A0C] hover:underline"
+                        >
+                          Celoscan <ArrowUpRight className="h-3.5 w-3.5" />
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-
-        {/* Right: Autonomous Agent & x402 Specification Table */}
-        <div className="min-w-0 space-y-4 lg:col-span-5">
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
-              Programmatic Access
-            </p>
-            <h2 className="mt-1 font-serif text-2xl font-normal tracking-[-0.02em] text-[#121210]">
-              Agent &amp; x402 endpoints
-            </h2>
-          </div>
-
-          <div className="vire-sheet overflow-hidden rounded-[6px]">
-            <dl className="divide-y divide-[#E4E2DC] font-mono text-xs">
-              {[
-                {
-                  method: "GET",
-                  path: "/api/agent-card.json",
-                  desc: "ERC-8004 manifest",
-                  href: "/api/agent-card.json",
-                },
-                {
-                  method: "POST",
-                  path: "/api/x402/verify",
-                  desc: "Paid x402 audit",
-                  href: "/console",
-                },
-                {
-                  method: "POST",
-                  path: "/api/x402/campaigns",
-                  desc: "Create campaign",
-                  href: "/console",
-                },
-                {
-                  method: "GET",
-                  path: "/api/corridors/live",
-                  desc: "Textile FX feed",
-                  href: "/api/corridors/live",
-                },
-                {
-                  method: "GET",
-                  path: "/api/ledger",
-                  desc: "Public audit feed",
-                  href: "/api/ledger",
-                },
-              ].map((ep) => (
-                <Link
-                  key={ep.path}
-                  href={ep.href}
-                  className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-[#FAF9F6]"
-                >
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="w-9 shrink-0 text-[10px] font-semibold text-[#68665F]">
-                      {ep.method}
-                    </span>
-                    <span className="truncate text-[#121210]">{ep.path}</span>
-                  </div>
-                  <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-[#68665F]">
-                    {ep.desc}
-                    <ArrowUpRight className="h-3 w-3" />
-                  </span>
-                </Link>
-              ))}
-            </dl>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }

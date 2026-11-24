@@ -30,6 +30,7 @@ import { Card } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
 import { FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TokenIcon } from "@/components/ui/token-icon";
 import { buildIdentityBindMessage } from "@/lib/session-client";
 import { cn, truncateMiddle } from "@/lib/utils";
 
@@ -278,14 +279,11 @@ function ClaimFlowInner() {
 
   return (
     <div className="space-y-8">
-      <div className="vire-enter border-b border-[#E4E2DC] pb-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
-          Clearing Execution · Celo 42220
-        </p>
-        <h1 className="mt-1.5 font-serif text-3xl font-normal tracking-[-0.025em] text-[#121210] sm:text-[36px]">
+      <div className="vire-enter">
+        <h1 className="text-[28px] font-medium tracking-[-0.03em] text-[#0A0A0C]">
           Submit deliverable
         </h1>
-        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-[#4F4E4A]">
+        <p className="mt-1 max-w-[60ch] text-[14px] leading-relaxed text-[#71717A]">
           Connect an external Celo wallet, bind your handle, and submit proof for automated x402
           verification and exact-output local stablecoin settlement.
         </p>
@@ -298,12 +296,12 @@ function ClaimFlowInner() {
           <Card className="vire-enter vire-delay-1 p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
-                <span className="font-mono text-xs text-[#787670]">01</span>
-                <h2 className="text-sm font-semibold text-[#121210]">Identity binding</h2>
+                <span className="font-mono text-[12px] text-[#A1A1AA]">01</span>
+                <h2 className="text-[15px] font-medium text-[#0A0A0C]">Identity binding</h2>
               </div>
 
               {identityData?.contributor ? (
-                <Badge tone="ink">
+                <Badge tone="positive">
                   <Check weight="bold" className="h-3 w-3" />
                   {identityData.contributor.identityProvider}: @
                   {identityData.contributor.identityHandle}
@@ -314,8 +312,8 @@ function ClaimFlowInner() {
             </div>
 
             {!isConnected ? (
-              <div className="vire-band mt-4 flex items-center gap-2.5 rounded-[4px] px-4 py-3 text-xs text-[#4F4E4A]">
-                <WarningCircle weight="regular" className="h-4 w-4 shrink-0 text-[#121210]" />
+              <div className="vire-well mt-4 flex items-center gap-2.5 rounded-xl px-4 py-3 text-[13px] text-[#52525B]">
+                <WarningCircle weight="regular" className="h-4 w-4 shrink-0 text-[#0A0A0C]" />
                 <span>Connect a Celo Mainnet wallet in the header to bind your identity.</span>
               </div>
             ) : (
@@ -356,7 +354,7 @@ function ClaimFlowInner() {
                       variant="secondary"
                       disabled={isBinding}
                       onClick={handleBindIdentity}
-                      className="w-full"
+                      className="h-10 w-full"
                     >
                       <Signature weight="regular" className="h-3.5 w-3.5" />
                       {isBinding ? "Signing…" : "Sign"}
@@ -377,7 +375,7 @@ function ClaimFlowInner() {
                 )}
 
                 {bindError && (
-                  <p className="font-mono text-xs text-[#B42318]" role="alert">
+                  <p className="font-mono text-xs text-[#DC2626]" role="alert">
                     {bindError}
                   </p>
                 )}
@@ -388,9 +386,17 @@ function ClaimFlowInner() {
           {/* Step 2: Deliverable Form */}
           <Card className="vire-enter vire-delay-2 p-6">
             <form onSubmit={handleSubmitDeliverable} className="space-y-4">
-              <div className="flex items-center gap-2.5">
-                <span className="font-mono text-xs text-[#787670]">02</span>
-                <h2 className="text-sm font-semibold text-[#121210]">Deliverable proof</h2>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono text-[12px] text-[#A1A1AA]">02</span>
+                  <h2 className="text-[15px] font-medium text-[#0A0A0C]">Deliverable proof</h2>
+                </div>
+                {activeCampaign && (
+                  <span className="inline-flex items-center gap-1.5 font-mono text-[12px] text-[#52525B]">
+                    <TokenIcon symbol={activeCampaign.corridor} size={18} />
+                    {activeCampaign.corridor}
+                  </span>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -428,15 +434,16 @@ function ClaimFlowInner() {
                 </div>
               </div>
 
-              {activeStage && (
-                <div className="vire-band rounded-[4px] p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="font-medium text-[#121210]">{activeStage.title}</span>
-                    <span className="font-mono font-semibold text-[#121210] tabular-nums">
-                      {activeStage.rewardLocalFormatted} {activeCampaign?.corridor}
+              {activeStage && activeCampaign && (
+                <div className="vire-well rounded-xl p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
+                    <span className="font-medium text-[#0A0A0C]">{activeStage.title}</span>
+                    <span className="inline-flex items-center gap-1.5 font-mono font-medium text-[#0A0A0C] tabular-nums">
+                      <TokenIcon symbol={activeCampaign.corridor} size={16} />
+                      {activeStage.rewardLocalFormatted} {activeCampaign.corridor}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs leading-relaxed text-[#4F4E4A]">
+                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#52525B]">
                     {activeStage.instructions}
                   </p>
                 </div>
@@ -475,7 +482,7 @@ function ClaimFlowInner() {
                     type="text"
                     readOnly
                     value={address ?? "Connect wallet above"}
-                    className="font-mono text-[#68665F]"
+                    className="font-mono text-[#71717A]"
                   />
                 </div>
               </div>
@@ -514,18 +521,25 @@ function ClaimFlowInner() {
           </Card>
         </div>
 
-        {/* Right Sticky Clearing Execution Statement */}
+        {/* Right Sticky Clearing Execution Trace */}
         <div className="min-w-0 lg:sticky lg:top-20 lg:col-span-5">
           <Card className="vire-enter vire-delay-2 overflow-hidden">
-            <div className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 px-6 py-3">
-              <h2 className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#68665F]">
-                Live Execution Trace
+            <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
+              <h2 className="text-[13px] font-medium text-[#0A0A0C]">
+                Execution trace
               </h2>
+              {activeCampaign && (
+                <div className="flex items-center gap-1.5">
+                  <TokenIcon symbol="USDT" size={16} />
+                  <ArrowRight className="h-3 w-3 text-[#A1A1AA]" />
+                  <TokenIcon symbol={activeCampaign.corridor} size={16} />
+                </div>
+              )}
             </div>
 
             <div className="p-6">
               {!result && !isSubmitting && (
-                <ol className="divide-y divide-[#E4E2DC]">
+                <ol className="divide-y divide-black/[0.06]">
                   {[
                     ["01", "x402 verification", "usebuy.ai · Cencori LLM & Chainstack ($0.01)"],
                     ["02", "Policy Gate", "7 deterministic rules + VireVault limits"],
@@ -534,10 +548,10 @@ function ClaimFlowInner() {
                     ["05", "Off-ramp & ERC-8004", "Local ramp links + onchain giveFeedback()"],
                   ].map(([num, title, desc]) => (
                     <li key={num} className="flex items-start gap-3.5 py-3.5 first:pt-0 last:pb-0">
-                      <span className="mt-0.5 font-mono text-[11px] text-[#787670]">{num}</span>
+                      <span className="mt-0.5 font-mono text-[11.5px] text-[#A1A1AA]">{num}</span>
                       <div>
-                        <div className="text-[13px] font-medium text-[#121210]">{title}</div>
-                        <div className="mt-0.5 text-xs text-[#68665F]">{desc}</div>
+                        <div className="text-[13.5px] font-medium text-[#0A0A0C]">{title}</div>
+                        <div className="mt-0.5 text-[12.5px] text-[#71717A]">{desc}</div>
                       </div>
                     </li>
                   ))}
@@ -546,7 +560,7 @@ function ClaimFlowInner() {
 
               {isSubmitting && (
                 <div className="space-y-3">
-                  <div className="vire-band flex items-center gap-2.5 rounded-[4px] p-3.5 text-xs text-[#121210]">
+                  <div className="vire-well flex items-center gap-2.5 rounded-xl p-3.5 text-[13px] text-[#0A0A0C]">
                     <CircleNotch className="h-4 w-4 animate-spin" />
                     <span>Running x402 verification, Textile quote, and Policy Gate…</span>
                   </div>
@@ -559,45 +573,45 @@ function ClaimFlowInner() {
                 <div className="space-y-4">
                   <div
                     className={cn(
-                      "rounded-[4px] border p-4 text-xs",
+                      "rounded-xl p-4 text-[12.5px]",
                       result.status === "COMPLETED"
-                        ? "border-[#121210] bg-[#121210] text-[#FAF9F6]"
-                        : "border-[#B42318]/30 bg-[#B42318]/[0.05] text-[#121210]"
+                        ? "bg-[#0A0A0C] text-white"
+                        : "bg-[#FEF2F2] text-[#0A0A0C] ring-1 ring-[#DC2626]/20"
                     )}
                   >
-                    <div className="flex items-center justify-between font-mono text-[11px] font-semibold">
+                    <div className="flex items-center justify-between font-mono text-[11.5px] font-medium">
                       <span>STATUS · {result.status}</span>
                       {result.verdict && <span>SCORE {result.verdict.score}/100</span>}
                     </div>
                     {result.error && <p className="mt-1.5 leading-relaxed">{result.error}</p>}
                     {result.policyDecision?.failedReason && (
-                      <p className="mt-1.5 font-medium text-[#B42318]">
+                      <p className="mt-1.5 font-medium text-[#B91C1C]">
                         {result.policyDecision.failedRule}: {result.policyDecision.failedReason}
                       </p>
                     )}
                   </div>
 
                   {result.buyReceipts && result.buyReceipts.length > 0 && (
-                    <div className="border-t border-[#E4E2DC] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-[#68665F]">
+                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
+                      <div className="font-mono text-[11px] text-[#71717A]">
                         01 · x402 usebuy.ai receipts
                       </div>
                       <div className="mt-2 space-y-1.5">
                         {result.buyReceipts.map((r, i) => (
-                          <div key={i} className="flex items-center justify-between font-mono text-[11px]">
-                            <span className="text-[#121210]">{r.capabilityId}</span>
+                          <div key={i} className="flex items-center justify-between font-mono text-[11.5px]">
+                            <span className="text-[#0A0A0C]">{r.capabilityId}</span>
                             {r.paymentTxHash ? (
                               <a
                                 href={celoscanTxUrl(r.paymentTxHash)}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[#121210] underline underline-offset-2"
+                                className="inline-flex items-center gap-1 text-[#0A0A0C] underline underline-offset-2"
                               >
                                 {truncateMiddle(r.paymentTxHash, 8, 6)}
                                 <ArrowUpRight className="h-3 w-3" />
                               </a>
                             ) : (
-                              <span className="text-[#68665F]">
+                              <span className="text-[#71717A]">
                                 {r.dryRun ? "dry-run" : "settled"}
                               </span>
                             )}
@@ -608,29 +622,29 @@ function ClaimFlowInner() {
                   )}
 
                   {result.policyDecision && (
-                    <div className="border-t border-[#E4E2DC] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-[#68665F]">
+                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
+                      <div className="font-mono text-[11px] text-[#71717A]">
                         02 · Policy Gate checks
                       </div>
                       <ul className="mt-2 space-y-2">
                         {result.policyDecision.checks.map((chk) => (
-                          <li key={chk.rule} className="flex items-start gap-2 text-[11px]">
+                          <li key={chk.rule} className="flex items-start gap-2 text-[11.5px]">
                             {chk.passed ? (
                               <Check
                                 weight="bold"
-                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#121210]"
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#16A34A]"
                               />
                             ) : (
                               <X
                                 weight="bold"
-                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#B42318]"
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#DC2626]"
                               />
                             )}
                             <div className="min-w-0">
-                              <span className="font-mono font-medium text-[#121210]">
+                              <span className="font-mono font-medium text-[#0A0A0C]">
                                 {chk.rule}
                               </span>
-                              <p className="text-[#68665F]">{chk.detail}</p>
+                              <p className="text-[#71717A]">{chk.detail}</p>
                             </div>
                           </li>
                         ))}
@@ -639,11 +653,11 @@ function ClaimFlowInner() {
                   )}
 
                   {result.txHashes && (
-                    <div className="border-t border-[#E4E2DC] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-[#68665F]">
+                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
+                      <div className="font-mono text-[11px] text-[#71717A]">
                         03 &amp; 04 · Onchain settlement proofs
                       </div>
-                      <div className="mt-2.5 space-y-2 font-mono text-[11px]">
+                      <div className="mt-2.5 space-y-2 font-mono text-[11.5px]">
                         {[
                           ["Vault Release", result.txHashes.vaultRelease],
                           ["Textile Swap", result.txHashes.textileSwap],
@@ -651,13 +665,13 @@ function ClaimFlowInner() {
                           ["Audit Receipt", result.txHashes.vaultReceipt],
                         ].map(([label, hash]) => (
                           <div key={label} className="flex items-center justify-between gap-2">
-                            <span className="text-[#68665F]">{label}</span>
+                            <span className="text-[#71717A]">{label}</span>
                             <div className="flex items-center gap-1.5">
                               <a
                                 href={celoscanTxUrl(hash!)}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-0.5 text-[#121210] underline underline-offset-2"
+                                className="inline-flex items-center gap-0.5 text-[#0A0A0C] underline underline-offset-2"
                               >
                                 {truncateMiddle(hash!, 8, 6)}
                                 <ArrowUpRight className="h-3 w-3" />
@@ -671,21 +685,21 @@ function ClaimFlowInner() {
                   )}
 
                   {result.offramp && (
-                    <div className="border-t border-[#E4E2DC] pt-3.5 text-xs">
-                      <div className="font-mono text-[11px] text-[#68665F]">
+                    <div className="border-t border-black/[0.06] pt-3.5 text-xs">
+                      <div className="font-mono text-[11px] text-[#71717A]">
                         05 · Off-ramp &amp; ERC-8004 rating
                       </div>
-                      <h3 className="mt-1 text-sm font-medium text-[#121210]">
+                      <h3 className="mt-1 text-sm font-medium text-[#0A0A0C]">
                         {result.offramp.headline}
                       </h3>
-                      <ul className="mt-2 space-y-1 text-[#4F4E4A]">
+                      <ul className="mt-2 space-y-1 text-[#52525B]">
                         {result.offramp.instructions.map((line, idx) => (
                           <li key={idx}>· {line}</li>
                         ))}
                       </ul>
 
-                      <div className="vire-band mt-3 flex items-center justify-between gap-2 rounded-[4px] px-3 py-2 font-mono text-[11px]">
-                        <span className="truncate text-[#4F4E4A]">
+                      <div className="vire-well mt-3 flex items-center justify-between gap-2 rounded-xl px-3 py-2 font-mono text-[11px]">
+                        <span className="truncate text-[#52525B]">
                           {result.offramp.tokenDecimals}dp · {result.offramp.tokenAddress}
                         </span>
                         <CopyButton
@@ -710,12 +724,12 @@ function ClaimFlowInner() {
                         ))}
                       </div>
 
-                      <div className="mt-4 border-t border-[#E4E2DC] pt-3.5">
+                      <div className="mt-4 border-t border-black/[0.06] pt-3.5">
                         <div className="flex items-center justify-between">
-                          <span className="font-medium text-[#121210]">
+                          <span className="font-medium text-[#0A0A0C]">
                             Rate onchain (ERC-8004)
                           </span>
-                          <span className="font-mono text-[10px] text-[#68665F]">
+                          <span className="font-mono text-[10.5px] text-[#71717A]">
                             tag: settlement
                           </span>
                         </div>
@@ -725,24 +739,24 @@ function ClaimFlowInner() {
                             href={celoscanTxUrl(ratingTxHash)}
                             target="_blank"
                             rel="noreferrer"
-                            className="mt-2 inline-flex items-center gap-1 font-mono text-xs text-[#121210] underline underline-offset-2"
+                            className="mt-2 inline-flex items-center gap-1 font-mono text-xs text-[#0A0A0C] underline underline-offset-2"
                           >
                             Confirmed: {truncateMiddle(ratingTxHash, 10, 6)}
                             <ArrowUpRight className="h-3 w-3" />
                           </a>
                         ) : repData?.registered && repData.agentId ? (
                           <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                            <div className="inline-flex items-center border border-[#E4E2DC] bg-[#FAF9F6] p-0.5 rounded-[4px]">
+                            <div className="vire-well inline-flex items-center rounded-full p-0.5">
                               {[80, 90, 95, 100].map((val) => (
                                 <button
                                   key={val}
                                   type="button"
                                   onClick={() => setRatingScore(val)}
                                   className={cn(
-                                    "vire-pressable rounded-[3px] px-2 py-1 font-mono text-[11px]",
+                                    "vire-pressable rounded-full px-2.5 py-1 font-mono text-[11px]",
                                     ratingScore === val
-                                      ? "bg-[#121210] text-[#FAF9F6]"
-                                      : "text-[#68665F] hover:text-[#121210]"
+                                      ? "bg-[#0A0A0C] text-white"
+                                      : "text-[#71717A] hover:text-[#0A0A0C]"
                                   )}
                                 >
                                   {val}
@@ -760,7 +774,7 @@ function ClaimFlowInner() {
                             </Button>
                           </div>
                         ) : (
-                          <p className="mt-1.5 text-[11px] text-[#68665F]">
+                          <p className="mt-1.5 text-[11.5px] text-[#71717A]">
                             Agent registration ID pending configuration.
                           </p>
                         )}

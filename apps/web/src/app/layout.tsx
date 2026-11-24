@@ -1,25 +1,18 @@
 import { ArrowUpRight } from "@phosphor-icons/react/dist/ssr";
 import { CELO_CONTRACTS, celoscanAddressUrl, DEFAULT_ATTRIBUTION_CODE } from "@vire/shared";
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Newsreader } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { VireMark } from "@/components/brand/vire-mark";
 import { Navbar } from "@/components/navbar";
 import { Providers } from "@/components/providers";
+import { TokenIcon } from "@/components/ui/token-icon";
 import "./globals.css";
-
-const newsreader = Newsreader({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  style: ["normal", "italic"],
-  variable: "--font-newsreader",
-  display: "swap",
-});
 
 const geistSans = Geist({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
   variable: "--font-geist-sans",
   display: "swap",
 });
@@ -40,7 +33,7 @@ const DEFAULT_DESCRIPTION =
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#faf9f6",
+  themeColor: "#f5f5f7",
   colorScheme: "light",
 };
 
@@ -130,6 +123,14 @@ export const metadata: Metadata = {
   },
 };
 
+const FOOTER_RAILS = [
+  { symbol: "cNGN", label: "cNGN · NG · 6dp" },
+  { symbol: "wARS", label: "wARS · AR · 18dp" },
+  { symbol: "wBRL", label: "wBRL · BR · 18dp" },
+  { symbol: "IDRX", label: "IDRX · ID · 2dp" },
+  { symbol: "wMXN", label: "wMXN · MX · 18dp" },
+] as const;
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   const attributionCode = process.env.VIRE_ATTRIBUTION_CODE || DEFAULT_ATTRIBUTION_CODE;
   const vaultAddress = process.env.VIRE_VAULT_ADDRESS?.trim();
@@ -165,11 +166,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <html
-      lang="en"
-      className={`${newsreader.variable} ${geistSans.variable} ${geistMono.variable}`}
-    >
-      <body className="min-h-[100dvh] bg-[#FAF9F6] font-sans text-[#121210] antialiased">
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className="min-h-[100dvh] bg-[#F5F5F7] font-sans text-[#0A0A0C] antialiased">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -177,7 +175,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[6px] focus:bg-[#121210] focus:px-3 focus:py-2 focus:text-xs focus:font-medium focus:text-[#FAF9F6]"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-[#0A0A0C] focus:px-4 focus:py-2 focus:text-xs focus:font-medium focus:text-white"
         >
           Skip to content
         </a>
@@ -187,89 +185,89 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <Navbar />
             <main
               id="main-content"
-              className="mx-auto w-full max-w-[1200px] flex-1 px-4 pb-24 pt-10 sm:px-6 lg:px-8"
+              className="mx-auto w-full max-w-[1220px] flex-1 px-4 pb-24 pt-8 sm:px-6 lg:px-8"
             >
               {children}
             </main>
 
-            <footer className="border-t border-[#E4E2DC] bg-white">
-              <div className="mx-auto max-w-[1200px] px-4 py-12 sm:px-6 lg:px-8">
-                <div className="grid grid-cols-2 gap-10 border-b border-[#E4E2DC] pb-10 md:grid-cols-12">
+            <footer className="border-t border-black/[0.06] bg-white">
+              <div className="mx-auto max-w-[1220px] px-4 py-12 sm:px-6 lg:px-8">
+                <div className="grid grid-cols-2 gap-10 border-b border-black/[0.06] pb-10 md:grid-cols-12">
                   <div className="col-span-2 space-y-3 md:col-span-5">
                     <Link
                       href="/"
-                      className="inline-flex items-center gap-2 text-sm font-semibold tracking-[-0.02em] text-[#121210]"
+                      className="inline-flex items-center gap-2 text-[14.5px] font-semibold tracking-[-0.025em] text-[#0A0A0C]"
                     >
-                      <VireMark variant="bare" size={16} />
-                      <span>Vire Clearinghouse</span>
+                      <VireMark variant="badge" size={22} />
+                      <span>Vire</span>
                     </Link>
-                    <p className="max-w-xs text-[13px] leading-[1.6] text-[#68665F]">
+                    <p className="max-w-xs text-[13px] leading-[1.6] text-[#71717A]">
                       Autonomous proof-of-work verification, bounded onchain USDT custody, and
                       exact-output local stablecoin settlement on Celo Mainnet.
                     </p>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 font-mono text-[11px] text-[#68665F]">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 text-[12px] text-[#71717A]">
                       <a
                         href="https://github.com/eugenennamdi/Vire"
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 hover:text-[#121210]"
+                        className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
                       >
                         GitHub <ArrowUpRight className="h-3 w-3" />
                       </a>
                       <Link
                         href="/api/agent-card.json"
-                        className="inline-flex items-center gap-1 hover:text-[#121210]"
+                        className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
                       >
                         agent-card.json <ArrowUpRight className="h-3 w-3" />
                       </Link>
                     </div>
                   </div>
 
-                  <nav aria-label="Clearing" className="space-y-2.5 md:col-span-2">
-                    <div className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#121210]">
-                      Clearing
+                  <nav aria-label="Protocol" className="space-y-3 md:col-span-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#A1A1AA]">
+                      Protocol
                     </div>
-                    <ul className="space-y-2 text-xs text-[#68665F]">
+                    <ul className="space-y-2 text-[13px] text-[#52525B]">
                       <li>
-                        <Link href="/" className="hover:text-[#121210]">
+                        <Link href="/" className="transition-colors hover:text-[#0A0A0C]">
                           Overview
                         </Link>
                       </li>
                       <li>
-                        <Link href="/campaigns" className="hover:text-[#121210]">
+                        <Link href="/campaigns" className="transition-colors hover:text-[#0A0A0C]">
                           Campaigns
                         </Link>
                       </li>
                       <li>
-                        <Link href="/claim" className="hover:text-[#121210]">
+                        <Link href="/claim" className="transition-colors hover:text-[#0A0A0C]">
                           Submit claim
                         </Link>
                       </li>
                       <li>
-                        <Link href="/ledger" className="hover:text-[#121210]">
+                        <Link href="/ledger" className="transition-colors hover:text-[#0A0A0C]">
                           Audit ledger
                         </Link>
                       </li>
                       <li>
-                        <Link href="/console" className="hover:text-[#121210]">
+                        <Link href="/console" className="transition-colors hover:text-[#0A0A0C]">
                           x402 Console
                         </Link>
                       </li>
                     </ul>
                   </nav>
 
-                  <nav aria-label="Contracts" className="space-y-2.5 md:col-span-3">
-                    <div className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#121210]">
-                      Contracts &amp; Feeds
+                  <nav aria-label="Contracts" className="space-y-3 md:col-span-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#A1A1AA]">
+                      Onchain
                     </div>
-                    <ul className="space-y-2 text-xs text-[#68665F]">
+                    <ul className="space-y-2 text-[13px] text-[#52525B]">
                       {vaultAddress && (
                         <li>
                           <a
                             href={celoscanAddressUrl(vaultAddress)}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 hover:text-[#121210]"
+                            className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
                           >
                             VireVault <ArrowUpRight className="h-3 w-3" />
                           </a>
@@ -280,7 +278,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                           href={celoscanAddressUrl(CELO_CONTRACTS.TEXTILE_LIMIT_ORDER_REACTOR)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 hover:text-[#121210]"
+                          className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
                         >
                           Textile FX Reactor <ArrowUpRight className="h-3 w-3" />
                         </a>
@@ -290,7 +288,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                           href={celoscanAddressUrl(CELO_CONTRACTS.ERC8004_IDENTITY_REGISTRY)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 hover:text-[#121210]"
+                          className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
                         >
                           ERC-8004{agentId ? ` #${agentId}` : ""} <ArrowUpRight className="h-3 w-3" />
                         </a>
@@ -300,7 +298,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                           href="/api/corridors/live"
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 hover:text-[#121210]"
+                          className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
                         >
                           Live FX JSON <ArrowUpRight className="h-3 w-3" />
                         </a>
@@ -308,27 +306,29 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     </ul>
                   </nav>
 
-                  <div className="space-y-2.5 md:col-span-2">
-                    <div className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#121210]">
+                  <div className="space-y-3 md:col-span-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#A1A1AA]">
                       Local Rails
                     </div>
-                    <ul className="space-y-2 whitespace-nowrap font-mono text-[11px] text-[#68665F]">
-                      <li>cNGN · NG · 6dp</li>
-                      <li>wARS · AR · 18dp</li>
-                      <li>wBRL · BR · 18dp</li>
-                      <li>IDRX · ID · 2dp</li>
-                      <li>wMXN · MX · 18dp</li>
+                    <ul className="space-y-2 whitespace-nowrap font-mono text-[11.5px] text-[#52525B]">
+                      {FOOTER_RAILS.map((r) => (
+                        <li key={r.symbol} className="flex items-center gap-2">
+                          <TokenIcon symbol={r.symbol} size={15} />
+                          <span>{r.label}</span>
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 </div>
 
-                <div className="flex flex-col items-start justify-between gap-2 pt-6 font-mono text-[11px] text-[#68665F] sm:flex-row sm:items-center">
+                <div className="flex flex-col items-start justify-between gap-2 pt-6 font-mono text-[11.5px] text-[#71717A] sm:flex-row sm:items-center">
                   <span>
                     Non-custodial USDT treasury · ERC-8021{" "}
-                    <span className="text-[#121210]">{attributionCode}</span>
+                    <span className="text-[#0A0A0C]">{attributionCode}</span>
                   </span>
-                  <span className="tabular-nums">
-                    Celo Mainnet · Chain 42220
+                  <span className="inline-flex items-center gap-1.5 tabular-nums">
+                    <TokenIcon symbol="CELO" size={14} />
+                    Celo Mainnet · 42220
                   </span>
                 </div>
               </div>

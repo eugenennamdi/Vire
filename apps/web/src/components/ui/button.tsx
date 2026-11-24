@@ -4,26 +4,26 @@ import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
   [
-    "vire-pressable inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[6px] font-medium",
+    "vire-pressable inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium",
     "select-none cursor-pointer disabled:pointer-events-none",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#121210]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAF9F6]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0A0C]/20 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F5F7]",
   ].join(" "),
   {
     variants: {
       variant: {
         primary:
-          "bg-[#121210] text-[#FAF9F6] hover:bg-[#292824] disabled:border disabled:border-[#E4E2DC] disabled:bg-[#F3F1EC] disabled:text-[#9E9B93]",
+          "bg-[#0A0A0C] text-white shadow-[0_1px_2px_rgba(10,10,12,0.16)] hover:bg-[#232327] disabled:bg-[#E4E4E7] disabled:text-[#A1A1AA] disabled:shadow-none",
         secondary:
-          "border border-[#D5D2C9] bg-white text-[#121210] hover:border-[#121210] hover:bg-[#FAF9F6] disabled:border-[#E4E2DC] disabled:bg-[#FAF9F6] disabled:text-[#9E9B93]",
+          "vire-pill-surface text-[#0A0A0C] hover:bg-[#FAFAFB] hover:shadow-[0_0_0_1px_rgba(10,10,12,0.16),0_2px_6px_rgba(10,10,12,0.06)] disabled:bg-[#F4F4F6] disabled:text-[#A1A1AA] disabled:shadow-none",
         outlineStrong:
-          "border border-[#121210] bg-white text-[#121210] hover:bg-[#121210] hover:text-[#FAF9F6] disabled:border-[#E4E2DC] disabled:text-[#9E9B93]",
+          "bg-white text-[#0A0A0C] shadow-[0_0_0_1px_rgba(10,10,12,0.22)] hover:bg-[#0A0A0C] hover:text-white disabled:text-[#A1A1AA] disabled:shadow-[0_0_0_1px_rgba(10,10,12,0.08)]",
         ghost:
-          "bg-transparent text-[#68665F] hover:bg-[#EFECE6] hover:text-[#121210] disabled:text-[#9E9B93]",
+          "bg-transparent text-[#52525B] hover:bg-black/[0.045] hover:text-[#0A0A0C] disabled:text-[#A1A1AA]",
       },
       size: {
-        sm: "h-8 px-3 text-xs",
-        md: "h-9 px-3.5 text-[13px]",
-        lg: "h-10 px-4 text-[13.5px]",
+        sm: "h-8 px-3.5 text-[12.5px]",
+        md: "h-9 px-4 text-[13.5px]",
+        lg: "h-10 px-5 text-[14px]",
         icon: "h-8 w-8 p-0",
       },
     },

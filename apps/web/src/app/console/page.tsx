@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { TokenIcon } from "@/components/ui/token-icon";
 import { truncateMiddle } from "@/lib/utils";
 
 interface VaultApiResponse {
@@ -138,34 +139,34 @@ console.log(await res.json());`;
 
   return (
     <div className="space-y-8">
-      <div className="vire-enter border-b border-[#E4E2DC] pb-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#68665F]">
-          Operator &amp; Agent Tools · Celo 42220
-        </p>
-        <h1 className="mt-1.5 font-serif text-3xl font-normal tracking-[-0.025em] text-[#121210] sm:text-[36px]">
+      <div className="vire-enter">
+        <h1 className="text-[28px] font-medium tracking-[-0.03em] text-[#0A0A0C]">
           Console &amp; x402 playground
         </h1>
-        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-[#4F4E4A]">
-          Live <code className="font-mono text-xs text-[#121210]">VireVault</code> custody state,
+        <p className="mt-1 max-w-[60ch] text-[14px] leading-relaxed text-[#71717A]">
+          Live <code className="font-mono text-[13px] text-[#0A0A0C]">VireVault</code> custody state,
           verified Celo Mainnet token decimals, and interactive HTTP 402 testing against{" "}
-          <code className="font-mono text-xs text-[#121210]">api.x402.celo.org</code>.
+          <code className="font-mono text-[13px] text-[#0A0A0C]">api.x402.celo.org</code>.
         </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
-        {/* Left: VireVault + Token Registry */}
+        {/* Left: VireVault + Official Token Registry */}
         <div className="min-w-0 space-y-6 lg:col-span-5">
           <Card className="vire-enter vire-delay-1 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-[#E4E2DC] bg-[#F3F1EC]/70 px-5 py-3">
-              <h2 className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#68665F]">
-                VireVault Custody
-              </h2>
-              <Badge tone={vault?.deployed && !vault.paused ? "ink" : "neutral"}>
-                {vault?.deployed ? (vault.paused ? "PAUSED" : "ACTIVE · 42220") : "UNCONFIGURED"}
+            <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#FAFAFB] px-5 py-3.5">
+              <div className="flex items-center gap-2">
+                <TokenIcon symbol="USDT" size={20} showChainBadge />
+                <h2 className="text-[13.5px] font-medium text-[#0A0A0C]">
+                  VireVault custody
+                </h2>
+              </div>
+              <Badge tone={vault?.deployed && !vault.paused ? "positive" : "neutral"}>
+                {vault?.deployed ? (vault.paused ? "Paused" : "Active · 42220") : "Unconfigured"}
               </Badge>
             </div>
 
-            <dl className="divide-y divide-[#E4E2DC] px-5 font-mono text-xs">
+            <dl className="divide-y divide-black/[0.055] px-5 font-mono text-[12px]">
               {[
                 { label: "Vault", value: vault?.address, copy: true },
                 { label: "Owner", value: vault?.owner, copy: true },
@@ -189,8 +190,8 @@ console.log(await res.json());`;
                 },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between gap-3 py-3">
-                  <dt className="text-[#68665F]">{row.label}</dt>
-                  <dd className="flex min-w-0 items-center gap-1.5 text-[#121210] tabular-nums">
+                  <dt className="text-[#71717A]">{row.label}</dt>
+                  <dd className="flex min-w-0 items-center gap-1.5 text-[#0A0A0C] tabular-nums">
                     <span className="truncate">
                       {row.value && row.value.startsWith("0x")
                         ? truncateMiddle(row.value, 8, 6)
@@ -205,12 +206,12 @@ console.log(await res.json());`;
             </dl>
 
             {vault?.deployed && vault.address && (
-              <div className="flex items-center justify-between gap-2 border-t border-[#E4E2DC] bg-[#FAF9F6] px-5 py-3">
+              <div className="flex items-center justify-between gap-2 border-t border-black/[0.06] bg-[#FAFAFB] px-5 py-3">
                 <a
                   href={`https://celoscan.io/address/${vault.address}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-mono text-xs text-[#121210] underline underline-offset-2"
+                  className="inline-flex items-center gap-1 font-mono text-[12px] text-[#0A0A0C] underline underline-offset-2"
                 >
                   Celoscan <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>
@@ -234,19 +235,24 @@ console.log(await res.json());`;
           </Card>
 
           <Card className="vire-enter vire-delay-2 overflow-hidden">
-            <div className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 px-5 py-3">
-              <h3 className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#68665F]">
-                Token Decimals · Celo 42220
+            <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#FAFAFB] px-5 py-3.5">
+              <h3 className="text-[13.5px] font-medium text-[#0A0A0C]">
+                Verified token decimals
               </h3>
+              <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-[#71717A]">
+                <TokenIcon symbol="CELO" size={14} />
+                42220
+              </span>
             </div>
-            <div className="divide-y divide-[#E4E2DC] font-mono text-[11.5px]">
+            <div className="divide-y divide-black/[0.055] font-mono text-[12px]">
               {Object.values(CELO_TOKENS).map((t) => (
-                <div key={t.symbol} className="flex items-center justify-between px-5 py-3">
-                  <span className="font-medium text-[#121210]">
-                    {t.symbol === "USDT" ? "USDT" : t.displaySymbol}
+                <div key={t.symbol} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <span className="inline-flex items-center gap-2 font-medium text-[#0A0A0C]">
+                    <TokenIcon symbol={t.symbol} size={20} />
+                    {t.symbol}
                   </span>
-                  <span className="text-[#68665F]">{truncateMiddle(t.address, 8, 5)}</span>
-                  <span className="text-[#4F4E4A] tabular-nums">{t.decimals}dp</span>
+                  <span className="text-[#71717A]">{truncateMiddle(t.address, 8, 5)}</span>
+                  <span className="text-[#3F3F46] tabular-nums">{t.decimals}dp</span>
                 </div>
               ))}
             </div>
@@ -255,8 +261,8 @@ console.log(await res.json());`;
 
         {/* Right: x402 Playground */}
         <Card className="vire-enter vire-delay-1 min-w-0 overflow-hidden lg:col-span-7">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E4E2DC] bg-[#F3F1EC]/70 px-5 py-3">
-            <h2 className="font-mono text-xs font-semibold text-[#121210]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-[#FAFAFB] px-5 py-3.5">
+            <h2 className="font-mono text-[12.5px] font-medium text-[#0A0A0C]">
               POST /api/x402/verify
             </h2>
 
@@ -266,7 +272,7 @@ console.log(await res.json());`;
                 onChange={setX402AssetMode}
                 options={[
                   { value: "default", label: "USDT / wFIAT" },
-                  { value: "cngn", label: "cNGN" },
+                  { value: "cngn", label: "cNGN", icon: <TokenIcon symbol="cNGN" size={15} /> },
                 ]}
               />
               <Button
@@ -284,15 +290,15 @@ console.log(await res.json());`;
           <div className="space-y-5 p-6">
             {x402Status !== null ? (
               <div className="space-y-4">
-                <div className="vire-band flex flex-wrap items-center justify-between gap-2 rounded-[4px] px-4 py-3 font-mono text-xs">
+                <div className="vire-well flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 font-mono text-xs">
                   <div className="flex items-center gap-2.5">
                     <Badge tone={x402Status === 402 ? "ink" : "outline"}>HTTP {x402Status}</Badge>
-                    <span className="text-[#4F4E4A]">
+                    <span className="text-[#3F3F46]">
                       {x402Status === 402 ? "x402 v2 Payment Required" : "Response received"}
                     </span>
                   </div>
                   {x402LatencyMs !== null && (
-                    <span className="text-[11px] text-[#68665F] tabular-nums">
+                    <span className="text-[11px] text-[#71717A] tabular-nums">
                       {x402LatencyMs}ms
                     </span>
                   )}
@@ -301,7 +307,7 @@ console.log(await res.json());`;
                 {x402DecodedHeader && (
                   <div>
                     <div className="mb-1.5 flex items-center justify-between">
-                      <span className="font-mono text-[11px] text-[#68665F]">
+                      <span className="font-mono text-[11.5px] text-[#71717A]">
                         Decoded payment-required header
                       </span>
                       <CopyButton
@@ -310,7 +316,7 @@ console.log(await res.json());`;
                         toastMessage="Challenge copied"
                       />
                     </div>
-                    <pre className="vire-band max-h-80 overflow-auto rounded-[4px] p-4 font-mono text-[11px] leading-relaxed text-[#121210]">
+                    <pre className="vire-well max-h-80 overflow-auto rounded-xl p-4 font-mono text-[11.5px] leading-relaxed text-[#0A0A0C]">
                       {x402DecodedHeader}
                     </pre>
                   </div>
@@ -318,30 +324,30 @@ console.log(await res.json());`;
 
                 {x402Body && (
                   <div>
-                    <div className="mb-1.5 font-mono text-[11px] text-[#68665F]">
+                    <div className="mb-1.5 font-mono text-[11.5px] text-[#71717A]">
                       Response body
                     </div>
-                    <pre className="vire-band max-h-32 overflow-auto rounded-[4px] p-3 font-mono text-[11px] text-[#4F4E4A]">
+                    <pre className="vire-well max-h-32 overflow-auto rounded-xl p-3 font-mono text-[11.5px] text-[#52525B]">
                       {x402Body}
                     </pre>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="vire-band rounded-[4px] px-5 py-8 text-center">
-                <p className="text-xs font-medium text-[#121210]">
+              <div className="vire-well rounded-xl px-5 py-8 text-center">
+                <p className="text-[13px] font-medium text-[#0A0A0C]">
                   Send an unpaid POST request to inspect the live HTTP 402 challenge.
                 </p>
-                <p className="mt-1 text-xs text-[#68665F]">
+                <p className="mt-1 text-[12.5px] text-[#71717A]">
                   Decodes EIP-3009 and Permit2 payment requirements from{" "}
-                  <code className="font-mono text-[#121210]">POST /api/x402/verify</code>.
+                  <code className="font-mono text-[#0A0A0C]">POST /api/x402/verify</code>.
                 </p>
               </div>
             )}
 
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-mono text-[11px] text-[#68665F]">
+                <span className="font-mono text-[11.5px] text-[#71717A]">
                   @x402/fetch client example
                 </span>
                 <CopyButton
@@ -350,7 +356,7 @@ console.log(await res.json());`;
                   toastMessage="Snippet copied"
                 />
               </div>
-              <pre className="vire-band overflow-x-auto rounded-[4px] p-4 font-mono text-[11px] leading-relaxed text-[#121210]">
+              <pre className="vire-well overflow-x-auto rounded-xl p-4 font-mono text-[11.5px] leading-relaxed text-[#0A0A0C]">
                 {sdkSnippet}
               </pre>
             </div>

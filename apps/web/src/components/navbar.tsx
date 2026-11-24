@@ -9,6 +9,7 @@ import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } fro
 import { celo } from "wagmi/chains";
 import { VireLogo } from "@/components/brand/vire-mark";
 import { Button } from "@/components/ui/button";
+import { TokenIcon } from "@/components/ui/token-icon";
 import { cn, truncateMiddle } from "@/lib/utils";
 
 const NAV_LINKS = [
@@ -55,21 +56,19 @@ export function Navbar() {
   const wrongChain = isConnected && chainId !== celo.id;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[#E4E2DC] bg-[#FAF9F6]/92 backdrop-blur-sm">
-      <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        {/* Left: Brand Lockup + Hairline Divider + Flush-Underline Ledger Nav */}
-        <div className="flex h-full items-center gap-5">
+    <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-[#F5F5F7]/85 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-[1220px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        {/* Left: Brand + Quiet Institutional Capsule Navigation */}
+        <div className="flex items-center gap-6">
           <Link
             href="/"
             aria-label="Vire — Overview"
-            className="vire-pressable inline-flex shrink-0 items-center rounded-[4px] py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#121210]/20"
+            className="vire-pressable inline-flex shrink-0 items-center rounded-lg py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0A0C]/20"
           >
-            <VireLogo size={24} />
+            <VireLogo size={26} />
           </Link>
 
-          <span className="hidden h-4 w-px bg-[#D5D2C9] md:block" aria-hidden="true" />
-
-          <nav aria-label="Primary" className="hidden h-full items-stretch gap-1 md:flex">
+          <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
             {NAV_LINKS.map((item) => {
               const active = activeHref === item.href;
               return (
@@ -82,41 +81,37 @@ export function Navbar() {
                     if (item.href !== pathname) setPendingHref(item.href);
                   }}
                   className={cn(
-                    "relative inline-flex items-center whitespace-nowrap px-2.5 text-[13px] font-medium transition-colors duration-150",
+                    "vire-pressable inline-flex h-8 items-center whitespace-nowrap rounded-full px-3.5 text-[13.5px] font-medium",
                     active
-                      ? "text-[#121210]"
-                      : "text-[#68665F] hover:text-[#121210]"
+                      ? "vire-pill-surface text-[#0A0A0C]"
+                      : "text-[#71717A] hover:bg-black/[0.04] hover:text-[#0A0A0C]"
                   )}
                 >
-                  <span>{item.label}</span>
-                  {active && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-x-1.5 bottom-0 h-[2px] bg-[#121210]"
-                    />
-                  )}
+                  {item.label}
                 </Link>
               );
             })}
           </nav>
         </div>
 
-        {/* Right: Quiet Celo Chain Stamp + Rectangular Wallet Control */}
-        <div className="flex min-w-0 items-center gap-3">
+        {/* Right: Official Celo Network Pill + Full-Capsule Wallet Control */}
+        <div className="flex min-w-0 items-center gap-2.5">
           <Link
             href="/api/agent-card.json"
-            className="hidden items-center gap-2 border-r border-[#E4E2DC] pr-3 font-mono text-[11px] text-[#68665F] transition-colors hover:text-[#121210] lg:inline-flex"
-            title="Inspect ERC-8004 agent registration manifest"
+            className="vire-pressable vire-pill-surface hidden h-8 items-center gap-2 rounded-full pl-1.5 pr-3 text-[12px] font-medium text-[#3F3F46] hover:text-[#0A0A0C] lg:inline-flex"
+            title="Inspect ERC-8004 agent registration manifest on Celo Mainnet"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#121210]" />
-            <span>CELO 42220</span>
+            <TokenIcon symbol="CELO" size={18} />
+            <span>Celo</span>
             {rep?.registered && rep.agentId && (
-              <span className="text-[#121210]">#{rep.agentId}</span>
+              <span className="font-mono text-[11px] text-[#71717A] tabular-nums">
+                #{rep.agentId}
+              </span>
             )}
           </Link>
 
           {!mounted ? (
-            <div className="h-8 w-28 animate-pulse rounded-[6px] bg-[#ECEAE4]" />
+            <div className="h-8 w-32 animate-pulse rounded-full bg-black/[0.06]" />
           ) : wrongChain ? (
             <Button
               size="sm"
@@ -127,15 +122,15 @@ export function Navbar() {
               Switch to Celo
             </Button>
           ) : isConnected && address ? (
-            <div className="inline-flex h-8 items-center gap-1.5 rounded-[6px] border border-[#D5D2C9] bg-white pl-2.5 pr-1 font-mono text-xs text-[#121210]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#121210]" />
+            <div className="vire-pill-surface inline-flex h-8 items-center gap-1.5 rounded-full pl-2.5 pr-1 font-mono text-[12px] text-[#0A0A0C]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A] ring-4 ring-[#16A34A]/15" />
               <span className="tabular-nums">{truncateMiddle(address, 6, 4)}</span>
               <button
                 type="button"
                 onClick={() => disconnect()}
                 aria-label="Disconnect wallet"
                 title="Disconnect wallet"
-                className="vire-pressable ml-0.5 flex h-6 w-6 items-center justify-center rounded-[4px] text-[#68665F] hover:bg-[#F3F1EC] hover:text-[#121210]"
+                className="vire-pressable ml-0.5 flex h-6 w-6 items-center justify-center rounded-full text-[#71717A] hover:bg-black/[0.05] hover:text-[#0A0A0C]"
               >
                 <SignOut weight="regular" className="h-3.5 w-3.5" />
               </button>
@@ -157,10 +152,10 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile navigation strip — crisp underline tabs fitting 390px cleanly */}
+      {/* Mobile navigation strip — crisp pills fitting 390px cleanly */}
       <nav
         aria-label="Mobile navigation"
-        className="flex items-stretch justify-between border-t border-[#E4E2DC] bg-[#FAF9F6] px-3 md:hidden"
+        className="flex items-center justify-between gap-1 border-t border-black/[0.05] bg-[#F5F5F7]/95 px-3 py-2 md:hidden"
       >
         {NAV_LINKS.map((item) => {
           const active = activeHref === item.href;
@@ -173,17 +168,13 @@ export function Navbar() {
                 if (item.href !== pathname) setPendingHref(item.href);
               }}
               className={cn(
-                "relative whitespace-nowrap px-2 py-2.5 text-xs font-medium",
-                active ? "text-[#121210]" : "text-[#68665F]"
+                "whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors",
+                active
+                  ? "vire-pill-surface text-[#0A0A0C]"
+                  : "text-[#71717A] hover:text-[#0A0A0C]"
               )}
             >
               {item.label}
-              {active && (
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-x-1 bottom-0 h-[2px] bg-[#121210]"
-                />
-              )}
             </Link>
           );
         })}
