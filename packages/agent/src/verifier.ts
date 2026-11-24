@@ -5,14 +5,36 @@ import {
   type DeliverableType,
   type VerificationVerdict,
 } from "@vire/shared";
-import { fetchDeliverableArtifact, parseXStatusUrl, type FetchedArtifact } from "./artifact-fetcher.js";
+import {
+  buildWalletClaimCode,
+  computeContentHash,
+  extractOriginalCommentary,
+  fetchDeliverableArtifact,
+  parseXStatusUrl,
+  type FetchedArtifact,
+} from "./artifact-fetcher.js";
+import type { Hex } from "viem";
 
 export interface VerifyDeliverableInput {
+  campaignIdBytes32?: Hex;
   deliverableUrl: string;
   deliverableType: DeliverableType;
   campaignTitle: string;
   criteria: string;
+  contributorWallet?: string;
   contributorHandle?: string;
+  /** True when the contributor's X/GitHub ownership was cryptographically verified via OAuth (e.g. Privy X JWT). */
+  identityOAuthVerified?: boolean;
+  /** Campaign launch timestamp (ms) — blocks submitting old tweets posted before the campaign launched. */
+  campaignCreatedAtMs?: number;
+  /** Minimum X follower count required for promo_post anti-bot filter (default 10 when authorFollowers is reported). */
+  minAuthorFollowers?: number;
+  /** Minimum X account age in days required for promo_post anti-bot filter (default 30 when authorJoinedAtMs is reported). */
+  minAccountAgeDays?: number;
+  /** Optional server-side callback blocking an immutable platform authorId that already claimed this campaign. */
+  isAuthorAlreadyClaimed?: (authorId: string) => Promise<boolean>;
+  /** Optional server-side callback blocking exact copy-pasted post text within the same campaign. */
+  isContentHashAlreadyUsed?: (contentHash: Hex) => Promise<boolean>;
   deliverableNotes?: string;
   referralCode?: string;
   githubApiToken?: string;
@@ -25,6 +47,7 @@ export interface VerifyDeliverableResult {
   verdict: VerificationVerdict;
   buyReceipts: BuyPaymentReceipt[];
   modelUsed: string;
+  contentHash?: Hex | null;
 }
 
 const SYSTEM_PROMPT = [
@@ -294,6 +317,191 @@ export async function verifyDeliverableWithBuy(
     }
   }
 
+  // Immutable authorId anti-Sybil check (blocks X handle-rename farming & multi-wallet reuse BEFORE spending on `buy`)
+  if (artifact.authorId && input.isAuthorAlreadyClaimed) {
+    const alreadyClaimed = await input.isAuthorAlreadyClaimed(artifact.authorId);
+    if (alreadyClaimed) {
+      return {
+        artifact,
+        verdict: {
+          verdict: "reject",
+          score: 0,
+          confidence: 1,
+          reason: "This social account has already claimed a payout in this campaign.",
+          evidenceSummary: `Immutable author ID ${artifact.authorId} already settled in this campaign.`,
+        },
+        buyReceipts,
+        modelUsed: "pre-llm-author-id-guard",
+      };
+    }
+  }
+
+  // Strict X anti-bot, anti-spam & anti-hijack guards (run BEFORE spending $0.005 on Celo `buy`!)
+  let contentHash: Hex | null = null;
+  if (artifact.sourceKind === "x_post") {
+    const rawTweetText = artifact.rawText ?? artifact.excerpt;
+
+    if (artifact.isReply) {
+      return {
+        artifact,
+        verdict: {
+          verdict: "reject",
+          score: 0,
+          confidence: 1,
+          reason: "Replies are not eligible. Please publish an original public post on your timeline.",
+          evidenceSummary: "Tweet flagged as a reply.",
+        },
+        buyReceipts,
+        modelUsed: "pre-llm-original-post-guard",
+      };
+    }
+
+    if (artifact.isRepost) {
+      return {
+        artifact,
+        verdict: {
+          verdict: "reject",
+          score: 0,
+          confidence: 1,
+          reason: "Retweets are not eligible. Please write and publish an original post.",
+          evidenceSummary: "Tweet flagged as a repost/retweet.",
+        },
+        buyReceipts,
+        modelUsed: "pre-llm-original-post-guard",
+      };
+    }
+
+    const minFollowers = input.minAuthorFollowers ?? 10;
+    if (
+      typeof artifact.authorFollowers === "number" &&
+      minFollowers > 0 &&
+      artifact.authorFollowers < minFollowers
+    ) {
+      return {
+        artifact,
+        verdict: {
+          verdict: "reject",
+          score: 0,
+          confidence: 1,
+          reason: `Your X account needs at least ${minFollowers} followers to claim this campaign (currently ${artifact.authorFollowers}).`,
+          evidenceSummary: `Author followers ${artifact.authorFollowers} < minimum ${minFollowers}.`,
+        },
+        buyReceipts,
+        modelUsed: "pre-llm-follower-guard",
+      };
+    }
+
+    const minAgeDays = input.minAccountAgeDays ?? 30;
+    if (typeof artifact.authorJoinedAtMs === "number" && minAgeDays > 0) {
+      const ageDays = Math.floor((Date.now() - artifact.authorJoinedAtMs) / (24 * 60 * 60 * 1000));
+      if (ageDays < minAgeDays) {
+        return {
+          artifact,
+          verdict: {
+            verdict: "reject",
+            score: 0,
+            confidence: 1,
+            reason: `Your X account must be at least ${minAgeDays} days old to claim (account age: ${Math.max(0, ageDays)} days).`,
+            evidenceSummary: `Author account age ${ageDays}d < minimum ${minAgeDays}d.`,
+          },
+          buyReceipts,
+          modelUsed: "pre-llm-account-age-guard",
+        };
+      }
+    }
+
+    if (
+      typeof input.campaignCreatedAtMs === "number" &&
+      typeof artifact.createdAtMs === "number" &&
+      artifact.createdAtMs < input.campaignCreatedAtMs - 10 * 60 * 1000
+    ) {
+      return {
+        artifact,
+        verdict: {
+          verdict: "reject",
+          score: 0,
+          confidence: 1,
+          reason: "Please submit a newly published post created after this campaign launched.",
+          evidenceSummary: "Submitted tweet predates campaign launch window.",
+        },
+        buyReceipts,
+        modelUsed: "pre-llm-freshness-guard",
+      };
+    }
+
+    // Anti-tweet-hijacking: unless X ownership was verified cryptographically via OAuth,
+    // require the user's personal VIRE-XXXX wallet tag inside the post so nobody else can front-run it.
+    if (!input.identityOAuthVerified && input.contributorWallet) {
+      const expectedCode = buildWalletClaimCode(input.contributorWallet);
+      if (!rawTweetText.toUpperCase().includes(expectedCode)) {
+        return {
+          artifact,
+          verdict: {
+            verdict: "reject",
+            score: 0,
+            confidence: 1,
+            reason: `Include your personal claim code ${expectedCode} in your post so nobody else can claim it (or sign in with X).`,
+            evidenceSummary: `Missing anti-hijack claim code ${expectedCode} on non-OAuth claim.`,
+          },
+          buyReceipts,
+          modelUsed: "pre-llm-hijack-guard",
+        };
+      }
+    }
+
+    // Require genuine original commentary (not just a bare tag/link/hashtag dump)
+    const originalBody = extractOriginalCommentary(rawTweetText);
+    if (originalBody.length < 30) {
+      return {
+        artifact,
+        verdict: {
+          verdict: "reject",
+          score: 0,
+          confidence: 1,
+          reason: "Please write a short original promo message (at least 30 characters beyond tags and links).",
+          evidenceSummary: `Original post text too short (${originalBody.length} chars < 30).`,
+        },
+        buyReceipts,
+        modelUsed: "pre-llm-originality-guard",
+      };
+    }
+
+    // Block word-for-word copy-paste spam across burner accounts in the same campaign
+    if (input.campaignIdBytes32) {
+      contentHash = computeContentHash(input.campaignIdBytes32, rawTweetText);
+      if (input.isContentHashAlreadyUsed) {
+        const dupContent = await input.isContentHashAlreadyUsed(contentHash);
+        if (dupContent) {
+          return {
+            artifact,
+            verdict: {
+              verdict: "reject",
+              score: 0,
+              confidence: 1,
+              reason: "This post text was already submitted by another account. Please write an original post in your own words.",
+              evidenceSummary: `Duplicate normalized post body hash ${contentHash}.`,
+            },
+            buyReceipts,
+            modelUsed: "pre-llm-duplicate-text-guard",
+            contentHash,
+          };
+        }
+      }
+    }
+  }
+
+  // Run fast local criteria check BEFORE paying $0.005 on `buy` so missing @tag/#hashtag/URL fails for $0!
+  const preCriteriaCheck = evaluateDeliverableDeterministically(artifact, input);
+  if (preCriteriaCheck.verdict !== "pass") {
+    return {
+      artifact,
+      verdict: preCriteriaCheck,
+      buyReceipts,
+      modelUsed: "pre-buy-criteria-guard",
+      contentHash,
+    };
+  }
+
   // Paid Celo `buy` verification calls (real onchain x402 payments on Celo Mainnet)
   let paidBuyObservedText = "";
   const parsedX = (() => {
@@ -393,5 +601,6 @@ export async function verifyDeliverableWithBuy(
     verdict,
     buyReceipts,
     modelUsed: "vire-deterministic-buy-auditor",
+    contentHash,
   };
 }

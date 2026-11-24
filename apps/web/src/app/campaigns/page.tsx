@@ -43,6 +43,7 @@ interface CampaignView {
   maxPayoutsPerRecipient: number;
   maxSpreadBps: number;
   minPassScore: number;
+  spotsRemaining?: number;
   active: boolean;
 }
 
@@ -233,11 +234,15 @@ function CampaignsInner() {
                   </div>
                 </div>
 
-                {/* Hairline multi-stage divider row */}
+                {/* Task & reward divider row */}
                 <div
                   className={cn(
                     "grid grid-cols-1 divide-y divide-black/[0.06] border-t border-black/[0.06] md:divide-x md:divide-y-0",
-                    camp.stages.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"
+                    camp.stages.length === 1
+                      ? "md:grid-cols-1"
+                      : camp.stages.length === 2
+                        ? "md:grid-cols-2"
+                        : "md:grid-cols-3"
                   )}
                 >
                   {camp.stages.map((st) => (
@@ -248,7 +253,9 @@ function CampaignsInner() {
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2 font-mono text-[11.5px]">
-                          <span className="text-[#A1A1AA]">STAGE 0{st.stageIndex}</span>
+                          <span className="text-[#A1A1AA]">
+                            {camp.stages.length === 1 ? "VERIFIED FCFS" : `STAGE 0${st.stageIndex}`}
+                          </span>
                           <span className="inline-flex items-center gap-1.5 font-medium text-[#0A0A0C] tabular-nums">
                             <TokenIcon symbol={camp.corridor} size={15} />
                             {st.rewardLocalFormatted} {camp.corridor}
@@ -261,10 +268,27 @@ function CampaignsInner() {
                           {st.instructions}
                         </p>
                       </div>
-                      <div className="mt-3 font-mono text-[11px] text-[#A1A1AA]">
-                        {st.cooldownHours === 0
-                          ? "Immediate entry"
-                          : `${st.cooldownHours}h cooldown after Stage ${st.stageIndex - 1}`}
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-[#A1A1AA]">
+                        <span>
+                          {camp.maxPayoutsPerRecipient === 1
+                            ? "1 claim per person · first-come, first-served"
+                            : st.cooldownHours === 0
+                              ? "Immediate entry"
+                              : `${st.cooldownHours}h cooldown after Stage ${st.stageIndex - 1}`}
+                        </span>
+                        {typeof camp.spotsRemaining === "number" && (
+                          <span
+                            className={
+                              camp.spotsRemaining > 0
+                                ? "font-medium text-[#0A0A0C]"
+                                : "text-[#DC2626]"
+                            }
+                          >
+                            {camp.spotsRemaining > 0
+                              ? `${camp.spotsRemaining} ${camp.spotsRemaining === 1 ? "spot" : "spots"} left`
+                              : "Pool full"}
+                          </span>
+                        )}
                       </div>
                     </Link>
                   ))}
@@ -272,12 +296,15 @@ function CampaignsInner() {
 
                 {/* Plain-English limits strip */}
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-black/[0.06] bg-[#FAFAFB] px-6 py-2.5 font-mono text-[11.5px] text-[#71717A] tabular-nums">
-                  <span className="font-medium text-[#0A0A0C]">Limits</span>
+                  <span className="font-medium text-[#0A0A0C]">Rules</span>
+                  <span>
+                    {camp.maxPayoutsPerRecipient === 1
+                      ? "1 payout per person (FCFS)"
+                      : `Max ${camp.maxPayoutsPerRecipient} payouts/person`}
+                  </span>
                   <span>Up to ${camp.maxPerPayoutUsdtFormatted}/payout</span>
-                  <span>${camp.dailyLimitUsdtFormatted}/day max</span>
-                  <span>Max {camp.maxPayoutsPerRecipient} payouts/person</span>
-                  <span>Min score {camp.minPassScore}/100</span>
-                  <span>{(camp.maxSpreadBps / 100).toFixed(1).replace(/\.0$/, "")}% max spread</span>
+                  <span>${camp.dailyLimitUsdtFormatted}/day cap</span>
+                  <span>{(camp.maxSpreadBps / 100).toFixed(1).replace(/\.0$/, "")}% max FX spread</span>
                 </div>
               </Card>
             );

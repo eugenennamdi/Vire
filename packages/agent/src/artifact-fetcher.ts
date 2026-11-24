@@ -7,6 +7,20 @@ export interface FetchedArtifact {
   sourceKind: "github_pr" | "github_issue" | "x_post" | "web_post";
   title: string;
   authorHandle: string | null;
+  /** Immutable platform user ID (X numeric author.id or GitHub user.id) — blocks handle-rename Sybil farming. */
+  authorId?: string | null;
+  /** Author follower count when available from platform metadata. */
+  authorFollowers?: number | null;
+  /** Account creation timestamp in epoch ms when available from platform metadata. */
+  authorJoinedAtMs?: number | null;
+  /** Post/PR creation timestamp in epoch ms when available. */
+  createdAtMs?: number | null;
+  /** True when an X post is a reply rather than a standalone original post. */
+  isReply?: boolean;
+  /** True when an X post is a retweet/repost rather than original content. */
+  isRepost?: boolean;
+  /** Raw platform text body without synthetic metadata prefixes. */
+  rawText?: string;
   excerpt: string;
   httpStatus: number;
   reachable: boolean;
@@ -77,7 +91,14 @@ export async function assertSafePublicUrl(rawUrl: string): Promise<URL> {
   return parsed;
 }
 
-const X_HOSTS = new Set(["x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"]);
+const X_HOSTS = new Set([
+  "x.com",
+  "www.x.com",
+  "mobile.x.com",
+  "twitter.com",
+  "www.twitter.com",
+  "mobile.twitter.com",
+]);
 
 /** Parse canonical X/Twitter status handle + tweet ID when URL points to a public post. */
 export function parseXStatusUrl(url: URL): { handle: string; tweetId: string } | null {
@@ -87,7 +108,12 @@ export function parseXStatusUrl(url: URL): { handle: string; tweetId: string } |
   return { handle: match[1]!, tweetId: match[2]! };
 }
 
-/** Normalize URL for deterministic anti-duplicate hashing (lowercase host, canonicalize x.com/twitter.com, strip tracking params). */
+/**
+ * Normalize URL for deterministic anti-duplicate hashing:
+ * - X/Twitter posts canonicalize strictly by numeric tweetId (`https://x.com/i/status/<id>`) so
+ *   `x.com/i/status/123`, `x.com/anyhandle/status/123`, `mobile.x.com/...`, and `twitter.com/...`
+ *   ALL hash identically and cannot bypass replay protection.
+ */
 export function normalizeDeliverableUrl(rawUrl: string): string {
   const u = new URL(rawUrl.trim());
   u.hash = "";
@@ -96,10 +122,43 @@ export function normalizeDeliverableUrl(rawUrl: string): string {
   }
   const xStatus = parseXStatusUrl(u);
   if (xStatus) {
-    return `https://x.com/${xStatus.handle.toLowerCase()}/status/${xStatus.tweetId}`;
+    return `https://x.com/i/status/${xStatus.tweetId}`;
   }
   u.searchParams.sort();
   return `${u.protocol}//${u.hostname.toLowerCase()}${u.pathname.replace(/\/+$/, "") || "/"}${u.search}`;
+}
+
+/** Personal 4-hex-char anti-hijack claim tag derived deterministically from the contributor's wallet. */
+export function buildWalletClaimCode(walletAddress: string): string {
+  const clean = walletAddress.trim().replace(/^0x/i, "");
+  return `VIRE-${clean.slice(-4).toUpperCase()}`;
+}
+
+/** Strip URLs, @mentions, #hashtags, and personal VIRE-XXXX codes to isolate original commentary text. */
+export function extractOriginalCommentary(rawText: string): string {
+  return rawText
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/@[A-Za-z0-9_]+/g, " ")
+    .replace(/#[A-Za-z0-9_]+/g, " ")
+    .replace(/\bVIRE-[A-F0-9]{4}\b/gi, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** Deterministic per-campaign hash of normalized original post body (blocks word-for-word copy-paste spam). */
+export function computeContentHash(campaignIdBytes32: Hex, rawText: string): Hex {
+  const normalizedBody = extractOriginalCommentary(rawText);
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { name: "campaignId", type: "bytes32" },
+        { name: "normalizedBody", type: "string" },
+      ],
+      [campaignIdBytes32, normalizedBody]
+    )
+  );
 }
 
 /**
@@ -187,7 +246,8 @@ export async function fetchDeliverableArtifact(params: {
       body?: string;
       state?: string;
       merged?: boolean;
-      user?: { login?: string };
+      created_at?: string;
+      user?: { login?: string; id?: number };
       changed_files?: number;
       additions?: number;
       deletions?: number;
@@ -202,11 +262,15 @@ export async function fetchDeliverableArtifact(params: {
       .filter(Boolean)
       .join(", ");
 
+    const ghCreatedAtMs = data.created_at ? Date.parse(data.created_at) : Number.NaN;
     return {
       normalizedUrl,
       sourceKind: kind === "pull" ? "github_pr" : "github_issue",
       title: data.title ?? `${owner}/${repo}#${num}`,
       authorHandle: data.user?.login ?? null,
+      authorId: data.user?.id !== undefined ? `gh:${data.user.id}` : null,
+      createdAtMs: Number.isFinite(ghCreatedAtMs) ? ghCreatedAtMs : null,
+      rawText: `${data.title ?? ""}\n${data.body ?? ""}`.trim(),
       excerpt: `[${metaLine}] ${(data.body ?? "").slice(0, 3_500)}`,
       httpStatus: res.status,
       reachable: true,
@@ -214,7 +278,7 @@ export async function fetchDeliverableArtifact(params: {
   }
 
   // Dedicated X (Twitter) public post extraction — X blocks raw fetch with a JS shell,
-  // so we resolve full tweet text, author handle, and expanded URLs via FxTwitter + official oEmbed fallback.
+  // so we resolve full tweet text, immutable author ID, followers, account age, and expanded URLs via FxTwitter.
   const xStatus = parseXStatusUrl(safeUrl);
   if (xStatus) {
     try {
@@ -231,20 +295,29 @@ export async function fetchDeliverableArtifact(params: {
           tweet?: {
             text?: string;
             created_at?: string;
+            created_timestamp?: number;
             likes?: number;
             retweets?: number;
             views?: number;
-            author?: { screen_name?: string; name?: string };
+            replying_to?: string | null;
+            reposted_by?: unknown;
+            author?: {
+              id?: string;
+              screen_name?: string;
+              name?: string;
+              followers?: number;
+              joined?: string;
+            };
             raw_text?: { facets?: Array<{ type?: string; replacement?: string; original?: string }> };
           };
         };
         if (fx.tweet?.text) {
-          const authorScreen = fx.tweet.author?.screen_name ?? xStatus.handle;
+          const authorScreen = fx.tweet.author?.screen_name ?? (xStatus.handle.toLowerCase() === "i" ? null : xStatus.handle);
           const expandedUrls = (fx.tweet.raw_text?.facets ?? [])
             .filter((f) => f.type === "url" && f.replacement)
             .map((f) => f.replacement!);
           const metaParts = [
-            `author=@${authorScreen}`,
+            authorScreen ? `author=@${authorScreen}` : null,
             fx.tweet.created_at ? `created_at=${fx.tweet.created_at}` : null,
             fx.tweet.likes !== undefined ? `likes=${fx.tweet.likes}` : null,
             fx.tweet.views !== undefined ? `views=${fx.tweet.views}` : null,
@@ -253,11 +326,27 @@ export async function fetchDeliverableArtifact(params: {
             .filter(Boolean)
             .join(", ");
 
+          const joinedMs = fx.tweet.author?.joined ? Date.parse(fx.tweet.author.joined) : Number.NaN;
+          const tweetCreatedMs =
+            typeof fx.tweet.created_timestamp === "number" && Number.isFinite(fx.tweet.created_timestamp)
+              ? fx.tweet.created_timestamp * 1000
+              : fx.tweet.created_at
+                ? Date.parse(fx.tweet.created_at)
+                : Number.NaN;
+
           return {
             normalizedUrl,
             sourceKind: "x_post",
-            title: `X post by @${authorScreen}`,
+            title: authorScreen ? `X post by @${authorScreen}` : "X post",
             authorHandle: authorScreen,
+            authorId: fx.tweet.author?.id ? `x:${fx.tweet.author.id}` : null,
+            authorFollowers:
+              typeof fx.tweet.author?.followers === "number" ? fx.tweet.author.followers : null,
+            authorJoinedAtMs: Number.isFinite(joinedMs) ? joinedMs : null,
+            createdAtMs: Number.isFinite(tweetCreatedMs) ? tweetCreatedMs : null,
+            isReply: Boolean(fx.tweet.replying_to),
+            isRepost: Boolean(fx.tweet.reposted_by) || /^RT\s+@/i.test(fx.tweet.text.trim()),
+            rawText: fx.tweet.text,
             excerpt: `[${metaParts}] ${fx.tweet.text}`.slice(0, 3_800),
             httpStatus: 200,
             reachable: true,
@@ -275,15 +364,18 @@ export async function fetchDeliverableArtifact(params: {
         signal: AbortSignal.timeout(10_000),
       });
       if (oeRes.ok) {
-        const oe = (await oeRes.json()) as { author_name?: string; html?: string };
+        const oe = (await oeRes.json()) as { author_name?: string; author_url?: string; html?: string };
         const { excerpt } = stripHtmlToExcerpt(oe.html ?? "");
+        const authorFromUrl = oe.author_url?.match(/twitter\.com\/([A-Za-z0-9_]{1,32})/i)?.[1] ?? null;
+        const resolvedHandle = authorFromUrl ?? (xStatus.handle.toLowerCase() === "i" ? null : xStatus.handle);
         if (excerpt) {
           return {
             normalizedUrl,
             sourceKind: "x_post",
-            title: `X post by @${xStatus.handle}`,
-            authorHandle: xStatus.handle,
-            excerpt: `[author=@${xStatus.handle}, source=oembed] ${excerpt}`.slice(0, 3_800),
+            title: resolvedHandle ? `X post by @${resolvedHandle}` : "X post",
+            authorHandle: resolvedHandle,
+            rawText: excerpt,
+            excerpt: `[author=@${resolvedHandle ?? "unknown"}, source=oembed] ${excerpt}`.slice(0, 3_800),
             httpStatus: 200,
             reachable: true,
           };

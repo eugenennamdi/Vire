@@ -54,24 +54,17 @@ export function buildDefaultCampaignBlueprints(): CampaignSeedBlueprint[] {
       stages: [
         {
           stageIndex: 1,
-          title: "Stage 1 — Black Friday Product Promo",
-          instructions: `Pick one live product from ${storeHost}, post an original Black Friday promo on X tagging ${partner.handle} + direct product link + #SWOTBlackFriday, and submit the tweet URL.`,
-          rewardLocalAtomic: parseTokenAmount("2500", "cNGN").toString(), // ~$1.73 clears $1 Textile floor cleanly; 50,000 cNGN budget = up to 20 payouts
+          title: "Black Friday Product Promo",
+          instructions: `Pick one live product from ${storeHost}, publish an original Black Friday post on X tagging ${partner.handle} with the direct product link and #SWOTBlackFriday, and submit your post URL. First-come, first-served — strictly 1 verified payout per person.`,
+          rewardLocalAtomic: parseTokenAmount("2500", "cNGN").toString(), // ~$1.73 clears $1 Textile floor cleanly; 50,000 cNGN budget = up to 20 FCFS payouts
           cooldownHours: 0,
-        },
-        {
-          stageIndex: 2,
-          title: "Stage 2 — Day-2 Product Spotlight",
-          instructions: `Return after 12h with an original follow-up post or spec comparison featuring a second live product on ${storeHost} with ${partner.handle} and #SWOTBlackFriday.`,
-          rewardLocalAtomic: parseTokenAmount("3500", "cNGN").toString(),
-          cooldownHours: 12,
         },
       ],
       budgetUsdtHuman: partner.campaignBudgetUsdt, // ~$35 USDT ≈ 50,000 cNGN
       maxPerPayoutUsdtHuman: "6",
       dailyLimitUsdtHuman: "20",
-      maxPayoutsPerRecipient: 2,
-      cooldownHours: 12,
+      maxPayoutsPerRecipient: 1,
+      cooldownHours: 0,
       maxSpreadBps: 250,
       minPassScore: 75,
     },
@@ -90,26 +83,18 @@ export function buildDefaultCampaignBlueprints(): CampaignSeedBlueprint[] {
       stages: [
         {
           stageIndex: 1,
-          title: "Stage 1 — Reproducible QA Issue",
+          title: "Reproducible QA Issue or Patch PR",
           instructions:
-            "File a reproducible GitHub issue on github.com/eugenennamdi/Vire with steps, expected vs actual output, and verification evidence.",
+            "File a reproducible GitHub issue or patch PR on github.com/eugenennamdi/Vire with clear steps, expected vs actual behavior, and verification evidence. First-come, first-served — 1 verified payout per contributor.",
           rewardLocalAtomic: parseTokenAmount("2500", "wARS").toString(), // ~$1.43 clears $1 floor
           cooldownHours: 0,
-        },
-        {
-          stageIndex: 2,
-          title: "Stage 2 — Verified Patch PR",
-          instructions:
-            "Open a clean pull request resolving an open issue or edge case with typecheck and test verification.",
-          rewardLocalAtomic: parseTokenAmount("4000", "wARS").toString(),
-          cooldownHours: 12,
         },
       ],
       budgetUsdtHuman: "2", // Matches live onchain VireVault allocation ($2.00 USDT)
       maxPerPayoutUsdtHuman: "5",
       dailyLimitUsdtHuman: "10",
-      maxPayoutsPerRecipient: 2,
-      cooldownHours: 12,
+      maxPayoutsPerRecipient: 1,
+      cooldownHours: 0,
       maxSpreadBps: 300,
       minPassScore: 75,
     },

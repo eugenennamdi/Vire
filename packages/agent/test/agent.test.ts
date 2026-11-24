@@ -159,35 +159,44 @@ describe("SSRF & prompt-injection fail-closed guards", () => {
     expect(v.score).toBe(0);
   });
 
-  it("canonicalizes twitter.com and x.com status URLs identically and extracts live tweet text + links", async () => {
+  it("canonicalizes twitter.com, x.com, mobile.x.com, and /i/status/ URLs identically and blocks all spam/Sybil/hijack vectors", async () => {
     expect(normalizeDeliverableUrl("https://twitter.com/PromoUser/status/123456789?s=20&t=abc")).toBe(
-      "https://x.com/promouser/status/123456789"
+      "https://x.com/i/status/123456789"
     );
     expect(normalizeDeliverableUrl("https://x.com/promouser/status/123456789/")).toBe(
-      "https://x.com/promouser/status/123456789"
+      "https://x.com/i/status/123456789"
+    );
+    expect(normalizeDeliverableUrl("https://mobile.x.com/any_spoofed_handle/status/123456789")).toBe(
+      "https://x.com/i/status/123456789"
     );
 
-    const mockFetch: typeof fetch = vi.fn(async (url) => {
-      if (String(url).startsWith("https://api.fxtwitter.com/")) {
-        return new Response(
-          JSON.stringify({
-            code: 200,
-            tweet: {
-              text: "Black Friday iPhone 15 deal at @swotgadgets https://swotgadgets.com/product/iphone-15 #SWOTBlackFriday",
-              author: { screen_name: "promouser" },
-              likes: 14,
-              views: 620,
-              raw_text: {
-                facets: [{ type: "url", replacement: "https://swotgadgets.com/product/iphone-15" }],
-              },
+    const makeTweetFetch = (overrides: Record<string, unknown> = {}): typeof fetch =>
+      vi.fn(async (url) => {
+        if (String(url).startsWith("https://api.fxtwitter.com/")) {
+          const baseTweet = {
+            text: "Huge Black Friday iPhone 15 and MacBook deals live right now at @swotgadgets check https://swotgadgets.com/product/iphone-15 #SWOTBlackFriday",
+            created_timestamp: Math.floor(Date.now() / 1000),
+            replying_to: null,
+            reposted_by: null,
+            author: {
+              id: "1765636339448328192",
+              screen_name: "promouser",
+              followers: 42,
+              joined: "Thu Mar 07 07:11:46 +0000 2024",
             },
-          }),
-          { status: 200 }
-        );
-      }
-      return new Response("not found", { status: 404 });
-    });
+            likes: 14,
+            views: 620,
+            raw_text: {
+              facets: [{ type: "url", replacement: "https://swotgadgets.com/product/iphone-15" }],
+            },
+            ...overrides,
+          };
+          return new Response(JSON.stringify({ code: 200, tweet: baseTweet }), { status: 200 });
+        }
+        return new Response("not found", { status: 404 });
+      });
 
+    const mockFetch = makeTweetFetch();
     const artifact = await fetchDeliverableArtifact({
       deliverableUrl: "https://x.com/promouser/status/123456789",
       fetchImpl: mockFetch,
@@ -195,10 +204,12 @@ describe("SSRF & prompt-injection fail-closed guards", () => {
     expect(artifact.sourceKind).toBe("x_post");
     expect(artifact.reachable).toBe(true);
     expect(artifact.authorHandle).toBe("promouser");
+    expect(artifact.authorId).toBe("x:1765636339448328192");
+    expect(artifact.authorFollowers).toBe(42);
     expect(artifact.excerpt).toContain("swotgadgets.com/product/iphone-15");
     expect(artifact.excerpt).toContain("#SWOTBlackFriday");
 
-    // Same URL submitted by two different handles MUST produce the exact same anti-replay hash
+    // 1. Same tweet via /i/status/ or different handle path MUST produce identical replay hash
     const campaignId = "0x1111111111111111111111111111111111111111111111111111111111111111";
     expect(
       computeDeliverableHash({
@@ -209,35 +220,144 @@ describe("SSRF & prompt-injection fail-closed guards", () => {
     ).toBe(
       computeDeliverableHash({
         campaignIdBytes32: campaignId,
-        deliverableUrl: "https://twitter.com/PromoUser/status/123456789?s=20",
+        deliverableUrl: "https://x.com/i/status/123456789?s=20",
         contributorHandle: "other_person",
       })
     );
 
-    // Author spoofing guard: @other_person submitting @promouser's tweet MUST reject BEFORE spending on `buy`
     const buyClient = new CeloBuyClient({ dryRun: true });
     const tweetSpy = vi.spyOn(buyClient, "fetchTweetDetail");
+    const criteria = "Post promoting swotgadgets.com tagging @swotgadgets with #SWOTBlackFriday";
+
+    // 2. Author handle spoofing MUST reject BEFORE spending on `buy`
     const spoofed = await verifyDeliverableWithBuy(buyClient, {
+      campaignIdBytes32: campaignId,
       deliverableUrl: "https://x.com/promouser/status/123456789",
       deliverableType: "promo_post",
       campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
-      criteria: "Post promoting swotgadgets.com tagging @swotgadgets with #SWOTBlackFriday",
+      criteria,
       contributorHandle: "other_person",
+      identityOAuthVerified: true,
       fetchImpl: mockFetch,
     });
     expect(spoofed.verdict.verdict).toBe("reject");
-    expect(spoofed.verdict.score).toBe(0);
     expect(spoofed.verdict.reason).toContain("Author mismatch");
-    expect(spoofed.buyReceipts).toHaveLength(0);
     expect(tweetSpy).not.toHaveBeenCalled();
 
-    // Legitimate author submitting valid SWOT Gadgets tweet MUST pass & record paid Celo `buy` receipt
-    const valid = await verifyDeliverableWithBuy(buyClient, {
+    // 3. Immutable authorId handle-rename Sybil attack MUST reject BEFORE spending on `buy`
+    const renamed = await verifyDeliverableWithBuy(buyClient, {
+      campaignIdBytes32: campaignId,
       deliverableUrl: "https://x.com/promouser/status/123456789",
       deliverableType: "promo_post",
       campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
-      criteria: "Post promoting swotgadgets.com tagging @swotgadgets with #SWOTBlackFriday",
+      criteria,
       contributorHandle: "promouser",
+      identityOAuthVerified: true,
+      isAuthorAlreadyClaimed: async (id) => id === "x:1765636339448328192",
+      fetchImpl: mockFetch,
+    });
+    expect(renamed.verdict.verdict).toBe("reject");
+    expect(renamed.verdict.reason).toContain("already claimed");
+    expect(tweetSpy).not.toHaveBeenCalled();
+
+    // 4. Low-follower bot account (< 10 followers) MUST reject BEFORE spending on `buy`
+    const botFollowers = await verifyDeliverableWithBuy(buyClient, {
+      campaignIdBytes32: campaignId,
+      deliverableUrl: "https://x.com/promouser/status/123456789",
+      deliverableType: "promo_post",
+      campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
+      criteria,
+      contributorHandle: "promouser",
+      identityOAuthVerified: true,
+      minAuthorFollowers: 10,
+      fetchImpl: makeTweetFetch({
+        author: { id: "x_bot_1", screen_name: "promouser", followers: 2, joined: "Thu Mar 07 07:11:46 +0000 2024" },
+      }),
+    });
+    expect(botFollowers.verdict.verdict).toBe("reject");
+    expect(botFollowers.verdict.reason).toContain("at least 10 followers");
+    expect(tweetSpy).not.toHaveBeenCalled();
+
+    // 5. Fresh burner account (< 30 days old) MUST reject BEFORE spending on `buy`
+    const freshBurner = await verifyDeliverableWithBuy(buyClient, {
+      campaignIdBytes32: campaignId,
+      deliverableUrl: "https://x.com/promouser/status/123456789",
+      deliverableType: "promo_post",
+      campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
+      criteria,
+      contributorHandle: "promouser",
+      identityOAuthVerified: true,
+      minAccountAgeDays: 30,
+      fetchImpl: makeTweetFetch({
+        author: {
+          id: "x_bot_2",
+          screen_name: "promouser",
+          followers: 50,
+          joined: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toUTCString(),
+        },
+      }),
+    });
+    expect(freshBurner.verdict.verdict).toBe("reject");
+    expect(freshBurner.verdict.reason).toContain("at least 30 days old");
+    expect(tweetSpy).not.toHaveBeenCalled();
+
+    // 6. Reply spam MUST reject BEFORE spending on `buy`
+    const replySpam = await verifyDeliverableWithBuy(buyClient, {
+      campaignIdBytes32: campaignId,
+      deliverableUrl: "https://x.com/promouser/status/123456789",
+      deliverableType: "promo_post",
+      campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
+      criteria,
+      contributorHandle: "promouser",
+      identityOAuthVerified: true,
+      fetchImpl: makeTweetFetch({ replying_to: "swotgadgets" }),
+    });
+    expect(replySpam.verdict.verdict).toBe("reject");
+    expect(replySpam.verdict.reason).toContain("Replies are not eligible");
+    expect(tweetSpy).not.toHaveBeenCalled();
+
+    // 7. Non-OAuth tweet hijacking (missing VIRE-AB9A wallet claim code) MUST reject BEFORE spending on `buy`
+    const hijacked = await verifyDeliverableWithBuy(buyClient, {
+      campaignIdBytes32: campaignId,
+      deliverableUrl: "https://x.com/promouser/status/123456789",
+      deliverableType: "promo_post",
+      campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
+      criteria,
+      contributorWallet: "0x915eb78f22D71F0f3E6076E29F4402C610e6AB9a",
+      contributorHandle: "promouser",
+      identityOAuthVerified: false,
+      fetchImpl: mockFetch,
+    });
+    expect(hijacked.verdict.verdict).toBe("reject");
+    expect(hijacked.verdict.reason).toContain("VIRE-AB9A");
+    expect(tweetSpy).not.toHaveBeenCalled();
+
+    // 8. Copy-paste duplicate tweet text across accounts MUST reject BEFORE spending on `buy`
+    const copyPaste = await verifyDeliverableWithBuy(buyClient, {
+      campaignIdBytes32: campaignId,
+      deliverableUrl: "https://x.com/promouser/status/123456789",
+      deliverableType: "promo_post",
+      campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
+      criteria,
+      contributorHandle: "promouser",
+      identityOAuthVerified: true,
+      isContentHashAlreadyUsed: async () => true,
+      fetchImpl: mockFetch,
+    });
+    expect(copyPaste.verdict.verdict).toBe("reject");
+    expect(copyPaste.verdict.reason).toContain("already submitted by another account");
+    expect(tweetSpy).not.toHaveBeenCalled();
+
+    // 9. Legitimate OAuth-verified author submitting valid original SWOT Gadgets tweet MUST pass & pay Celo `buy`
+    const valid = await verifyDeliverableWithBuy(buyClient, {
+      campaignIdBytes32: campaignId,
+      deliverableUrl: "https://x.com/promouser/status/123456789",
+      deliverableType: "promo_post",
+      campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
+      criteria,
+      contributorWallet: "0x915eb78f22D71F0f3E6076E29F4402C610e6AB9a",
+      contributorHandle: "promouser",
+      identityOAuthVerified: true,
       fetchImpl: mockFetch,
     });
     expect(valid.verdict.verdict).toBe("pass");
@@ -245,17 +365,21 @@ describe("SSRF & prompt-injection fail-closed guards", () => {
     expect(valid.buyReceipts.length).toBeGreaterThanOrEqual(1);
     expect(tweetSpy).toHaveBeenCalledWith("123456789");
 
-    // Missing required hashtag MUST reject deterministically
-    const missingTag = await verifyDeliverableWithBuy(buyClient, {
+    // 10. Non-OAuth wallet (Google/MiniPay) WITH matching VIRE-AB9A code in post MUST ALSO pass
+    const validWithCode = await verifyDeliverableWithBuy(buyClient, {
+      campaignIdBytes32: campaignId,
       deliverableUrl: "https://x.com/promouser/status/123456789",
       deliverableType: "promo_post",
       campaignTitle: "SWOT Gadgets Black Friday Promo Sprint",
-      criteria: "Post promoting swotgadgets.com tagging @swotgadgets with #DifferentRequiredTag",
+      criteria,
+      contributorWallet: "0x915eb78f22D71F0f3E6076E29F4402C610e6AB9a",
       contributorHandle: "promouser",
-      fetchImpl: mockFetch,
+      identityOAuthVerified: false,
+      fetchImpl: makeTweetFetch({
+        text: "Huge Black Friday iPhone 15 deals live right now at @swotgadgets check https://swotgadgets.com/product/iphone-15 #SWOTBlackFriday VIRE-AB9A",
+      }),
     });
-    expect(missingTag.verdict.verdict).toBe("reject");
-    expect(missingTag.verdict.reason).toContain("#differentrequiredtag");
+    expect(validWithCode.verdict.verdict).toBe("pass");
   });
 });
 

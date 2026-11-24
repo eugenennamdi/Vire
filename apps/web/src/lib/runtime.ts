@@ -22,7 +22,7 @@ import {
   type CorridorSymbol,
 } from "@vire/shared";
 import { TextileClient } from "@vire/textile";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { erc20Abi, getAddress, isAddress, type Address, type Hash, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { ensureDatabaseReady, getDb, schema } from "@/db";
@@ -339,16 +339,24 @@ export function createDrizzlePersistenceAdapter(): OrchestratorPersistenceAdapte
       return false;
     },
 
-    async getContributorPayoutStats(campaignIdBytes32: Hex, wallet: Address) {
+    async getContributorPayoutStats(campaignIdBytes32: Hex, wallet: Address, identityHandle?: string | null) {
       await ensureDatabaseReady();
       const db = getDb();
+      const walletLower = wallet.toLowerCase();
+      const handleLower = identityHandle?.trim().replace(/^@/, "").toLowerCase() || null;
+
       const rows = await db
         .select({ settledAt: schema.settlements.settledAt })
         .from(schema.settlements)
         .where(
           and(
             eq(schema.settlements.campaignId, campaignIdBytes32),
-            eq(schema.settlements.recipientWallet, wallet.toLowerCase())
+            handleLower
+              ? or(
+                  eq(schema.settlements.recipientWallet, walletLower),
+                  eq(schema.settlements.identityHandle, handleLower)
+                )
+              : eq(schema.settlements.recipientWallet, walletLower)
           )
         )
         .orderBy(desc(schema.settlements.settledAt));
@@ -357,6 +365,38 @@ export function createDrizzlePersistenceAdapter(): OrchestratorPersistenceAdapte
         count: rows.length,
         lastPayoutAtMs: rows[0]?.settledAt ?? null,
       };
+    },
+
+    async isAuthorIdClaimedInCampaign(campaignIdBytes32: Hex, authorId: string): Promise<boolean> {
+      await ensureDatabaseReady();
+      const db = getDb();
+      const rows = await db
+        .select({ id: schema.settlements.id })
+        .from(schema.settlements)
+        .where(
+          and(
+            eq(schema.settlements.campaignId, campaignIdBytes32),
+            eq(schema.settlements.authorId, authorId)
+          )
+        )
+        .limit(1);
+      return rows.length > 0;
+    },
+
+    async isContentHashUsedInCampaign(campaignIdBytes32: Hex, contentHash: Hex): Promise<boolean> {
+      await ensureDatabaseReady();
+      const db = getDb();
+      const rows = await db
+        .select({ id: schema.settlements.id })
+        .from(schema.settlements)
+        .where(
+          and(
+            eq(schema.settlements.campaignId, campaignIdBytes32),
+            eq(schema.settlements.contentHash, contentHash)
+          )
+        )
+        .limit(1);
+      return rows.length > 0;
     },
 
     async updateSubmissionStatus(submissionId, patch) {
@@ -440,6 +480,9 @@ export function createDrizzlePersistenceAdapter(): OrchestratorPersistenceAdapte
         submissionId: record.submissionId,
         campaignId: record.campaignIdBytes32,
         recipientWallet: record.recipientWallet.toLowerCase(),
+        identityHandle: record.identityHandle?.trim().replace(/^@/, "").toLowerCase() ?? null,
+        authorId: record.authorId ?? null,
+        contentHash: record.contentHash ?? null,
         corridor: record.corridor,
         localTokenAddress: record.localTokenAddress,
         localAmountAtomic: record.localAmountAtomic,

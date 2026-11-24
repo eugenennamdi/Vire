@@ -51,14 +51,23 @@ export interface OrchestratorCampaignRecord {
   stageCooldownHours: number;
   maxSpreadBps: number;
   minPassScore: number;
+  createdAtMs?: number;
+  minAuthorFollowers?: number;
+  minAccountAgeDays?: number;
 }
 
 export interface OrchestratorPersistenceAdapter {
   isDeliverableHashUsed(deliverableHash: Hex): Promise<boolean>;
-  getContributorPayoutStats(campaignIdBytes32: Hex, wallet: Address): Promise<{
+  getContributorPayoutStats(
+    campaignIdBytes32: Hex,
+    wallet: Address,
+    identityHandle?: string | null
+  ): Promise<{
     count: number;
     lastPayoutAtMs: number | null;
   }>;
+  isAuthorIdClaimedInCampaign?(campaignIdBytes32: Hex, authorId: string): Promise<boolean>;
+  isContentHashUsedInCampaign?(campaignIdBytes32: Hex, contentHash: Hex): Promise<boolean>;
   updateSubmissionStatus(submissionId: string, patch: {
     status: SubmissionStatus;
     policyPassed?: boolean;
@@ -78,6 +87,9 @@ export interface OrchestratorPersistenceAdapter {
     submissionId: string;
     campaignIdBytes32: Hex;
     recipientWallet: Address;
+    identityHandle?: string | null;
+    authorId?: string | null;
+    contentHash?: Hex | null;
     corridor: CorridorSymbol;
     localTokenAddress: Address;
     localAmountAtomic: string;
@@ -126,6 +138,7 @@ export interface ProcessSubmissionParams {
   contributorWallet: Address;
   identityVerified: boolean;
   identityHandle: string | null;
+  identityOAuthVerified?: boolean;
   deliverableUrl: string;
   deliverableNotes?: string;
   referralCode?: string;
@@ -230,7 +243,11 @@ export class SettlementOrchestrator {
         .catch((): RfqPreviewData | null => null),
       this.resolveReferenceRate(campaign.corridor),
       this.deps.persistence.isDeliverableHashUsed(deliverableHash),
-      this.deps.persistence.getContributorPayoutStats(campaign.idBytes32, contributorWallet),
+      this.deps.persistence.getContributorPayoutStats(
+        campaign.idBytes32,
+        contributorWallet,
+        params.identityHandle
+      ),
     ]);
 
     const walletLower = contributorWallet.toLowerCase();
@@ -257,11 +274,25 @@ export class SettlementOrchestrator {
     // 1b. Run Paid Verification via Celo `buy` ONLY when contributor & campaign pre-checks pass
     const verification = preEligible
       ? await verifyDeliverableWithBuy(this.deps.buyClient, {
+          campaignIdBytes32: campaign.idBytes32,
           deliverableUrl: params.deliverableUrl,
           deliverableType: campaign.deliverableType,
           campaignTitle: campaign.title,
           criteria: campaign.criteria,
+          contributorWallet,
           contributorHandle: params.identityHandle ?? undefined,
+          identityOAuthVerified: params.identityOAuthVerified,
+          campaignCreatedAtMs: campaign.createdAtMs,
+          minAuthorFollowers: campaign.minAuthorFollowers,
+          minAccountAgeDays: campaign.minAccountAgeDays,
+          isAuthorAlreadyClaimed: this.deps.persistence.isAuthorIdClaimedInCampaign
+            ? (authorId) =>
+                this.deps.persistence.isAuthorIdClaimedInCampaign!(campaign.idBytes32, authorId)
+            : undefined,
+          isContentHashAlreadyUsed: this.deps.persistence.isContentHashUsedInCampaign
+            ? (contentHash) =>
+                this.deps.persistence.isContentHashUsedInCampaign!(campaign.idBytes32, contentHash)
+            : undefined,
           deliverableNotes: params.deliverableNotes,
           referralCode: params.referralCode,
           githubApiToken: this.deps.githubApiToken,
@@ -273,6 +304,7 @@ export class SettlementOrchestrator {
             sourceKind: "web_post" as const,
             title: "Pre-check skipped",
             authorHandle: null,
+            authorId: null,
             excerpt: "",
             httpStatus: 0,
             reachable: false,
@@ -286,6 +318,7 @@ export class SettlementOrchestrator {
           },
           buyReceipts: [] as BuyPaymentReceipt[],
           modelUsed: "pre-check-shortcircuit",
+          contentHash: null,
         };
 
     for (const receipt of verification.buyReceipts) {
@@ -542,6 +575,9 @@ export class SettlementOrchestrator {
       submissionId,
       campaignIdBytes32: campaign.idBytes32,
       recipientWallet: contributorWallet,
+      identityHandle: params.identityHandle,
+      authorId: verification.artifact.authorId ?? null,
+      contentHash: verification.contentHash ?? null,
       corridor: campaign.corridor,
       localTokenAddress: corridorMeta.tokenAddress,
       localAmountAtomic: exactBuyAmount.toString(),

@@ -10,7 +10,11 @@ import {
   Signature,
   WarningCircle,
 } from "@phosphor-icons/react";
-import { usePrivy, useSignMessage as usePrivySignMessage } from "@privy-io/react-auth";
+import {
+  useIdentityToken,
+  usePrivy,
+  useSignMessage as usePrivySignMessage,
+} from "@privy-io/react-auth";
 import { useQuery } from "@tanstack/react-query";
 import {
   CELO_CONTRACTS,
@@ -34,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfettiBurst } from "@/components/ui/confetti-burst";
+import { CopyButton } from "@/components/ui/copy-button";
 import { FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TokenIcon } from "@/components/ui/token-icon";
@@ -64,6 +69,9 @@ interface CampaignItem {
   title: string;
   corridor: string;
   partnerName: string;
+  deliverableType: string;
+  maxPayoutsPerRecipient: number;
+  spotsRemaining?: number;
   stages: Array<{
     stageIndex: number;
     title: string;
@@ -98,6 +106,7 @@ interface PrivyBridgeProps {
   privyWalletAddress?: Address;
   privyTwitterHandle?: string | null;
   privyGithubHandle?: string | null;
+  privyIdentityToken?: string | null;
   privySignMessage?: (message: string) => Promise<string>;
 }
 
@@ -106,6 +115,7 @@ function ClaimFlowInner({
   privyWalletAddress,
   privyTwitterHandle,
   privyGithubHandle,
+  privyIdentityToken,
   privySignMessage,
 }: PrivyBridgeProps) {
   const searchParams = useSearchParams();
@@ -187,10 +197,12 @@ function ClaimFlowInner({
       return (await r.json()) as {
         githubSession: { login: string; profileUrl: string } | null;
         githubOAuthConfigured: boolean;
+        hasWalletSession?: boolean;
         contributor: {
           identityProvider: string;
           identityHandle: string;
           identityProfileUrl: string;
+          oauthVerified?: boolean;
         } | null;
         completedBySlug?: Record<string, { count: number; lastPayoutAtMs: number | null }>;
       };
@@ -247,9 +259,23 @@ function ClaimFlowInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSlug, expectedNextStage, hasExplicitStageParam, Boolean(activeCampaign)]);
 
-  const profileLinked = Boolean(identityData?.contributor);
+  const profileLinked = Boolean(identityData?.contributor && identityData?.hasWalletSession);
+  const maxPayoutsForCampaign = activeCampaign?.maxPayoutsPerRecipient ?? 1;
+  const alreadyClaimedCampaign = completedCountForCampaign >= maxPayoutsForCampaign;
+  const poolFull =
+    typeof activeCampaign?.spotsRemaining === "number" && activeCampaign.spotsRemaining <= 0;
+  const walletClaimCode = address ? `VIRE-${address.replace(/^0x/i, "").slice(-4).toUpperCase()}` : null;
+  const needsAntiHijackCode = Boolean(
+    isSignedIn &&
+      activeCampaign?.deliverableType === "promo_post" &&
+      walletClaimCode &&
+      !identityData?.contributor?.oauthVerified
+  );
   const stageMismatchNote =
-    activeCampaign && expectedNextStage <= activeCampaign.stages.length && stageIndex !== expectedNextStage
+    activeCampaign &&
+    activeCampaign.stages.length > 1 &&
+    expectedNextStage <= activeCampaign.stages.length &&
+    stageIndex !== expectedNextStage
       ? `Complete Stage ${expectedNextStage} first before submitting Stage ${stageIndex}.`
       : null;
 
@@ -281,6 +307,7 @@ function ClaimFlowInner({
           provider,
           handle: cleanHandle,
           signature,
+          privyIdentityToken: privyIdentityToken ?? undefined,
         }),
       });
       const json = (await res.json()) as { verified?: boolean; error?: string; handle?: string };
@@ -485,12 +512,14 @@ function ClaimFlowInner({
                 <h2 className="text-[15px] font-medium text-[#0A0A0C]">Link your profile</h2>
               </div>
 
-              {identityData?.contributor ? (
+              {identityData?.contributor && identityData?.hasWalletSession ? (
                 <Badge tone="positive">
                   <Check weight="bold" className="h-3 w-3" />
                   {identityData.contributor.identityProvider}: @
                   {identityData.contributor.identityHandle}
                 </Badge>
+              ) : identityData?.contributor ? (
+                <Badge tone="neutral">Re-sign to confirm session</Badge>
               ) : (
                 <Badge tone="neutral">Not linked</Badge>
               )}
@@ -608,34 +637,70 @@ function ClaimFlowInner({
                   </Select>
                 </div>
 
-                <div className="min-w-0 space-y-1.5">
-                  <FieldLabel htmlFor="claim-stage">Stage</FieldLabel>
-                  <Select
-                    id="claim-stage"
-                    value={stageIndex}
-                    onChange={(e) => setStageIndex(Number(e.target.value))}
-                  >
-                    {(activeCampaign?.stages ?? []).map((s) => (
-                      <option key={s.stageIndex} value={s.stageIndex}>
-                        Stage {s.stageIndex} — {s.rewardLocalFormatted} {activeCampaign?.corridor}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+                {activeCampaign && activeCampaign.stages.length > 1 && (
+                  <div className="min-w-0 space-y-1.5">
+                    <FieldLabel htmlFor="claim-stage">Stage</FieldLabel>
+                    <Select
+                      id="claim-stage"
+                      value={stageIndex}
+                      onChange={(e) => setStageIndex(Number(e.target.value))}
+                    >
+                      {activeCampaign.stages.map((s) => (
+                        <option key={s.stageIndex} value={s.stageIndex}>
+                          Stage {s.stageIndex} — {s.rewardLocalFormatted} {activeCampaign.corridor}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
               </div>
 
               {activeStage && activeCampaign && (
-                <div className="vire-well rounded-xl p-4">
+                <div className="vire-well space-y-2.5 rounded-xl p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
-                    <span className="font-medium text-[#0A0A0C]">{activeStage.title}</span>
-                    <span className="inline-flex items-center gap-1.5 font-mono font-medium text-[#0A0A0C] tabular-nums">
-                      <TokenIcon symbol={activeCampaign.corridor} size={16} />
-                      {activeStage.rewardLocalFormatted} {activeCampaign.corridor}
+                    <span className="font-medium text-[#0A0A0C]">
+                      {activeStage.title.replace(/^Stage \d+\s*[—-]\s*/i, "")}
                     </span>
+                    <div className="flex items-center gap-2">
+                      {typeof activeCampaign.spotsRemaining === "number" && (
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 font-mono text-[10.5px] font-medium",
+                            activeCampaign.spotsRemaining > 0
+                              ? "bg-white text-[#52525B] ring-1 ring-black/[0.07]"
+                              : "bg-[#FEF2F2] text-[#B91C1C]"
+                          )}
+                        >
+                          {activeCampaign.spotsRemaining > 0
+                            ? `FCFS · ${activeCampaign.spotsRemaining} left`
+                            : "Pool full"}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1.5 font-mono font-medium text-[#0A0A0C] tabular-nums">
+                        <TokenIcon symbol={activeCampaign.corridor} size={16} />
+                        {activeStage.rewardLocalFormatted} {activeCampaign.corridor}
+                      </span>
+                    </div>
                   </div>
-                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#52525B]">
+                  <p className="text-[12.5px] leading-relaxed text-[#52525B]">
                     {activeStage.instructions}
                   </p>
+                  {needsAntiHijackCode && walletClaimCode && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-[12px] ring-1 ring-black/[0.07]">
+                      <span className="text-[#52525B]">
+                        Include your code{" "}
+                        <span className="font-mono font-semibold text-[#0A0A0C]">
+                          {walletClaimCode}
+                        </span>{" "}
+                        in your post to prevent spoofing
+                      </span>
+                      <CopyButton
+                        value={walletClaimCode}
+                        label="Copy"
+                        toastMessage={`Copied ${walletClaimCode}`}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -688,6 +753,19 @@ function ClaimFlowInner({
                 />
               </div>
 
+              {alreadyClaimedCampaign && (
+                <div className="flex items-center gap-2 rounded-xl bg-[#F0FDF4] px-3.5 py-2.5 text-[12.5px] font-medium text-[#15803D] ring-1 ring-[#16A34A]/20">
+                  <Check weight="bold" className="h-4 w-4 shrink-0" />
+                  <span>You&apos;ve already claimed this campaign (1 verified payout per person).</span>
+                </div>
+              )}
+
+              {!alreadyClaimedCampaign && poolFull && (
+                <div className="rounded-xl bg-[#FEF2F2] px-3.5 py-2.5 text-[12.5px] text-[#B91C1C] ring-1 ring-[#DC2626]/20">
+                  All FCFS spots in this campaign pool have been claimed. Check back when the next wave opens.
+                </div>
+              )}
+
               {stageMismatchNote && (
                 <div className="rounded-xl bg-[#FEF2F2] px-3.5 py-2.5 text-[12px] text-[#B91C1C] ring-1 ring-[#DC2626]/20">
                   {stageMismatchNote}
@@ -698,7 +776,13 @@ function ClaimFlowInner({
                 type="submit"
                 size="lg"
                 variant="primary"
-                disabled={!isSignedIn || !profileLinked || isSubmitting}
+                disabled={
+                  !isSignedIn ||
+                  !profileLinked ||
+                  alreadyClaimedCampaign ||
+                  poolFull ||
+                  isSubmitting
+                }
                 className="w-full"
               >
                 {isSubmitting ? (
@@ -706,8 +790,19 @@ function ClaimFlowInner({
                     <CircleNotch className="h-4 w-4 animate-spin" />
                     Verifying and paying…
                   </>
+                ) : alreadyClaimedCampaign ? (
+                  <>
+                    <Check weight="bold" className="h-4 w-4" />
+                    Already claimed
+                  </>
+                ) : poolFull ? (
+                  <>Pool full</>
                 ) : isSignedIn && !profileLinked ? (
-                  <>Link your profile in Step 01 first</>
+                  <>
+                    {identityData?.contributor
+                      ? "Re-sign Step 01 to confirm wallet"
+                      : "Link your profile in Step 01 first"}
+                  </>
                 ) : (
                   <>
                     Verify &amp; get paid
@@ -1050,6 +1145,7 @@ function ClaimFlowInner({
 
 function ClaimFlowWithPrivy() {
   const { login, user } = usePrivy();
+  const { identityToken } = useIdentityToken();
   const { signMessage } = usePrivySignMessage();
 
   return (
@@ -1058,6 +1154,7 @@ function ClaimFlowWithPrivy() {
       privyWalletAddress={user?.wallet?.address as Address | undefined}
       privyTwitterHandle={user?.twitter?.username ?? null}
       privyGithubHandle={user?.github?.username ?? null}
+      privyIdentityToken={identityToken}
       privySignMessage={async (message) => {
         const res = await signMessage({ message });
         return res.signature;

@@ -80,6 +80,7 @@ const DDL_STATEMENTS = [
     identity_handle TEXT NOT NULL,
     identity_profile_url TEXT,
     eip191_signature TEXT,
+    oauth_verified INTEGER NOT NULL DEFAULT 0,
     verified_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS submissions (
@@ -125,6 +126,9 @@ const DDL_STATEMENTS = [
     submission_id TEXT NOT NULL UNIQUE REFERENCES submissions(id),
     campaign_id TEXT NOT NULL REFERENCES campaigns(id),
     recipient_wallet TEXT NOT NULL,
+    identity_handle TEXT,
+    author_id TEXT,
+    content_hash TEXT,
     corridor TEXT NOT NULL,
     local_token_address TEXT NOT NULL,
     local_amount_atomic TEXT NOT NULL,
@@ -165,13 +169,27 @@ const DDL_STATEMENTS = [
   )`,
 ];
 
-/** Ensure schema tables exist idempotently on cold start before querying. */
+const ADDITIVE_MIGRATIONS = [
+  `ALTER TABLE contributors ADD COLUMN oauth_verified INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE settlements ADD COLUMN identity_handle TEXT`,
+  `ALTER TABLE settlements ADD COLUMN author_id TEXT`,
+  `ALTER TABLE settlements ADD COLUMN content_hash TEXT`,
+];
+
+/** Ensure schema tables & additive anti-Sybil columns exist idempotently on cold start before querying. */
 export async function ensureDatabaseReady(): Promise<void> {
   if (!_initPromise) {
     _initPromise = (async () => {
       const client = getLibsqlClient();
       for (const stmt of DDL_STATEMENTS) {
         await client.execute(stmt);
+      }
+      for (const alter of ADDITIVE_MIGRATIONS) {
+        try {
+          await client.execute(alter);
+        } catch {
+          // Column already exists on live DB
+        }
       }
     })();
   }

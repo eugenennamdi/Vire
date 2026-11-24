@@ -8,11 +8,12 @@ import {
   type CorridorSymbol,
   type DeliverableType,
 } from "@vire/shared";
-import { eq } from "drizzle-orm";
+import { and, eq, gt, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { getAddress, type Hex } from "viem";
 import { ensureDatabaseReady, getDb, schema } from "@/db";
 import { ensureDefaultCampaignsSeeded } from "@/db/seed";
+import { verifyWalletSessionCookie, WALLET_SESSION_COOKIE } from "@/lib/session";
 import {
   createDrizzlePersistenceAdapter,
   createLiveOrchestrator,
@@ -45,6 +46,20 @@ export async function POST(req: NextRequest) {
   const wallet = getAddress(parsed.data.contributorWallet);
   const walletLower = wallet.toLowerCase();
 
+  // Require signed HttpOnly wallet session issued during Step 01 EIP-191 profile link
+  // (prevents unauthenticated curl/bot scripts from impersonating other wallets).
+  const walletSession = verifyWalletSessionCookie(req.cookies.get(WALLET_SESSION_COOKIE)?.value);
+  if (!walletSession || walletSession.wallet !== walletLower) {
+    return NextResponse.json(
+      {
+        status: "REJECTED",
+        failedRule: "VERIFIED_EXTERNAL_IDENTITY",
+        error: "Please sign Step 01 (Link your profile) to confirm wallet ownership before submitting.",
+      },
+      { status: 401 }
+    );
+  }
+
   const campaignRows = await db
     .select()
     .from(schema.campaigns)
@@ -54,6 +69,53 @@ export async function POST(req: NextRequest) {
   const campaignRow = campaignRows[0];
   if (!campaignRow) {
     return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+  }
+
+  const now = Date.now();
+
+  // Atomic in-flight concurrency lock (closes 2-tab simultaneous double-spend race)
+  const inFlight = await db
+    .select({ id: schema.submissions.id })
+    .from(schema.submissions)
+    .where(
+      and(
+        eq(schema.submissions.contributorWallet, walletLower),
+        inArray(schema.submissions.status, ["SUBMITTED", "VERIFYING", "AUTHORIZED", "SWAPPING", "PAYING"]),
+        gt(schema.submissions.updatedAt, now - 120_000)
+      )
+    )
+    .limit(1);
+
+  if (inFlight.length > 0) {
+    return NextResponse.json(
+      {
+        status: "REJECTED",
+        error: "A payout for your wallet is already being processed. Please wait a moment.",
+      },
+      { status: 429 }
+    );
+  }
+
+  // Per-wallet burst rate limit (max 5 attempts / 10 minutes — protects Celo `buy` balance)
+  const recentAttempts = await db
+    .select({ id: schema.submissions.id })
+    .from(schema.submissions)
+    .where(
+      and(
+        eq(schema.submissions.contributorWallet, walletLower),
+        gt(schema.submissions.updatedAt, now - 10 * 60 * 1000)
+      )
+    )
+    .limit(6);
+
+  if (recentAttempts.length >= 5) {
+    return NextResponse.json(
+      {
+        status: "REJECTED",
+        error: "Too many submission attempts in the last 10 minutes. Please wait a few minutes and try again.",
+      },
+      { status: 429 }
+    );
   }
 
   const stages = JSON.parse(campaignRow.stagesJson) as CampaignStage[];
@@ -95,7 +157,6 @@ export async function POST(req: NextRequest) {
   }
 
   const submissionId = existingSub[0]?.id ?? `sub_${randomUUID()}`;
-  const now = Date.now();
   if (!existingSub[0]) {
     await db.insert(schema.submissions).values({
       id: submissionId,
@@ -153,11 +214,15 @@ export async function POST(req: NextRequest) {
           stageCooldownHours: selectedStage.cooldownHours,
           maxSpreadBps: syncedCampaign.maxSpreadBps,
           minPassScore: syncedCampaign.minPassScore,
+          createdAtMs: syncedCampaign.createdAt,
+          minAuthorFollowers: 10,
+          minAccountAgeDays: 30,
         },
         stageIndex: selectedStage.stageIndex,
         contributorWallet: wallet,
         identityVerified: Boolean(contributor),
         identityHandle: contributor?.identityHandle ?? null,
+        identityOAuthVerified: Boolean(contributor?.oauthVerified),
         deliverableUrl: parsed.data.deliverableUrl,
         deliverableNotes: parsed.data.deliverableNotes,
         referralCode: parsed.data.referralCode,

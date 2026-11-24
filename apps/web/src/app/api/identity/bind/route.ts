@@ -6,7 +6,10 @@ import { ensureDatabaseReady, getDb, schema } from "@/db";
 import {
   buildIdentityBindMessage,
   GITHUB_SESSION_COOKIE,
+  signWalletSession,
+  verifyPrivyOAuthOwnership,
   verifySessionCookie,
+  WALLET_SESSION_COOKIE,
 } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +19,7 @@ const BindBodySchema = z.object({
   provider: z.enum(["github", "x", "signed_proof"]),
   handle: z.string().min(2).max(64).regex(/^@?[a-zA-Z0-9._-]+$/, "Invalid handle format"),
   signature: z.string().regex(/^0x[0-9a-fA-F]+$/, "Invalid EIP-191 signature"),
+  privyIdentityToken: z.string().max(8192).optional().nullable(),
 });
 
 export async function POST(req: NextRequest) {
@@ -41,10 +45,26 @@ export async function POST(req: NextRequest) {
         : `https://celoscan.io/address/${wallet}`;
 
   // If GitHub OAuth session cookie exists, enforce matching GitHub login
+  let oauthVerified = false;
   const ghSession = verifySessionCookie(req.cookies.get(GITHUB_SESSION_COOKIE)?.value);
   if (provider === "github" && ghSession) {
     cleanHandle = ghSession.login;
     profileUrl = ghSession.profileUrl;
+    oauthVerified = true;
+  }
+
+  // Cryptographically verify Privy ES256 Identity Token for X or GitHub OAuth ownership when provided
+  if (
+    !oauthVerified &&
+    (provider === "x" || provider === "github") &&
+    parsed.data.privyIdentityToken
+  ) {
+    oauthVerified = await verifyPrivyOAuthOwnership({
+      identityToken: parsed.data.privyIdentityToken,
+      walletAddress: wallet,
+      provider,
+      handle: cleanHandle,
+    });
   }
 
   // Cryptographically verify EIP-191 signature from the contributor's wallet
@@ -77,6 +97,7 @@ export async function POST(req: NextRequest) {
       identityHandle: cleanHandle,
       identityProfileUrl: profileUrl,
       eip191Signature: signature,
+      oauthVerified,
       verifiedAt: now,
     })
     .onConflictDoUpdate({
@@ -86,16 +107,35 @@ export async function POST(req: NextRequest) {
         identityHandle: cleanHandle,
         identityProfileUrl: profileUrl,
         eip191Signature: signature,
+        oauthVerified,
         verifiedAt: now,
       },
     });
 
-  return NextResponse.json({
+  const sessionCookie = signWalletSession({
+    wallet: wallet.toLowerCase(),
+    handle: cleanHandle,
+    provider,
+    iat: now,
+  });
+
+  const res = NextResponse.json({
     verified: true,
+    oauthVerified,
     walletAddress: wallet,
     provider,
     handle: cleanHandle,
     profileUrl,
     verifiedAt: now,
   });
+
+  res.cookies.set(WALLET_SESSION_COOKIE, sessionCookie, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 7 * 24 * 60 * 60,
+  });
+
+  return res;
 }

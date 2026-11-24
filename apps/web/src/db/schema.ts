@@ -34,6 +34,7 @@ export const contributors = sqliteTable("contributors", {
   identityHandle: text("identity_handle").notNull(),
   identityProfileUrl: text("identity_profile_url"),
   eip191Signature: text("eip191_signature"),
+  oauthVerified: integer("oauth_verified", { mode: "boolean" }).notNull().default(false),
   verifiedAt: integer("verified_at").notNull(),
 });
 
@@ -95,6 +96,9 @@ export const settlements = sqliteTable("settlements", {
     .notNull()
     .references(() => campaigns.id),
   recipientWallet: text("recipient_wallet").notNull(),
+  identityHandle: text("identity_handle"),
+  authorId: text("author_id"),
+  contentHash: text("content_hash"),
   corridor: text("corridor").notNull(),
   localTokenAddress: text("local_token_address").notNull(),
   localAmountAtomic: text("local_amount_atomic").notNull(),
