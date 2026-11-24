@@ -32,9 +32,9 @@ export function CopyButton({ value, label, toastMessage, className }: CopyButton
       onClick={handleCopy}
       aria-label={label ? `Copy ${label}` : "Copy to clipboard"}
       className={cn(
-        "vire-pressable inline-flex items-center gap-1.5 rounded border border-[#E5E5E5] bg-white px-2 py-1 font-mono text-[11px] text-[#525252]",
-        "hover:border-[#A3A3A3] hover:text-[#111111]",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/20",
+        "vire-pressable inline-flex items-center gap-1.5 rounded-md border border-black/[0.09] bg-card px-2 py-1 font-mono text-[11px] text-muted-foreground shadow-[0_1px_1px_rgba(0,0,0,0.02)]",
+        "hover:border-black/[0.2] hover:text-foreground",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20",
         className
       )}
     >
@@ -49,7 +49,7 @@ export function CopyButton({ value, label, toastMessage, className }: CopyButton
         <Check
           weight="bold"
           className={cn(
-            "absolute h-3.5 w-3.5 text-[#111111] transition-[opacity,transform,filter] duration-[180ms] ease-[cubic-bezier(0.23,1,0.32,1)]",
+            "absolute h-3.5 w-3.5 text-foreground transition-[opacity,transform,filter] duration-[180ms] ease-[cubic-bezier(0.23,1,0.32,1)]",
             copied ? "scale-100 opacity-100 blur-0" : "scale-75 opacity-0 blur-[2px]"
           )}
         />

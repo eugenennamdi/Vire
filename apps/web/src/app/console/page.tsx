@@ -139,28 +139,33 @@ console.log(await res.json());`;
   return (
     <div className="space-y-8">
       <div className="vire-enter">
-        <h1 className="text-2xl font-semibold tracking-[-0.03em] text-[#111111] sm:text-[28px]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Operator &amp; Agent Tools
+        </p>
+        <h1 className="mt-1.5 text-3xl font-semibold tracking-[-0.035em] text-foreground">
           Console
         </h1>
-        <p className="mt-1 max-w-[60ch] text-sm text-[#525252]">
-          <code className="font-mono text-xs text-[#111111]">VireVault</code> custody state, token
-          decimals registry, and live HTTP 402 testing against{" "}
-          <code className="font-mono text-xs text-[#111111]">api.x402.celo.org</code>.
+        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-muted-foreground">
+          Live <code className="font-mono text-xs text-foreground">VireVault</code> custody state,
+          verified Celo Mainnet token decimals, and interactive HTTP 402 testing against{" "}
+          <code className="font-mono text-xs text-foreground">api.x402.celo.org</code>.
         </p>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-12 lg:items-start">
+      <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
         {/* Left: VireVault + Token Registry */}
         <div className="space-y-6 lg:col-span-5">
           <Card className="vire-enter vire-delay-1 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-[#E5E5E5] bg-[#FAFAFA] px-5 py-3">
-              <h2 className="text-xs font-medium text-[#111111]">VireVault custody</h2>
+            <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                VireVault custody
+              </h2>
               <Badge tone={vault?.deployed && !vault.paused ? "ink" : "neutral"}>
-                {vault?.deployed ? (vault.paused ? "Paused" : "Active · 42220") : "Unconfigured"}
+                {vault?.deployed ? (vault.paused ? "PAUSED" : "ACTIVE · 42220") : "UNCONFIGURED"}
               </Badge>
             </div>
 
-            <dl className="divide-y divide-[#E5E5E5] px-5 font-mono text-xs">
+            <dl className="divide-y divide-black/[0.06] px-6 font-mono text-xs">
               {[
                 { label: "Vault", value: vault?.address, copy: true },
                 { label: "Owner", value: vault?.owner, copy: true },
@@ -184,8 +189,8 @@ console.log(await res.json());`;
                 },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between gap-3 py-3">
-                  <dt className="text-[#737373]">{row.label}</dt>
-                  <dd className="flex min-w-0 items-center gap-1.5 text-[#111111] tabular-nums">
+                  <dt className="text-muted-foreground">{row.label}</dt>
+                  <dd className="flex min-w-0 items-center gap-1.5 text-foreground tabular-nums">
                     <span className="truncate">
                       {row.value && row.value.startsWith("0x")
                         ? truncateMiddle(row.value, 8, 6)
@@ -200,12 +205,12 @@ console.log(await res.json());`;
             </dl>
 
             {vault?.deployed && vault.address && (
-              <div className="flex items-center justify-between gap-2 border-t border-[#E5E5E5] bg-[#FAFAFA] px-5 py-3">
+              <div className="flex items-center justify-between gap-2 border-t border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
                 <a
                   href={`https://celoscan.io/address/${vault.address}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-mono text-xs text-[#111111] underline underline-offset-2"
+                  className="inline-flex items-center gap-1 font-mono text-xs text-foreground underline underline-offset-2"
                 >
                   Celoscan <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>
@@ -229,25 +234,29 @@ console.log(await res.json());`;
           </Card>
 
           <Card className="vire-enter vire-delay-2 overflow-hidden">
-            <div className="border-b border-[#E5E5E5] bg-[#FAFAFA] px-5 py-3">
-              <h3 className="text-xs font-medium text-[#111111]">Token decimals (Celo 42220)</h3>
+            <div className="border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                Token decimals · Celo 42220
+              </h3>
             </div>
-            <div className="divide-y divide-[#E5E5E5] font-mono text-[11px]">
+            <div className="divide-y divide-black/[0.06] font-mono text-[11.5px]">
               {Object.values(CELO_TOKENS).map((t) => (
-                <div key={t.symbol} className="flex items-center justify-between px-5 py-2.5">
-                  <span className="font-medium text-[#111111]">{t.displaySymbol}</span>
-                  <span className="text-[#737373]">{truncateMiddle(t.address, 8, 5)}</span>
-                  <span className="text-[#525252] tabular-nums">{t.decimals}dp</span>
+                <div key={t.symbol} className="flex items-center justify-between px-6 py-3">
+                  <span className="font-medium text-foreground">{t.displaySymbol}</span>
+                  <span className="text-muted-foreground">{truncateMiddle(t.address, 8, 5)}</span>
+                  <span className="text-foreground/80 tabular-nums">{t.decimals}dp</span>
                 </div>
               ))}
             </div>
           </Card>
         </div>
 
-        {/* Right: x402 Playground */}
-        <Card className="vire-enter vire-delay-1 overflow-hidden lg:col-span-7">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E5E5] bg-[#FAFAFA] px-5 py-3">
-            <h2 className="font-mono text-xs font-medium text-[#111111]">POST /api/x402/verify</h2>
+        {/* Right: Elevated x402 Playground */}
+        <Card elevated className="vire-enter vire-delay-1 overflow-hidden lg:col-span-7">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
+            <h2 className="font-mono text-xs font-semibold text-foreground">
+              POST /api/x402/verify
+            </h2>
 
             <div className="flex flex-wrap items-center gap-2">
               <SegmentedTabs
@@ -270,18 +279,18 @@ console.log(await res.json());`;
             </div>
           </div>
 
-          <div className="space-y-5 p-5">
+          <div className="space-y-5 p-6">
             {x402Status !== null ? (
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#E5E5E5] bg-[#FAFAFA] px-3.5 py-2.5 font-mono text-xs">
+                <div className="surface-well flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 font-mono text-xs">
                   <div className="flex items-center gap-2.5">
                     <Badge tone={x402Status === 402 ? "ink" : "outline"}>HTTP {x402Status}</Badge>
-                    <span className="text-[#525252]">
+                    <span className="text-muted-foreground">
                       {x402Status === 402 ? "x402 v2 Payment Required" : "Response received"}
                     </span>
                   </div>
                   {x402LatencyMs !== null && (
-                    <span className="text-[11px] text-[#737373] tabular-nums">
+                    <span className="text-[11px] text-muted-foreground tabular-nums">
                       {x402LatencyMs}ms
                     </span>
                   )}
@@ -290,7 +299,7 @@ console.log(await res.json());`;
                 {x402DecodedHeader && (
                   <div>
                     <div className="mb-1.5 flex items-center justify-between">
-                      <span className="font-mono text-[11px] text-[#737373]">
+                      <span className="font-mono text-[11px] text-muted-foreground">
                         Decoded payment-required header
                       </span>
                       <CopyButton
@@ -299,7 +308,7 @@ console.log(await res.json());`;
                         toastMessage="Challenge copied"
                       />
                     </div>
-                    <pre className="max-h-80 overflow-auto rounded-md border border-[#E5E5E5] bg-[#FAFAFA] p-4 font-mono text-[11px] leading-relaxed text-[#111111]">
+                    <pre className="surface-well max-h-80 overflow-auto rounded-xl p-4 font-mono text-[11px] leading-relaxed text-foreground">
                       {x402DecodedHeader}
                     </pre>
                   </div>
@@ -307,28 +316,30 @@ console.log(await res.json());`;
 
                 {x402Body && (
                   <div>
-                    <div className="mb-1.5 font-mono text-[11px] text-[#737373]">Response body</div>
-                    <pre className="max-h-32 overflow-auto rounded-md border border-[#E5E5E5] bg-[#FAFAFA] p-3 font-mono text-[11px] text-[#525252]">
+                    <div className="mb-1.5 font-mono text-[11px] text-muted-foreground">
+                      Response body
+                    </div>
+                    <pre className="surface-well max-h-32 overflow-auto rounded-xl p-3 font-mono text-[11px] text-muted-foreground">
                       {x402Body}
                     </pre>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="rounded-md border border-dashed border-[#D4D4D4] bg-[#FAFAFA] px-5 py-7 text-center">
-                <p className="text-xs font-medium text-[#111111]">
+              <div className="surface-well rounded-xl px-5 py-8 text-center">
+                <p className="text-xs font-medium text-foreground">
                   Send an unpaid POST request to inspect the live HTTP 402 challenge.
                 </p>
-                <p className="mt-1 text-xs text-[#737373]">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Decodes EIP-3009 and Permit2 payment requirements from{" "}
-                  <code className="font-mono text-[#111111]">POST /api/x402/verify</code>.
+                  <code className="font-mono text-foreground">POST /api/x402/verify</code>.
                 </p>
               </div>
             )}
 
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-mono text-[11px] text-[#737373]">
+                <span className="font-mono text-[11px] text-muted-foreground">
                   @x402/fetch client example
                 </span>
                 <CopyButton
@@ -337,7 +348,7 @@ console.log(await res.json());`;
                   toastMessage="Snippet copied"
                 />
               </div>
-              <pre className="overflow-x-auto rounded-md border border-[#E5E5E5] bg-[#FAFAFA] p-4 font-mono text-[11px] leading-relaxed text-[#111111]">
+              <pre className="surface-well overflow-x-auto rounded-xl p-4 font-mono text-[11px] leading-relaxed text-foreground">
                 {sdkSnippet}
               </pre>
             </div>

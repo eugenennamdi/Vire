@@ -1,3 +1,4 @@
+import { ArrowUpRight } from "@phosphor-icons/react/dist/ssr";
 import { CELO_CONTRACTS, celoscanAddressUrl, DEFAULT_ATTRIBUTION_CODE } from "@vire/shared";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -31,7 +32,7 @@ const DEFAULT_DESCRIPTION =
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#ffffff",
+  themeColor: "#f5f5f5",
   colorScheme: "light",
 };
 
@@ -157,7 +158,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="min-h-[100dvh] bg-white font-sans text-[#111111] antialiased">
+      <body className="min-h-[100dvh] bg-background font-sans text-foreground antialiased">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -165,7 +166,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-[#111111] focus:px-3 focus:py-2 focus:text-xs focus:font-medium focus:text-white"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-foreground focus:px-3 focus:py-2 focus:text-xs focus:font-medium focus:text-primary-foreground"
         >
           Skip to content
         </a>
@@ -175,63 +176,160 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <Navbar />
             <main
               id="main-content"
-              className="mx-auto w-full max-w-[1160px] flex-1 px-4 pb-20 pt-10 sm:px-6 lg:px-8"
+              className="mx-auto w-full max-w-[1240px] flex-1 px-4 pb-24 pt-10 sm:px-6 lg:px-8"
             >
               {children}
             </main>
 
-            <footer className="border-t border-[#E5E5E5] bg-white">
-              <div className="mx-auto flex max-w-[1160px] flex-col items-start justify-between gap-3 px-4 py-6 font-mono text-[11px] text-[#737373] sm:flex-row sm:items-center sm:px-6 lg:px-8">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                  <span className="inline-flex items-center gap-1.5 font-medium text-[#111111]">
-                    <VireMark variant="bare" size={14} />
-                    Vire
-                  </span>
-                  <span>Celo 42220</span>
-                  <span>{attributionCode}</span>
-                  {vaultAddress && (
-                    <a
-                      href={celoscanAddressUrl(vaultAddress)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="transition-colors hover:text-[#111111]"
+            {/* Full-Bleed Architectural Multi-Column Footer Slab */}
+            <footer className="border-t border-black/[0.06] bg-card">
+              <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 lg:px-8">
+                <div className="grid grid-cols-2 gap-10 border-b border-black/[0.06] pb-10 md:grid-cols-12">
+                  {/* Brand Column */}
+                  <div className="col-span-2 space-y-3.5 md:col-span-5">
+                    <Link
+                      href="/"
+                      className="inline-flex items-center gap-2 text-[14px] font-semibold tracking-[-0.025em] text-foreground transition-opacity hover:opacity-80"
                     >
-                      VireVault
-                    </a>
-                  )}
-                  <a
-                    href={celoscanAddressUrl(CELO_CONTRACTS.TEXTILE_LIMIT_ORDER_REACTOR)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="transition-colors hover:text-[#111111]"
-                  >
-                    Textile
-                  </a>
-                  <a
-                    href={celoscanAddressUrl(CELO_CONTRACTS.ERC8004_IDENTITY_REGISTRY)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="transition-colors hover:text-[#111111]"
-                  >
-                    ERC-8004{agentId ? ` #${agentId}` : ""}
-                  </a>
+                      <VireMark variant="bare" size={16} />
+                      <span>Vire</span>
+                    </Link>
+                    <p className="max-w-xs text-[13px] leading-[1.6] text-muted-foreground">
+                      Proof-of-work verification, bounded onchain USD₮ custody, and exact-output
+                      local stablecoin clearing on Celo Mainnet.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 text-xs font-medium text-muted-foreground">
+                      <a
+                        href="https://github.com/eugenennamdi/Vire"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+                      >
+                        <span>GitHub</span>
+                        <ArrowUpRight className="h-3 w-3" />
+                      </a>
+                      <Link
+                        href="/api/agent-card.json"
+                        className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+                      >
+                        <span>Agent Card</span>
+                        <ArrowUpRight className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Column 1: Product */}
+                  <nav aria-label="Product" className="space-y-3 md:col-span-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground">
+                      Product
+                    </div>
+                    <ul className="space-y-2 text-xs text-muted-foreground">
+                      <li>
+                        <Link href="/" className="transition-colors hover:text-foreground">
+                          Overview
+                        </Link>
+                      </li>
+                      <li>
+                        <Link href="/campaigns" className="transition-colors hover:text-foreground">
+                          Campaigns
+                        </Link>
+                      </li>
+                      <li>
+                        <Link href="/claim" className="transition-colors hover:text-foreground">
+                          Submit claim
+                        </Link>
+                      </li>
+                      <li>
+                        <Link href="/ledger" className="transition-colors hover:text-foreground">
+                          Audit ledger
+                        </Link>
+                      </li>
+                      <li>
+                        <Link href="/console" className="transition-colors hover:text-foreground">
+                          x402 Console
+                        </Link>
+                      </li>
+                    </ul>
+                  </nav>
+
+                  {/* Column 2: Contracts & Standards */}
+                  <nav aria-label="Contracts" className="space-y-3 md:col-span-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground">
+                      Onchain &amp; APIs
+                    </div>
+                    <ul className="space-y-2 text-xs text-muted-foreground">
+                      {vaultAddress && (
+                        <li>
+                          <a
+                            href={celoscanAddressUrl(vaultAddress)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+                          >
+                            <span>VireVault</span>
+                            <ArrowUpRight className="h-3 w-3" />
+                          </a>
+                        </li>
+                      )}
+                      <li>
+                        <a
+                          href={celoscanAddressUrl(CELO_CONTRACTS.TEXTILE_LIMIT_ORDER_REACTOR)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+                        >
+                          <span>Textile FX Reactor</span>
+                          <ArrowUpRight className="h-3 w-3" />
+                        </a>
+                      </li>
+                      <li>
+                        <a
+                          href={celoscanAddressUrl(CELO_CONTRACTS.ERC8004_IDENTITY_REGISTRY)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+                        >
+                          <span>ERC-8004{agentId ? ` #${agentId}` : ""}</span>
+                          <ArrowUpRight className="h-3 w-3" />
+                        </a>
+                      </li>
+                      <li>
+                        <a
+                          href="/api/corridors/live"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+                        >
+                          <span>Corridors API</span>
+                          <ArrowUpRight className="h-3 w-3" />
+                        </a>
+                      </li>
+                    </ul>
+                  </nav>
+
+                  {/* Column 3: Corridors */}
+                  <div className="space-y-3 md:col-span-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground">
+                      Corridors
+                    </div>
+                    <ul className="space-y-2 font-mono text-xs text-muted-foreground">
+                      <li>cNGN · Nigeria</li>
+                      <li>wARS · Argentina</li>
+                      <li>wBRL · Brazil</li>
+                      <li>IDRX · Indonesia</li>
+                      <li>wMXN · Mexico</li>
+                    </ul>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <Link
-                    href="/api/agent-card.json"
-                    className="transition-colors hover:text-[#111111]"
-                  >
-                    agent-card.json
-                  </Link>
-                  <a
-                    href="https://github.com/eugenennamdi/Vire"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="transition-colors hover:text-[#111111]"
-                  >
-                    GitHub
-                  </a>
+                <div className="flex flex-col items-start justify-between gap-2 pt-6 text-[11px] text-muted-foreground sm:flex-row sm:items-center">
+                  <span>
+                    Non-custodial USD₮ settlement vault · ERC-8021{" "}
+                    <code className="font-mono text-foreground/80">{attributionCode}</code>
+                  </span>
+                  <span className="font-mono tabular-nums">
+                    © {new Date().getFullYear()} Vire · Celo Chain 42220
+                  </span>
                 </div>
               </div>
             </footer>
