@@ -12,7 +12,6 @@ import {
   Pause,
   Play,
   Plus,
-  ShieldCheck,
   UserSwitch,
   X,
 } from "@phosphor-icons/react";
@@ -497,10 +496,7 @@ export default function ManagePage() {
                   Waiting for signature…
                 </>
               ) : (
-                <>
-                  <ShieldCheck weight="fill" className="h-4 w-4" />
-                  Sign to verify wallet
-                </>
+                "Sign to verify wallet"
               )}
             </Button>
           </div>

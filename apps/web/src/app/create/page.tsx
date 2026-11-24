@@ -8,7 +8,6 @@ import {
   Globe,
   LinkSimple,
   LockSimple,
-  ShieldCheck,
   Sparkle,
   UserCheck,
   Warning,
@@ -1200,13 +1199,11 @@ export default function CreateCampaignPage() {
                 </Button>
               )}
 
-              <div className="flex items-start gap-2 text-[11.5px] leading-relaxed text-[#71717A]">
-                <ShieldCheck weight="fill" className="mt-0.5 h-4 w-4 shrink-0 text-[#0A0A0C]" />
-                <span>
-                  Non-custodial: only your wallet can pause, top up, or withdraw unspent USDT at
-                  any time. Includes a 3% FX cushion; unused dust refunds back to your pool on every payout.
-                </span>
-              </div>
+              <p className="text-[11.5px] leading-relaxed text-[#71717A]">
+                <span className="font-medium text-[#0A0A0C]">Note:</span> Only your wallet can
+                pause, top up, or withdraw unspent USDT at any time. Includes a 3% FX cushion;
+                unused dust refunds back to your pool on every payout.
+              </p>
             </div>
           </Card>
         </div>

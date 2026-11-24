@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, BracketsCurly, FileCode, ShieldCheck } from "@phosphor-icons/react";
+import { ArrowUpRight, BracketsCurly, FileCode } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -23,8 +23,8 @@ const TABS: Array<{
     id: "vault",
     label: "VireVault.sol",
     meta: "Celo Mainnet · Verified Solidity 0.8.28",
-    href: "https://celo.blockscout.com/address/0x86140c2aFd04c9dEC2AB71EA74953Bce70C5a9BF?tab=contract",
-    linkLabel: "Blockscout",
+    href: "https://celoscan.io/address/0x8969060F1605A6C351210323169Efb226667b26f",
+    linkLabel: "Celoscan",
     icon: <FileCode weight="regular" className="h-3.5 w-3.5" />,
     lines: [
       { segments: [{ text: "// SPDX-License-Identifier: MIT — Celo Mainnet 42220", tone: "comment" }] },
@@ -61,7 +61,7 @@ const TABS: Array<{
       {
         segments: [
           { text: "  if ", tone: "keyword" },
-          { text: "(recipient == settlementAgent || recipient == owner())", tone: "default" },
+          { text: "(recipient == settlementAgent || recipient == owner() || recipient == c.creator)", tone: "default" },
         ],
       },
       {
@@ -104,7 +104,7 @@ const TABS: Array<{
     meta: "packages/agent · Deterministic 7-rule verifier",
     href: "https://github.com/eugenennamdi/Vire/blob/main/packages/agent/src/policy-gate.ts",
     linkLabel: "GitHub",
-    icon: <ShieldCheck weight="regular" className="h-3.5 w-3.5" />,
+    icon: <FileCode weight="regular" className="h-3.5 w-3.5" />,
     lines: [
       { segments: [{ text: "// Zero funds move until every deterministic check passes", tone: "comment" }] },
       {
