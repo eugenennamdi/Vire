@@ -10,6 +10,7 @@ import {
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
+import { usePrivy, useSignMessage as usePrivySignMessage } from "@privy-io/react-auth";
 import { useQuery } from "@tanstack/react-query";
 import {
   CELO_CONTRACTS,
@@ -22,7 +23,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { zeroHash } from "viem";
+import { zeroHash, type Address } from "viem";
 import { useAccount, useSignMessage, useWriteContract } from "wagmi";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -84,7 +85,23 @@ interface SubmissionResponse {
   error?: string;
 }
 
-function ClaimFlowInner() {
+const PRIVY_ENABLED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim());
+
+interface PrivyBridgeProps {
+  onSignIn?: () => void;
+  privyWalletAddress?: Address;
+  privyTwitterHandle?: string | null;
+  privyGithubHandle?: string | null;
+  privySignMessage?: (message: string) => Promise<string>;
+}
+
+function ClaimFlowInner({
+  onSignIn,
+  privyWalletAddress,
+  privyTwitterHandle,
+  privyGithubHandle,
+  privySignMessage,
+}: PrivyBridgeProps) {
   const searchParams = useSearchParams();
   const initialSlug = searchParams.get("campaign") || "";
   const initialStageParam = Number(searchParams.get("stage") || "1");
@@ -93,13 +110,16 @@ function ClaimFlowInner() {
       ? initialStageParam
       : 1;
 
-  const { address, isConnected } = useAccount();
+  const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const { writeContractAsync, isPending: isRatingTxPending } = useWriteContract();
 
+  const address = wagmiAddress ?? privyWalletAddress;
+  const isSignedIn = Boolean(address);
+
   const [selectedSlug, setSelectedSlug] = useState(initialSlug);
   const [stageIndex, setStageIndex] = useState(validInitialStage);
-  const [provider, setProvider] = useState<"github" | "x" | "signed_proof">("github");
+  const [provider, setProvider] = useState<"github" | "x" | "signed_proof">("x");
   const [handle, setHandle] = useState("");
   const [deliverableUrl, setDeliverableUrl] = useState("");
   const [deliverableNotes, setDeliverableNotes] = useState("");
@@ -153,11 +173,18 @@ function ClaimFlowInner() {
   }, [campData, selectedSlug]);
 
   useEffect(() => {
-    if (identityData?.githubSession?.login && !handle) {
+    if (handle) return;
+    if (privyTwitterHandle) {
+      setProvider("x");
+      setHandle(privyTwitterHandle);
+    } else if (privyGithubHandle) {
+      setProvider("github");
+      setHandle(privyGithubHandle);
+    } else if (identityData?.githubSession?.login) {
       setProvider("github");
       setHandle(identityData.githubSession.login);
     }
-  }, [identityData, handle]);
+  }, [identityData, handle, privyTwitterHandle, privyGithubHandle]);
 
   const activeCampaign = campData?.campaigns.find((c) => c.slug === selectedSlug);
   const activeStage =
@@ -178,7 +205,11 @@ function ClaimFlowInner() {
         provider,
         handle: cleanHandle,
       });
-      const signature = await signMessageAsync({ message });
+      const signature = wagmiConnected
+        ? await signMessageAsync({ message })
+        : privySignMessage
+          ? await privySignMessage(message)
+          : await signMessageAsync({ message });
       const res = await fetch("/api/identity/bind", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -284,8 +315,8 @@ function ClaimFlowInner() {
           Submit work
         </h1>
         <p className="mt-1 max-w-[60ch] text-[14px] leading-relaxed text-[#71717A]">
-          Connect your Celo wallet, link your profile, and submit your link to get automatically
-          verified and paid in local currency.
+          Sign in with Google, email, or a Celo wallet, link your profile, and submit your link to
+          get automatically verified and paid in local currency.
         </p>
       </div>
 
@@ -311,10 +342,17 @@ function ClaimFlowInner() {
               )}
             </div>
 
-            {!isConnected ? (
-              <div className="vire-well mt-4 flex items-center gap-2.5 rounded-xl px-4 py-3 text-[13px] text-[#52525B]">
-                <WarningCircle weight="regular" className="h-4 w-4 shrink-0 text-[#0A0A0C]" />
-                <span>Connect your Celo wallet in the header to link your profile.</span>
+            {!isSignedIn ? (
+              <div className="vire-well mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 text-[13px] text-[#52525B]">
+                <div className="flex items-center gap-2.5">
+                  <WarningCircle weight="regular" className="h-4 w-4 shrink-0 text-[#0A0A0C]" />
+                  <span>Sign in to link your profile and receive payouts.</span>
+                </div>
+                {onSignIn && (
+                  <Button type="button" size="sm" variant="primary" onClick={onSignIn}>
+                    Sign in
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="mt-4 space-y-3">
@@ -481,7 +519,7 @@ function ClaimFlowInner() {
                     id="recipient-wallet"
                     type="text"
                     readOnly
-                    value={address ?? "Connect wallet above"}
+                    value={address ?? "Sign in above"}
                     className="font-mono text-[#71717A]"
                   />
                 </div>
@@ -502,7 +540,7 @@ function ClaimFlowInner() {
                 type="submit"
                 size="lg"
                 variant="primary"
-                disabled={!isConnected || isSubmitting}
+                disabled={!isSignedIn || isSubmitting}
                 className="w-full"
               >
                 {isSubmitting ? (
@@ -791,6 +829,24 @@ function ClaimFlowInner() {
   );
 }
 
+function ClaimFlowWithPrivy() {
+  const { login, user } = usePrivy();
+  const { signMessage } = usePrivySignMessage();
+
+  return (
+    <ClaimFlowInner
+      onSignIn={() => login()}
+      privyWalletAddress={user?.wallet?.address as Address | undefined}
+      privyTwitterHandle={user?.twitter?.username ?? null}
+      privyGithubHandle={user?.github?.username ?? null}
+      privySignMessage={async (message) => {
+        const res = await signMessage({ message });
+        return res.signature;
+      }}
+    />
+  );
+}
+
 export default function ClaimPage() {
   return (
     <Suspense
@@ -801,7 +857,7 @@ export default function ClaimPage() {
         </div>
       }
     >
-      <ClaimFlowInner />
+      {PRIVY_ENABLED ? <ClaimFlowWithPrivy /> : <ClaimFlowInner />}
     </Suspense>
   );
 }

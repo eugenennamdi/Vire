@@ -15,6 +15,8 @@
   "dependencies": {
     "@libsql/client": "^0.14.0",
     "@phosphor-icons/react": "^2.1.10",
+    "@privy-io/react-auth": "^3.52.1",
+    "@privy-io/wagmi": "^4.0.20",
     "@tanstack/react-query": "^5.71.0",
     "@vire/agent": "workspace:*",
     "@vire/celo-infra": "workspace:*",

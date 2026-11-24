@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
       ".js": [".ts", ".tsx", ".js"],
       ".mjs": [".mts", ".mjs"],
     };
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@x402/svm/exact/client": false,
+      "@react-native-async-storage/async-storage": false,
+      "pino-pretty": false,
+    };
     return config;
   },
 };
