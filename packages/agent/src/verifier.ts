@@ -1,6 +1,7 @@
 import { CeloBuyClient } from "@vire/celo-infra";
 import {
   VerificationVerdictSchema,
+  type AutoVerificationRules,
   type BuyPaymentReceipt,
   type DeliverableType,
   type VerificationVerdict,
@@ -31,6 +32,8 @@ export interface VerifyDeliverableInput {
   minAuthorFollowers?: number;
   /** Minimum X account age in days required for promo_post anti-bot filter (default 30 when authorJoinedAtMs is reported). */
   minAccountAgeDays?: number;
+  /** Optional structured auto-verification rules configured by self-serve campaign owners. */
+  autoRules?: AutoVerificationRules | null;
   /** Optional server-side callback blocking an immutable platform authorId that already claimed this campaign. */
   isAuthorAlreadyClaimed?: (authorId: string) => Promise<boolean>;
   /** Optional server-side callback blocking exact copy-pasted post text within the same campaign. */
@@ -166,6 +169,32 @@ export function evaluateDeliverableDeterministically(
     }
   }
 
+  // 4b. Explicit structured auto-verification rules (configured by self-serve campaign owners)
+  if (input.autoRules) {
+    if (input.autoRules.platform === "x" && artifact.sourceKind !== "x_post") {
+      missing.push("public X (Twitter) post URL");
+    } else if (
+      input.autoRules.platform === "github" &&
+      artifact.sourceKind !== "github_pr" &&
+      artifact.sourceKind !== "github_issue"
+    ) {
+      missing.push("public GitHub issue or pull request URL");
+    }
+
+    const urlLower = artifact.normalizedUrl.toLowerCase();
+    for (const rawToken of input.autoRules.requiredTokens) {
+      const needle = rawToken.trim().toLowerCase();
+      if (!needle) continue;
+      if (combinedLower.includes(needle) || urlLower.includes(needle)) {
+        if (!matched.some((m) => m.toLowerCase().includes(needle))) {
+          matched.push(`match "${rawToken.trim()}"`);
+        }
+      } else if (!missing.some((m) => m.toLowerCase().includes(needle))) {
+        missing.push(`required "${rawToken.trim()}"`);
+      }
+    }
+  }
+
   if (missing.length > 0) {
     const score = Math.max(15, Math.min(55, 55 - missing.length * 15));
     return {
@@ -282,7 +311,40 @@ export async function verifyDeliverableWithBuy(
     };
   }
 
-  // Deterministic fail-closed pre-LLM guards (prevents wasting paid `buy` calls on unreachable or spoofed links)
+  // Deterministic fail-closed pre-LLM guards (prevents wasting paid `buy` calls on wrong-platform, unreachable, or spoofed links)
+  if (input.autoRules?.platform === "x" && artifact.sourceKind !== "x_post") {
+    return {
+      artifact,
+      verdict: {
+        verdict: "reject",
+        score: 0,
+        confidence: 1,
+        reason: "This campaign requires a public X (Twitter) post URL.",
+        evidenceSummary: `Received ${artifact.sourceKind} instead of x_post.`,
+      },
+      buyReceipts,
+      modelUsed: "pre-llm-platform-guard",
+    };
+  }
+  if (
+    input.autoRules?.platform === "github" &&
+    artifact.sourceKind !== "github_pr" &&
+    artifact.sourceKind !== "github_issue"
+  ) {
+    return {
+      artifact,
+      verdict: {
+        verdict: "reject",
+        score: 0,
+        confidence: 1,
+        reason: "This campaign requires a public GitHub issue or pull request URL.",
+        evidenceSummary: `Received ${artifact.sourceKind} instead of GitHub PR/issue.`,
+      },
+      buyReceipts,
+      modelUsed: "pre-llm-platform-guard",
+    };
+  }
+
   if (!artifact.reachable) {
     return {
       artifact,

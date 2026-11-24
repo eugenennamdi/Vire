@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { SettlementOrchestrator, type OrchestratorPersistenceAdapter } from "@vire/agent";
 import {
   CeloBuyClient,
@@ -23,9 +23,19 @@ import {
 } from "@vire/shared";
 import { TextileClient } from "@vire/textile";
 import { and, desc, eq, or } from "drizzle-orm";
-import { erc20Abi, getAddress, isAddress, type Address, type Hash, type Hex } from "viem";
+import { erc20Abi, getAddress, isAddress, parseAbiItem, type Address, type Hash, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { ensureDatabaseReady, getDb, schema } from "@/db";
+
+export function getMinCampaignBudgetUsdtAtomic(): bigint {
+  const raw = Number(process.env.VIRE_MIN_CAMPAIGN_BUDGET_USDT?.trim() || "10");
+  const usd = Number.isFinite(raw) && raw >= 1 ? raw : 10;
+  return BigInt(Math.round(usd * 1_000_000));
+}
+
+export function hashInviteCode(code: string): string {
+  return createHash("sha256").update(code.trim().toLowerCase()).digest("hex");
+}
 
 export function getAttributionCode(): string {
   return validateAttributionCode(process.env.VIRE_ATTRIBUTION_CODE || DEFAULT_ATTRIBUTION_CODE);
@@ -156,6 +166,7 @@ export async function getVaultSnapshot(): Promise<VaultLiveSnapshot> {
 
 export interface OnchainCampaignState {
   exists: boolean;
+  creator: Address;
   active: boolean;
   vaultPaused: boolean;
   budgetUsdtAtomic: string;
@@ -173,8 +184,8 @@ function minAtomic(a: string, b: string): string {
 }
 
 /**
- * Read live onchain campaign budgets, active status, and remaining 24h daily limits from VireVault.
- * Keeps UI readouts and Policy Gate 100% synced with Celo Mainnet even after owner topUpCampaign() calls.
+ * Read live onchain campaign budgets, creator, active status, and remaining 24h daily limits from VireVault v2.
+ * Keeps UI readouts and Policy Gate 100% synced with Celo Mainnet even after creator topUpCampaign() calls.
  */
 export async function getOnchainCampaignStates(
   campaignIds: Hex[]
@@ -209,9 +220,24 @@ export async function getOnchainCampaignStates(
     ]);
 
     for (const { id, camp, remDaily } of entries) {
-      if (!camp.exists) continue;
+      if (!camp.exists) {
+        result.set(id.toLowerCase(), {
+          exists: false,
+          creator: "0x0000000000000000000000000000000000000000",
+          active: false,
+          vaultPaused: Boolean(vaultPaused),
+          budgetUsdtAtomic: "0",
+          remainingBudgetUsdtAtomic: "0",
+          maxPerPayoutUsdtAtomic: "0",
+          dailyLimitUsdtAtomic: "0",
+          remainingDailyLimitUsdtAtomic: "0",
+          maxPayoutsPerRecipient: 0,
+        });
+        continue;
+      }
       result.set(id.toLowerCase(), {
         exists: true,
+        creator: camp.creator,
         active: Boolean(camp.active && !vaultPaused),
         vaultPaused: Boolean(vaultPaused),
         budgetUsdtAtomic: camp.budgetUsdt.toString(),
@@ -229,7 +255,58 @@ export async function getOnchainCampaignStates(
   return result;
 }
 
-/** Merge a DB campaign row with its live onchain VireVault state when funded onchain. */
+const CAMPAIGN_CREATED_EVENT = parseAbiItem(
+  "event CampaignCreated(bytes32 indexed campaignId, address indexed creator, uint256 budgetUsdt, uint256 maxPerPayoutUsdt, uint256 dailyLimitUsdt, uint32 maxPayoutsPerRecipient, bool active)"
+);
+
+/**
+ * Scan VireVault v2 CampaignCreated logs for a given creator wallet so owners can ALWAYS recover
+ * funded onchain campaigns even if their browser dropped mid-publish.
+ */
+export async function getOnchainCampaignsByCreator(
+  creator: Address
+): Promise<Array<{ campaignId: Hex; txHash: Hash; state: OnchainCampaignState }>> {
+  const address = getVaultAddress();
+  if (!address) return [];
+
+  try {
+    const client = getPublicClient();
+    const deployBlockRaw = process.env.NEXT_PUBLIC_VIRE_VAULT_DEPLOY_BLOCK?.trim();
+    const fromBlock = deployBlockRaw && /^\d+$/.test(deployBlockRaw) ? BigInt(deployBlockRaw) : 83660000n;
+    const logs = await client.getLogs({
+      address,
+      event: CAMPAIGN_CREATED_EVENT,
+      args: { creator: getAddress(creator) },
+      fromBlock,
+      toBlock: "latest",
+    });
+
+    const ids = Array.from(new Set(logs.map((l) => l.args.campaignId).filter((x): x is Hex => Boolean(x))));
+    const txById = new Map<string, Hash>();
+    for (const l of logs) {
+      if (l.args.campaignId && l.transactionHash) {
+        txById.set(l.args.campaignId.toLowerCase(), l.transactionHash);
+      }
+    }
+
+    const states = await getOnchainCampaignStates(ids);
+    const out: Array<{ campaignId: Hex; txHash: Hash; state: OnchainCampaignState }> = [];
+    for (const id of ids) {
+      const state = states.get(id.toLowerCase());
+      if (!state) continue;
+      out.push({
+        campaignId: id,
+        txHash: txById.get(id.toLowerCase()) ?? ("0x0000000000000000000000000000000000000000000000000000000000000000" as Hash),
+        state,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** Merge a DB campaign row with its live onchain VireVault v2 state and optional deadline. */
 export function mergeCampaignWithOnchain<
   T extends {
     id: string;
@@ -239,19 +316,47 @@ export function mergeCampaignWithOnchain<
     maxPerPayoutUsdtAtomic: string;
     dailyLimitUsdtAtomic: string;
     maxPayoutsPerRecipient: number;
+    creatorWallet?: string | null;
+    endsAt?: number | null;
   },
->(row: T, onchainMap: Map<string, OnchainCampaignState>): T & { remainingDailyLimitUsdtAtomic: string; onchainSynced: boolean } {
+>(
+  row: T,
+  onchainMap: Map<string, OnchainCampaignState>
+): T & {
+  remainingDailyLimitUsdtAtomic: string;
+  onchainSynced: boolean;
+  onchainCreator: Address | null;
+  isExpired: boolean;
+} {
+  const isExpired = Boolean(row.endsAt && Date.now() > row.endsAt);
   const onchain = onchainMap.get(row.id.toLowerCase());
   if (!onchain) {
+    // RPC unreachable or vault not configured — fall back gracefully to DB cache
     return {
       ...row,
+      active: row.active && !isExpired,
       remainingDailyLimitUsdtAtomic: row.dailyLimitUsdtAtomic,
       onchainSynced: false,
+      onchainCreator: null,
+      isExpired,
+    };
+  }
+  if (!onchain.exists) {
+    // Confirmed on Celo Mainnet that this campaign is not funded on the active VireVault v2
+    return {
+      ...row,
+      active: false,
+      remainingUsdtAtomic: "0",
+      remainingDailyLimitUsdtAtomic: "0",
+      onchainSynced: false,
+      onchainCreator: null,
+      isExpired,
     };
   }
   return {
     ...row,
-    active: row.active && onchain.active,
+    creatorWallet: onchain.creator.toLowerCase(),
+    active: row.active && onchain.active && !isExpired,
     budgetUsdtAtomic: onchain.budgetUsdtAtomic,
     remainingUsdtAtomic: onchain.remainingBudgetUsdtAtomic,
     maxPerPayoutUsdtAtomic: minAtomic(row.maxPerPayoutUsdtAtomic, onchain.maxPerPayoutUsdtAtomic),
@@ -262,6 +367,8 @@ export function mergeCampaignWithOnchain<
     ),
     maxPayoutsPerRecipient: Math.min(row.maxPayoutsPerRecipient, onchain.maxPayoutsPerRecipient),
     onchainSynced: true,
+    onchainCreator: onchain.creator,
+    isExpired,
   };
 }
 
@@ -397,6 +504,26 @@ export function createDrizzlePersistenceAdapter(): OrchestratorPersistenceAdapte
         )
         .limit(1);
       return rows.length > 0;
+    },
+
+    async hasReceivedWelcomeGasDrip(wallet: Address): Promise<boolean> {
+      await ensureDatabaseReady();
+      const db = getDb();
+      const rows = await db
+        .select({ gasDripTxHash: schema.contributors.gasDripTxHash })
+        .from(schema.contributors)
+        .where(eq(schema.contributors.walletAddress, wallet.toLowerCase()))
+        .limit(1);
+      return Boolean(rows[0]?.gasDripTxHash);
+    },
+
+    async markWelcomeGasDripSent(wallet: Address, txHash: Hash): Promise<void> {
+      await ensureDatabaseReady();
+      const db = getDb();
+      await db
+        .update(schema.contributors)
+        .set({ gasDripTxHash: txHash })
+        .where(eq(schema.contributors.walletAddress, wallet.toLowerCase()));
     },
 
     async updateSubmissionStatus(submissionId, patch) {

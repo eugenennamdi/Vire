@@ -79,6 +79,7 @@ export const VIRE_VAULT_ABI = [
         name: "",
         type: "tuple",
         components: [
+          { name: "creator", type: "address" },
           { name: "budgetUsdt", type: "uint256" },
           { name: "remainingBudget", type: "uint256" },
           { name: "maxPerPayoutUsdt", type: "uint256" },
@@ -128,6 +129,39 @@ export const VIRE_VAULT_ABI = [
     inputs: [
       { name: "campaignId", type: "bytes32" },
       { name: "active", type: "bool" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "updateCampaignLimits",
+    inputs: [
+      { name: "campaignId", type: "bytes32" },
+      { name: "maxPerPayoutUsdt", type: "uint256" },
+      { name: "dailyLimitUsdt", type: "uint256" },
+      { name: "maxPayoutsPerRecipient", type: "uint32" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "transferCampaignCreator",
+    inputs: [
+      { name: "campaignId", type: "bytes32" },
+      { name: "newCreator", type: "address" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "withdrawUnused",
+    inputs: [
+      { name: "campaignId", type: "bytes32" },
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
     ],
     outputs: [],
     stateMutability: "nonpayable",
@@ -186,15 +220,46 @@ export const VIRE_VAULT_ABI = [
     stateMutability: "nonpayable",
   },
   {
-    type: "function",
-    name: "adminWithdrawUnused",
+    type: "event",
+    name: "CampaignCreated",
     inputs: [
-      { name: "campaignId", type: "bytes32" },
-      { name: "to", type: "address" },
-      { name: "amount", type: "uint256" },
+      { name: "campaignId", type: "bytes32", indexed: true },
+      { name: "creator", type: "address", indexed: true },
+      { name: "budgetUsdt", type: "uint256", indexed: false },
+      { name: "maxPerPayoutUsdt", type: "uint256", indexed: false },
+      { name: "dailyLimitUsdt", type: "uint256", indexed: false },
+      { name: "maxPayoutsPerRecipient", type: "uint32", indexed: false },
+      { name: "active", type: "bool", indexed: false },
     ],
-    outputs: [],
-    stateMutability: "nonpayable",
+  },
+  {
+    type: "event",
+    name: "CampaignToppedUp",
+    inputs: [
+      { name: "campaignId", type: "bytes32", indexed: true },
+      { name: "creator", type: "address", indexed: true },
+      { name: "addedUsdt", type: "uint256", indexed: false },
+      { name: "newRemainingBudget", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "CampaignCreatorTransferred",
+    inputs: [
+      { name: "campaignId", type: "bytes32", indexed: true },
+      { name: "previousCreator", type: "address", indexed: true },
+      { name: "newCreator", type: "address", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "CampaignUnusedWithdrawn",
+    inputs: [
+      { name: "campaignId", type: "bytes32", indexed: true },
+      { name: "creator", type: "address", indexed: true },
+      { name: "to", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
   },
   {
     type: "event",

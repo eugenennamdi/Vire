@@ -10,6 +10,7 @@ import {
   CORRIDORS,
   DEFAULT_ATTRIBUTION_CODE,
   VIRE_VAULT_ABI,
+  type AutoVerificationRules,
   type BuyPaymentReceipt,
   type CorridorSymbol,
   type DeliverableType,
@@ -52,6 +53,8 @@ export interface OrchestratorCampaignRecord {
   maxSpreadBps: number;
   minPassScore: number;
   createdAtMs?: number;
+  creatorWallet?: Address | null;
+  autoRules?: AutoVerificationRules | null;
   minAuthorFollowers?: number;
   minAccountAgeDays?: number;
 }
@@ -68,6 +71,8 @@ export interface OrchestratorPersistenceAdapter {
   }>;
   isAuthorIdClaimedInCampaign?(campaignIdBytes32: Hex, authorId: string): Promise<boolean>;
   isContentHashUsedInCampaign?(campaignIdBytes32: Hex, contentHash: Hex): Promise<boolean>;
+  hasReceivedWelcomeGasDrip?(wallet: Address): Promise<boolean>;
+  markWelcomeGasDripSent?(wallet: Address, txHash: Hash): Promise<void>;
   updateSubmissionStatus(submissionId: string, patch: {
     status: SubmissionStatus;
     policyPassed?: boolean;
@@ -254,6 +259,7 @@ export class SettlementOrchestrator {
     const isTeamWallet =
       this.deps.teamBlocklist.has(walletLower) ||
       (this.deps.vaultOwnerAddress && walletLower === this.deps.vaultOwnerAddress.toLowerCase()) ||
+      (campaign.creatorWallet && walletLower === campaign.creatorWallet.toLowerCase()) ||
       walletLower === this.deps.taggedWalletClient.account.address.toLowerCase();
     const cooldownMs = campaign.stageCooldownHours * 60 * 60 * 1000;
     const elapsedMs =
@@ -283,8 +289,9 @@ export class SettlementOrchestrator {
           contributorHandle: params.identityHandle ?? undefined,
           identityOAuthVerified: params.identityOAuthVerified,
           campaignCreatedAtMs: campaign.createdAtMs,
-          minAuthorFollowers: campaign.minAuthorFollowers,
-          minAccountAgeDays: campaign.minAccountAgeDays,
+          autoRules: campaign.autoRules,
+          minAuthorFollowers: campaign.autoRules?.minAuthorFollowers ?? campaign.minAuthorFollowers,
+          minAccountAgeDays: campaign.autoRules?.minAccountAgeDays ?? campaign.minAccountAgeDays,
           isAuthorAlreadyClaimed: this.deps.persistence.isAuthorIdClaimedInCampaign
             ? (authorId) =>
                 this.deps.persistence.isAuthorIdClaimedInCampaign!(campaign.idBytes32, authorId)
@@ -333,6 +340,7 @@ export class SettlementOrchestrator {
       identityHandle: params.identityHandle,
       teamBlocklist: this.deps.teamBlocklist,
       vaultOwnerAddress: this.deps.vaultOwnerAddress,
+      campaignCreatorAddress: campaign.creatorWallet ?? undefined,
       settlementAgentAddress: this.deps.taggedWalletClient.account.address,
       campaignActive: campaign.active,
       campaignRemainingBudgetUsdtAtomic: BigInt(campaign.remainingBudgetUsdtAtomic),
@@ -352,26 +360,151 @@ export class SettlementOrchestrator {
       minPassScore: campaign.minPassScore,
     });
 
+    return this.executeAfterPolicyGate({
+      submissionId,
+      campaign,
+      contributorWallet,
+      identityHandle: params.identityHandle,
+      deliverableHash,
+      requestedBuyAmountAtomic,
+      verdict: verification.verdict,
+      policyDecision,
+      buyReceipts: verification.buyReceipts,
+      authorId: verification.artifact.authorId ?? null,
+      contentHash: verification.contentHash ?? null,
+    });
+  }
+
+  /**
+   * Settle a Manual-mode submission after the campaign creator explicitly clicks "Approve & Pay".
+   * Reuses the exact same 7-rule Policy Gate + VireVault release + Textile FX swap + onchain receipt pipeline.
+   */
+  async settleManuallyApprovedSubmission(
+    params: ProcessSubmissionParams & { reviewerWallet: Address; reviewNote?: string }
+  ): Promise<ProcessSubmissionResult> {
+    const { submissionId, campaign, contributorWallet } = params;
+    const corridorMeta = CORRIDORS[campaign.corridor];
+    const requestedBuyAmountAtomic = BigInt(campaign.rewardLocalAtomic);
+    const deliverableHash = computeDeliverableHash({
+      campaignIdBytes32: campaign.idBytes32,
+      deliverableUrl: params.deliverableUrl,
+      contributorHandle: params.identityHandle ?? undefined,
+    });
+
+    await this.deps.persistence.updateSubmissionStatus(submissionId, { status: "VERIFYING" });
+
+    const [previewResult, refRate, hashAlreadyUsed, contributorStats] = await Promise.all([
+      this.deps.textileClient
+        .previewExactOutput({
+          buyToken: corridorMeta.tokenAddress,
+          buyAmountAtomic: requestedBuyAmountAtomic.toString(),
+          taker: this.deps.untaggedTextileWalletClient.account.address,
+        })
+        .catch((): RfqPreviewData | null => null),
+      this.resolveReferenceRate(campaign.corridor),
+      this.deps.persistence.isDeliverableHashUsed(deliverableHash),
+      this.deps.persistence.getContributorPayoutStats(
+        campaign.idBytes32,
+        contributorWallet,
+        params.identityHandle
+      ),
+    ]);
+
+    const manualVerdict: VerificationVerdict = {
+      verdict: "pass",
+      score: 100,
+      confidence: 1,
+      reason: params.reviewNote?.trim() || "Approved by campaign owner.",
+      evidenceSummary: `Manually approved by campaign owner ${params.reviewerWallet} for ${params.deliverableUrl}.`,
+    };
+
+    const policyDecision = evaluatePolicyGate({
+      deliverableHashAlreadyUsed: hashAlreadyUsed,
+      contributorWallet,
+      identityVerified: params.identityVerified,
+      identityHandle: params.identityHandle,
+      teamBlocklist: this.deps.teamBlocklist,
+      vaultOwnerAddress: this.deps.vaultOwnerAddress,
+      campaignCreatorAddress: campaign.creatorWallet ?? undefined,
+      settlementAgentAddress: this.deps.taggedWalletClient.account.address,
+      campaignActive: campaign.active,
+      campaignRemainingBudgetUsdtAtomic: BigInt(campaign.remainingBudgetUsdtAtomic),
+      campaignMaxPerPayoutUsdtAtomic: BigInt(campaign.maxPerPayoutUsdtAtomic),
+      campaignRemainingDailyLimitUsdtAtomic: BigInt(campaign.remainingDailyLimitUsdtAtomic),
+      contributorPayoutCountInCampaign: contributorStats.count,
+      maxPayoutsPerRecipient: campaign.maxPayoutsPerRecipient,
+      requestedStageIndex: params.stageIndex,
+      lastPayoutAtMs: contributorStats.lastPayoutAtMs,
+      stageCooldownHours: campaign.stageCooldownHours,
+      corridor: campaign.corridor,
+      requestedBuyAmountAtomic,
+      textilePreview: previewResult,
+      referenceRateLocalPerUsdt: refRate,
+      maxSpreadBps: campaign.maxSpreadBps,
+      verificationVerdict: manualVerdict,
+      minPassScore: campaign.minPassScore,
+    });
+
+    return this.executeAfterPolicyGate({
+      submissionId,
+      campaign,
+      contributorWallet,
+      identityHandle: params.identityHandle,
+      deliverableHash,
+      requestedBuyAmountAtomic,
+      verdict: manualVerdict,
+      policyDecision,
+      buyReceipts: [],
+      authorId: null,
+      contentHash: null,
+    });
+  }
+
+  private async executeAfterPolicyGate(ctx: {
+    submissionId: string;
+    campaign: OrchestratorCampaignRecord;
+    contributorWallet: Address;
+    identityHandle: string | null;
+    deliverableHash: Hex;
+    requestedBuyAmountAtomic: bigint;
+    verdict: VerificationVerdict;
+    policyDecision: PolicyGateDecision;
+    buyReceipts: BuyPaymentReceipt[];
+    authorId: string | null;
+    contentHash: Hex | null;
+  }): Promise<ProcessSubmissionResult> {
+    const {
+      submissionId,
+      campaign,
+      contributorWallet,
+      deliverableHash,
+      requestedBuyAmountAtomic,
+      verdict,
+      policyDecision,
+      buyReceipts,
+    } = ctx;
+    const corridorMeta = CORRIDORS[campaign.corridor];
+
     if (!policyDecision.passed || !policyDecision.estimatedUsdtAtomic) {
       await this.deps.persistence.updateSubmissionStatus(submissionId, {
         status: "REJECTED",
         policyPassed: false,
         failedPolicyRule: policyDecision.failedRule,
         policyDetailsJson: JSON.stringify(policyDecision.checks),
-        aiVerdict: verification.verdict.verdict,
-        aiScore: verification.verdict.score,
-        aiConfidence: verification.verdict.confidence,
-        aiReason: verification.verdict.reason,
-        aiEvidenceSummary: verification.verdict.evidenceSummary,
+        aiVerdict: verdict.verdict,
+        aiScore: verdict.score,
+        aiConfidence: verdict.confidence,
+        aiReason: verdict.reason,
+        aiEvidenceSummary: verdict.evidenceSummary,
       });
 
       return {
         submissionId,
         deliverableHash,
         status: "REJECTED",
-        verdict: verification.verdict,
+        verdict,
         policyDecision,
-        buyReceipts: verification.buyReceipts,
+        buyReceipts,
       };
     }
 
@@ -398,11 +531,11 @@ export class SettlementOrchestrator {
       policyPassed: true,
       failedPolicyRule: null,
       policyDetailsJson: JSON.stringify(policyDecision.checks),
-      aiVerdict: verification.verdict.verdict,
-      aiScore: verification.verdict.score,
-      aiConfidence: verification.verdict.confidence,
-      aiReason: verification.verdict.reason,
-      aiEvidenceSummary: verification.verdict.evidenceSummary,
+      aiVerdict: verdict.verdict,
+      aiScore: verdict.score,
+      aiConfidence: verdict.confidence,
+      aiReason: verdict.reason,
+      aiEvidenceSummary: verdict.evidenceSummary,
     });
 
     // Helper to cleanly refund 100% of released USD₮ back to VireVault if Textile swap cannot execute
@@ -430,9 +563,9 @@ export class SettlementOrchestrator {
         submissionId,
         deliverableHash,
         status: "REFUNDED" as const,
-        verdict: verification.verdict,
+        verdict,
         policyDecision,
-        buyReceipts: verification.buyReceipts,
+        buyReceipts,
         refundTxHash: refundTx.hash,
         error: reason,
       };
@@ -539,26 +672,34 @@ export class SettlementOrchestrator {
       useUsdtFeeAbstraction: this.deps.useUsdtFeeAbstraction,
     });
 
-    // 7b. Best-effort first-time native CELO gas drip (0.01 CELO) so social-login embedded wallets
-    // can immediately withdraw cNGN or submit ERC-8004 ratings without hitting a zero-gas trap.
+    // 7b. Best-effort 1-time-ever native CELO gas drip (0.01 CELO) per unique wallet across Vire
+    // (only for >= $1.00 payouts to prevent micro-payout gas farming).
     let gasDripTxHash: Hash | undefined;
     const dripWei = this.deps.recipientGasDripWei ?? DEFAULT_RECIPIENT_GAS_DRIP_WEI;
-    if (dripWei > 0n && typeof this.deps.publicClient.getBalance === "function") {
+    if (dripWei > 0n && actualTakerPays >= 1_000_000n && typeof this.deps.publicClient.getBalance === "function") {
       try {
-        const [recipientCelo, agentCelo] = await Promise.all([
-          this.deps.publicClient.getBalance({ address: contributorWallet }),
-          this.deps.publicClient.getBalance({ address: this.deps.taggedWalletClient.account.address }),
-        ]);
-        if (recipientCelo < RECIPIENT_GAS_THRESHOLD_WEI && agentCelo >= AGENT_MIN_CELO_RESERVE_WEI + dripWei) {
-          const dripTx = await sendTaggedTx({
-            walletClient: this.deps.taggedWalletClient,
-            publicClient: this.deps.publicClient,
-            to: contributorWallet,
-            value: dripWei,
-            attributionCode: this.attributionCode,
-            useUsdtFeeAbstraction: false, // simple native transfer paid in native CELO
-          });
-          gasDripTxHash = dripTx.hash;
+        const alreadyDripped = this.deps.persistence.hasReceivedWelcomeGasDrip
+          ? await this.deps.persistence.hasReceivedWelcomeGasDrip(contributorWallet)
+          : false;
+        if (!alreadyDripped) {
+          const [recipientCelo, agentCelo] = await Promise.all([
+            this.deps.publicClient.getBalance({ address: contributorWallet }),
+            this.deps.publicClient.getBalance({ address: this.deps.taggedWalletClient.account.address }),
+          ]);
+          if (recipientCelo < RECIPIENT_GAS_THRESHOLD_WEI && agentCelo >= AGENT_MIN_CELO_RESERVE_WEI + dripWei) {
+            const dripTx = await sendTaggedTx({
+              walletClient: this.deps.taggedWalletClient,
+              publicClient: this.deps.publicClient,
+              to: contributorWallet,
+              value: dripWei,
+              attributionCode: this.attributionCode,
+              useUsdtFeeAbstraction: false,
+            });
+            gasDripTxHash = dripTx.hash;
+            if (this.deps.persistence.markWelcomeGasDripSent) {
+              await this.deps.persistence.markWelcomeGasDripSent(contributorWallet, dripTx.hash);
+            }
+          }
         }
       } catch {
         // Non-fatal: recipient already received their exact local stablecoin payout.
@@ -575,9 +716,9 @@ export class SettlementOrchestrator {
       submissionId,
       campaignIdBytes32: campaign.idBytes32,
       recipientWallet: contributorWallet,
-      identityHandle: params.identityHandle,
-      authorId: verification.artifact.authorId ?? null,
-      contentHash: verification.contentHash ?? null,
+      identityHandle: ctx.identityHandle,
+      authorId: ctx.authorId,
+      contentHash: ctx.contentHash,
       corridor: campaign.corridor,
       localTokenAddress: corridorMeta.tokenAddress,
       localAmountAtomic: exactBuyAmount.toString(),
@@ -596,9 +737,9 @@ export class SettlementOrchestrator {
       submissionId,
       deliverableHash,
       status: "COMPLETED",
-      verdict: verification.verdict,
+      verdict,
       policyDecision,
-      buyReceipts: verification.buyReceipts,
+      buyReceipts,
       txHashes: {
         vaultRelease: releaseTx.hash,
         textileSwap: swapResult.swapTxHash,

@@ -8,10 +8,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/// @title VireVault
-/// @notice Policy-guarded USD₮ treasury separating human financial custody from autonomous agent execution.
-/// @dev Enforces hard per-payout caps, rolling UTC daily limits, per-recipient repeat caps,
-///      deliverable replay protection, and external-recipient guardrails on Celo Mainnet (42220).
+/// @title VireVault (v2 — Non-Custodial Multi-Tenant Settlement Vault)
+/// @notice Policy-guarded USD₮ treasury separating per-campaign creator custody from autonomous agent execution.
+/// @dev Any wallet can create and fund a campaign with deterministic onchain guardrails (per-payout cap,
+///      rolling UTC daily limit, per-recipient cap, deliverable replay protection, external-recipient check).
+///      Unspent USD₮ is strictly withdrawable ONLY by each campaign's creator, even if the vault is paused.
 contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
@@ -23,6 +24,7 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
     }
 
     struct Campaign {
+        address creator;
         uint256 budgetUsdt;
         uint256 remainingBudget;
         uint256 maxPerPayoutUsdt;
@@ -63,13 +65,14 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Rolling UTC 24h spend: dailySpent[campaignId][block.timestamp / 1 days].
     mapping(bytes32 => mapping(uint64 => uint256)) public dailySpent;
 
-    /// @notice Payout count per contributor per campaign (enables multi-stage repeat missions while bounding abuse).
+    /// @notice Payout count per contributor per campaign (enables repeat missions while bounding abuse).
     mapping(bytes32 => mapping(address => uint32)) public recipientPayoutCount;
 
     event SettlementAgentUpdated(address indexed previousAgent, address indexed newAgent);
 
     event CampaignCreated(
         bytes32 indexed campaignId,
+        address indexed creator,
         uint256 budgetUsdt,
         uint256 maxPerPayoutUsdt,
         uint256 dailyLimitUsdt,
@@ -77,13 +80,18 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
         bool active
     );
 
-    event CampaignToppedUp(bytes32 indexed campaignId, uint256 addedUsdt, uint256 newRemainingBudget);
+    event CampaignToppedUp(bytes32 indexed campaignId, address indexed creator, uint256 addedUsdt, uint256 newRemainingBudget);
     event CampaignActiveUpdated(bytes32 indexed campaignId, bool active);
     event CampaignLimitsUpdated(
         bytes32 indexed campaignId,
         uint256 maxPerPayoutUsdt,
         uint256 dailyLimitUsdt,
         uint32 maxPayoutsPerRecipient
+    );
+    event CampaignCreatorTransferred(
+        bytes32 indexed campaignId,
+        address indexed previousCreator,
+        address indexed newCreator
     );
 
     event SettlementAuthorized(
@@ -116,14 +124,21 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
         uint256 timestamp
     );
 
-    event AdminWithdrewUnused(bytes32 indexed campaignId, address indexed to, uint256 amount);
+    event CampaignUnusedWithdrawn(
+        bytes32 indexed campaignId,
+        address indexed creator,
+        address indexed to,
+        uint256 amount
+    );
 
     error ZeroAddress();
     error ZeroAmount();
     error InvalidCampaignId();
     error InvalidDeliverableHash();
     error AgentCannotBeOwner();
+    error CreatorCannotBeAgent();
     error UnauthorizedAgent();
+    error UnauthorizedCampaignCreator();
     error CampaignAlreadyExists();
     error CampaignNotFound();
     error CampaignInactive();
@@ -145,6 +160,13 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
         _;
     }
 
+    modifier onlyCampaignCreator(bytes32 campaignId) {
+        Campaign storage c = campaigns[campaignId];
+        if (!c.exists) revert CampaignNotFound();
+        if (msg.sender != c.creator) revert UnauthorizedCampaignCreator();
+        _;
+    }
+
     constructor(
         address usdtToken,
         address initialOwner,
@@ -159,7 +181,7 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
         emit SettlementAgentUpdated(address(0), initialSettlementAgent);
     }
 
-    /// @notice Update the autonomous settlementAgent EOA (admin only; cannot equal owner).
+    /// @notice Update the autonomous settlementAgent EOA (protocol owner only; cannot equal owner).
     function setSettlementAgent(address newAgent) external onlyOwner {
         if (newAgent == address(0)) revert ZeroAddress();
         if (newAgent == owner()) revert AgentCannotBeOwner();
@@ -168,7 +190,8 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
         emit SettlementAgentUpdated(prev, newAgent);
     }
 
-    /// @notice Create and fund a new USD₮ campaign with deterministic onchain spending guardrails.
+    /// @notice Permissionlessly create and fund a new USD₮ campaign with deterministic onchain spending guardrails.
+    /// @dev msg.sender becomes the campaign creator with exclusive custody over top-ups, pausing, limits, and withdrawals.
     function createCampaign(
         bytes32 campaignId,
         uint256 budgetUsdt,
@@ -176,8 +199,9 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
         uint256 dailyLimitUsdt,
         uint32 maxPayoutsPerRecipient,
         bool active
-    ) external onlyOwner nonReentrant {
+    ) external whenNotPaused nonReentrant {
         if (campaignId == bytes32(0)) revert InvalidCampaignId();
+        if (msg.sender == settlementAgent) revert CreatorCannotBeAgent();
         if (campaigns[campaignId].exists) revert CampaignAlreadyExists();
         if (budgetUsdt == 0) revert ZeroAmount();
         if (maxPerPayoutUsdt == 0 || dailyLimitUsdt < maxPerPayoutUsdt || maxPayoutsPerRecipient == 0) {
@@ -185,6 +209,7 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
         }
 
         campaigns[campaignId] = Campaign({
+            creator: msg.sender,
             budgetUsdt: budgetUsdt,
             remainingBudget: budgetUsdt,
             maxPerPayoutUsdt: maxPerPayoutUsdt,
@@ -199,6 +224,7 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
 
         emit CampaignCreated(
             campaignId,
+            msg.sender,
             budgetUsdt,
             maxPerPayoutUsdt,
             dailyLimitUsdt,
@@ -207,11 +233,13 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
         );
     }
 
-    /// @notice Top up an existing campaign's USD₮ budget.
-    function topUpCampaign(bytes32 campaignId, uint256 additionalUsdt) external onlyOwner nonReentrant {
-        Campaign storage c = campaigns[campaignId];
-        if (!c.exists) revert CampaignNotFound();
+    /// @notice Top up an existing campaign's USD₮ budget (campaign creator only).
+    function topUpCampaign(
+        bytes32 campaignId,
+        uint256 additionalUsdt
+    ) external onlyCampaignCreator(campaignId) nonReentrant {
         if (additionalUsdt == 0) revert ZeroAmount();
+        Campaign storage c = campaigns[campaignId];
 
         c.budgetUsdt += additionalUsdt;
         c.remainingBudget += additionalUsdt;
@@ -219,38 +247,69 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
 
         _pullExactUsdt(msg.sender, additionalUsdt);
 
-        emit CampaignToppedUp(campaignId, additionalUsdt, c.remainingBudget);
+        emit CampaignToppedUp(campaignId, msg.sender, additionalUsdt, c.remainingBudget);
     }
 
-    /// @notice Pause or activate an individual campaign.
-    function setCampaignActive(bytes32 campaignId, bool active) external onlyOwner {
-        Campaign storage c = campaigns[campaignId];
-        if (!c.exists) revert CampaignNotFound();
-        c.active = active;
+    /// @notice Pause or activate an individual campaign (campaign creator only).
+    function setCampaignActive(bytes32 campaignId, bool active) external onlyCampaignCreator(campaignId) {
+        campaigns[campaignId].active = active;
         emit CampaignActiveUpdated(campaignId, active);
     }
 
-    /// @notice Update per-payout, daily, and per-recipient limits for an existing campaign.
+    /// @notice Update per-payout, daily, and per-recipient limits for an existing campaign (campaign creator only).
     function updateCampaignLimits(
         bytes32 campaignId,
         uint256 maxPerPayoutUsdt,
         uint256 dailyLimitUsdt,
         uint32 maxPayoutsPerRecipient
-    ) external onlyOwner {
-        Campaign storage c = campaigns[campaignId];
-        if (!c.exists) revert CampaignNotFound();
+    ) external onlyCampaignCreator(campaignId) {
         if (maxPerPayoutUsdt == 0 || dailyLimitUsdt < maxPerPayoutUsdt || maxPayoutsPerRecipient == 0) {
             revert InvalidLimits();
         }
+        Campaign storage c = campaigns[campaignId];
         c.maxPerPayoutUsdt = maxPerPayoutUsdt;
         c.dailyLimitUsdt = dailyLimitUsdt;
         c.maxPayoutsPerRecipient = maxPayoutsPerRecipient;
         emit CampaignLimitsUpdated(campaignId, maxPerPayoutUsdt, dailyLimitUsdt, maxPayoutsPerRecipient);
     }
 
+    /// @notice Transfer custody of a campaign to another wallet or Safe multisig (campaign creator only).
+    function transferCampaignCreator(
+        bytes32 campaignId,
+        address newCreator
+    ) external onlyCampaignCreator(campaignId) {
+        if (newCreator == address(0)) revert ZeroAddress();
+        if (newCreator == settlementAgent) revert CreatorCannotBeAgent();
+        address prev = campaigns[campaignId].creator;
+        campaigns[campaignId].creator = newCreator;
+        emit CampaignCreatorTransferred(campaignId, prev, newCreator);
+    }
+
+    /// @notice Withdraw unused USD₮ from a campaign back to a creator-chosen address (campaign creator only).
+    /// @dev Intentionally callable even while paused so creators always retain non-custodial exit rights.
+    function withdrawUnused(
+        bytes32 campaignId,
+        address to,
+        uint256 amount
+    ) external onlyCampaignCreator(campaignId) nonReentrant {
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        Campaign storage c = campaigns[campaignId];
+        if (amount > c.remainingBudget) {
+            revert InsufficientCampaignBudget(amount, c.remainingBudget);
+        }
+
+        c.remainingBudget -= amount;
+        totalCampaignRemainingBudget -= amount;
+
+        usdt.safeTransfer(to, amount);
+
+        emit CampaignUnusedWithdrawn(campaignId, msg.sender, to, amount);
+    }
+
     /// @notice Release bounded USD₮ to settlementAgent (the Textile taker EOA) for one verified deliverable.
     /// @dev Enforces replay protection, per-payout cap, rolling 24h daily cap, per-recipient repeat cap,
-    ///      campaign remaining budget, and non-team external recipient checks atomically.
+    ///      campaign remaining budget, and non-creator/non-team external recipient checks atomically.
     function releaseForSettlement(
         bytes32 campaignId,
         bytes32 deliverableHash,
@@ -258,14 +317,20 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
         uint256 exactUsdtNeeded
     ) external onlySettlementAgent whenNotPaused nonReentrant {
         if (deliverableHash == bytes32(0)) revert InvalidDeliverableHash();
-        if (recipient == address(0) || recipient == settlementAgent || recipient == owner()) {
-            revert RecipientNotExternal();
-        }
         if (exactUsdtNeeded == 0) revert ZeroAmount();
 
         Campaign storage c = campaigns[campaignId];
         if (!c.exists) revert CampaignNotFound();
         if (!c.active) revert CampaignInactive();
+
+        if (
+            recipient == address(0) ||
+            recipient == settlementAgent ||
+            recipient == owner() ||
+            recipient == c.creator
+        ) {
+            revert RecipientNotExternal();
+        }
 
         SettlementRecord storage rec = settlements[deliverableHash];
         if (
@@ -393,35 +458,18 @@ contract VireVault is Ownable2Step, ReentrancyGuard, Pausable {
         emit SettlementRefunded(campaignId, deliverableHash, recipient, amount, block.timestamp);
     }
 
-    /// @notice Emergency pause stopping all new settlement releases.
+    /// @notice Emergency pause stopping all new campaign creations and settlement releases.
+    /// @dev Campaign creators can still call withdrawUnused() while paused.
     function pause() external onlyOwner {
         _pause();
     }
 
-    /// @notice Resume settlement releases.
+    /// @notice Resume campaign creations and settlement releases.
     function unpause() external onlyOwner {
         _unpause();
     }
 
-    /// @notice Withdraw unused USD₮ from a campaign back to the admin-specified treasury address.
-    function adminWithdrawUnused(bytes32 campaignId, address to, uint256 amount) external onlyOwner nonReentrant {
-        if (to == address(0)) revert ZeroAddress();
-        if (amount == 0) revert ZeroAmount();
-        Campaign storage c = campaigns[campaignId];
-        if (!c.exists) revert CampaignNotFound();
-        if (amount > c.remainingBudget) {
-            revert InsufficientCampaignBudget(amount, c.remainingBudget);
-        }
-
-        c.remainingBudget -= amount;
-        totalCampaignRemainingBudget -= amount;
-
-        usdt.safeTransfer(to, amount);
-
-        emit AdminWithdrewUnused(campaignId, to, amount);
-    }
-
-    /// @notice Return full campaign struct.
+    /// @notice Return full campaign struct including creator address.
     function getCampaign(bytes32 campaignId) external view returns (Campaign memory) {
         return campaigns[campaignId];
     }

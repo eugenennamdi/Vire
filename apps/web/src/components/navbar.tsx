@@ -32,7 +32,8 @@ const PRIVY_ENABLED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim());
 const NAV_LINKS = [
   { href: "/", label: "Overview" },
   { href: "/campaigns", label: "Campaigns" },
-  { href: "/claim", label: "Claim" },
+  { href: "/create", label: "Launch" },
+  { href: "/manage", label: "Workspace" },
   { href: "/ledger", label: "Ledger" },
   { href: "/console", label: "Console" },
 ] as const;
@@ -631,10 +632,10 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile navigation strip — crisp pills fitting 390px cleanly */}
+      {/* Mobile navigation strip — clean horizontal strip fitting 390px cleanly */}
       <nav
         aria-label="Mobile navigation"
-        className="flex items-center justify-between gap-1 border-t border-black/[0.05] bg-[#F5F5F7]/95 px-3 py-2 md:hidden"
+        className="flex items-center justify-between gap-1 overflow-x-auto border-t border-black/[0.05] bg-[#F5F5F7]/95 px-3 py-2 md:hidden"
       >
         {NAV_LINKS.map((item) => {
           const active = activeHref === item.href;

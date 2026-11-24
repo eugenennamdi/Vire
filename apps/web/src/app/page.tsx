@@ -7,7 +7,7 @@ import {
   type CampaignStage,
   type CorridorSymbol,
 } from "@vire/shared";
-import { desc } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import type { Hex } from "viem";
 import { ClearingInspector, type InspectorCampaign } from "@/components/clearing-inspector";
@@ -35,6 +35,7 @@ export default async function HomePage() {
     db
       .select()
       .from(schema.campaigns)
+      .where(and(eq(schema.campaigns.visibility, "public"), eq(schema.campaigns.hidden, false)))
       .orderBy(desc(schema.campaigns.isLaunchPartner), desc(schema.campaigns.createdAt)),
     db.select().from(schema.settlements).orderBy(desc(schema.settlements.settledAt)),
   ]);

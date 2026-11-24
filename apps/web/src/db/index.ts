@@ -71,6 +71,14 @@ const DDL_STATEMENTS = [
     max_spread_bps INTEGER NOT NULL DEFAULT 250,
     min_pass_score INTEGER NOT NULL DEFAULT 75,
     active INTEGER NOT NULL DEFAULT 1,
+    creator_wallet TEXT,
+    visibility TEXT NOT NULL DEFAULT 'public',
+    verification_mode TEXT NOT NULL DEFAULT 'auto',
+    auto_rules_json TEXT,
+    invite_code_hash TEXT,
+    ends_at INTEGER,
+    hidden INTEGER NOT NULL DEFAULT 0,
+    created_tx_hash TEXT,
     created_via_x402_tx_hash TEXT,
     created_at INTEGER NOT NULL
   )`,
@@ -81,6 +89,7 @@ const DDL_STATEMENTS = [
     identity_profile_url TEXT,
     eip191_signature TEXT,
     oauth_verified INTEGER NOT NULL DEFAULT 0,
+    gas_drip_tx_hash TEXT,
     verified_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS submissions (
@@ -100,6 +109,9 @@ const DDL_STATEMENTS = [
     ai_confidence REAL,
     ai_reason TEXT,
     ai_evidence_summary TEXT,
+    reviewed_by_wallet TEXT,
+    review_note TEXT,
+    reviewed_at INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   )`,
@@ -171,9 +183,21 @@ const DDL_STATEMENTS = [
 
 const ADDITIVE_MIGRATIONS = [
   `ALTER TABLE contributors ADD COLUMN oauth_verified INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE contributors ADD COLUMN gas_drip_tx_hash TEXT`,
   `ALTER TABLE settlements ADD COLUMN identity_handle TEXT`,
   `ALTER TABLE settlements ADD COLUMN author_id TEXT`,
   `ALTER TABLE settlements ADD COLUMN content_hash TEXT`,
+  `ALTER TABLE campaigns ADD COLUMN creator_wallet TEXT`,
+  `ALTER TABLE campaigns ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'`,
+  `ALTER TABLE campaigns ADD COLUMN verification_mode TEXT NOT NULL DEFAULT 'auto'`,
+  `ALTER TABLE campaigns ADD COLUMN auto_rules_json TEXT`,
+  `ALTER TABLE campaigns ADD COLUMN invite_code_hash TEXT`,
+  `ALTER TABLE campaigns ADD COLUMN ends_at INTEGER`,
+  `ALTER TABLE campaigns ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE campaigns ADD COLUMN created_tx_hash TEXT`,
+  `ALTER TABLE submissions ADD COLUMN reviewed_by_wallet TEXT`,
+  `ALTER TABLE submissions ADD COLUMN review_note TEXT`,
+  `ALTER TABLE submissions ADD COLUMN reviewed_at INTEGER`,
 ];
 
 /** Ensure schema tables & additive anti-Sybil columns exist idempotently on cold start before querying. */

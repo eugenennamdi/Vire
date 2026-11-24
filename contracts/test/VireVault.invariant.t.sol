@@ -110,7 +110,7 @@ contract VireVaultHandler is Test {
         if (c.remainingBudget == 0) return;
         amount = bound(amount, 1, c.remainingBudget);
         vm.prank(owner);
-        vault.adminWithdrawUnused(CAMPAIGN_ID, owner, amount);
+        vault.withdrawUnused(CAMPAIGN_ID, owner, amount);
         ghostTotalWithdrawn += amount;
     }
 

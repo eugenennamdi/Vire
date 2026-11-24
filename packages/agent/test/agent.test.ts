@@ -623,4 +623,98 @@ describe("SettlementOrchestrator atomic flow & quote-expiry refund recovery", ()
     expect(result.refundTxHash).toBeDefined();
     expect(statusLog).toEqual(["VERIFYING", "AUTHORIZED", "REFUNDED"]);
   });
+
+  it("blocks campaignCreatorAddress wash-trading and enforces structured autoRules platform/tokens", async () => {
+    const creator = "0x9999999999999999999999999999999999999999";
+    const blocked = evaluatePolicyGate({
+      deliverableHashAlreadyUsed: false,
+      contributorWallet: creator,
+      identityVerified: true,
+      identityHandle: "creator_self",
+      teamBlocklist: new Set(),
+      campaignCreatorAddress: creator,
+      campaignActive: true,
+      campaignRemainingBudgetUsdtAtomic: 20_000_000n,
+      campaignMaxPerPayoutUsdtAtomic: 5_000_000n,
+      campaignRemainingDailyLimitUsdtAtomic: 20_000_000n,
+      contributorPayoutCountInCampaign: 0,
+      maxPayoutsPerRecipient: 1,
+      requestedStageIndex: 1,
+      lastPayoutAtMs: null,
+      stageCooldownHours: 0,
+      corridor: "cNGN",
+      requestedBuyAmountAtomic: 2_500_000_000n,
+      textilePreview: {
+        status: "preview",
+        takerPays: "1730000",
+        feeAmount: "0",
+        rateRay: "1445000000000000000000000000000",
+        buyAmount: "2500000000",
+      },
+      referenceRateLocalPerUsdt: 1450,
+      maxSpreadBps: 250,
+      verificationVerdict: {
+        verdict: "pass",
+        score: 95,
+        confidence: 0.99,
+        reason: "ok",
+        evidenceSummary: "ok",
+      },
+      minPassScore: 75,
+    });
+    expect(blocked.passed).toBe(false);
+    expect(blocked.failedRule).toBe("VERIFIED_EXTERNAL_IDENTITY");
+
+    const buyClient = new CeloBuyClient({ dryRun: true });
+    const webFetch: typeof fetch = async () =>
+      new Response("<html><title>Launch review</title><body>Check out acme.io and #AcmeLaunch today!</body></html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      });
+
+    // Wrong platform (autoRules requires X post, got web URL) -> immediate reject
+    const wrongPlatform = await verifyDeliverableWithBuy(buyClient, {
+      deliverableUrl: "https://example.com/review",
+      deliverableType: "promo_post",
+      campaignTitle: "Acme Launch",
+      criteria: "Post on X mentioning acme.io",
+      autoRules: { platform: "x", requiredTokens: ["acme.io"], minAuthorFollowers: 10, minAccountAgeDays: 30 },
+      fetchImpl: webFetch,
+    });
+    expect(wrongPlatform.verdict.verdict).toBe("reject");
+    expect(wrongPlatform.verdict.reason).toContain("X (Twitter)");
+
+    // Matching web platform + missing token -> reject
+    const missingTok = await verifyDeliverableWithBuy(buyClient, {
+      deliverableUrl: "https://example.com/review",
+      deliverableType: "referral",
+      campaignTitle: "Acme Launch",
+      criteria: "Write a review",
+      autoRules: {
+        platform: "web",
+        requiredTokens: ["acme.io", "#MissingTag"],
+        minAuthorFollowers: 0,
+        minAccountAgeDays: 0,
+      },
+      fetchImpl: webFetch,
+    });
+    expect(missingTok.verdict.verdict).toBe("reject");
+    expect(missingTok.verdict.reason).toContain("#MissingTag");
+
+    // Matching web platform + all required tokens -> pass
+    const passed = await verifyDeliverableWithBuy(buyClient, {
+      deliverableUrl: "https://example.com/review",
+      deliverableType: "referral",
+      campaignTitle: "Acme Launch",
+      criteria: "Write a review",
+      autoRules: {
+        platform: "web",
+        requiredTokens: ["acme.io", "#AcmeLaunch"],
+        minAuthorFollowers: 0,
+        minAccountAgeDays: 0,
+      },
+      fetchImpl: webFetch,
+    });
+    expect(passed.verdict.verdict).toBe("pass");
+  });
 });

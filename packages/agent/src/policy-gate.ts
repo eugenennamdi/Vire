@@ -19,12 +19,13 @@ export interface PolicyGateInput {
   /** Rule 1: anti-duplicate deliverable hash check */
   deliverableHashAlreadyUsed: boolean;
 
-  /** Rule 2: external verified identity & anti-Sybil / non-team wallet guard */
+  /** Rule 2: external verified identity & anti-Sybil / non-team / non-creator wallet guard */
   contributorWallet: string;
   identityVerified: boolean;
   identityHandle: string | null;
   teamBlocklist: ReadonlySet<string>;
   vaultOwnerAddress?: string;
+  campaignCreatorAddress?: string;
   settlementAgentAddress?: string;
 
   /** Rule 3: campaign active & budget/limits check */
@@ -77,10 +78,11 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateDecision {
       : "Deliverable proof hash is unique.",
   });
 
-  // Rule 2: Linked external social/dev identity + non-team wallet (anti-Sybil & no self-trading)
+  // Rule 2: Linked external social/dev identity + non-team / non-creator wallet (anti-Sybil & no self-trading)
   const isTeamWallet =
     input.teamBlocklist.has(walletLower) ||
     (input.vaultOwnerAddress && walletLower === input.vaultOwnerAddress.toLowerCase()) ||
+    (input.campaignCreatorAddress && walletLower === input.campaignCreatorAddress.toLowerCase()) ||
     (input.settlementAgentAddress && walletLower === input.settlementAgentAddress.toLowerCase());
 
   const identityPassed = Boolean(input.identityVerified && input.identityHandle && !isTeamWallet);
@@ -88,7 +90,7 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateDecision {
     rule: "VERIFIED_EXTERNAL_IDENTITY",
     passed: identityPassed,
     detail: isTeamWallet
-      ? "Wallet belongs to team, vault owner, or settlement agent (external recipients only)."
+      ? "Wallet belongs to campaign creator, team, vault owner, or settlement agent (external recipients only)."
       : !input.identityVerified || !input.identityHandle
         ? "Contributor must link a verified external GitHub/X or EIP-191 signed identity."
         : `Verified external identity (${input.identityHandle}) on non-team wallet.`,

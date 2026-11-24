@@ -9,6 +9,7 @@ export const CorridorSymbolSchema = z.enum(["cNGN", "IDRX", "wARS", "wBRL", "wMX
 export const SubmissionStatusSchema = z.enum([
   "SUBMITTED",
   "VERIFYING",
+  "PENDING_REVIEW",
   "REJECTED",
   "AUTHORIZED",
   "SWAPPING",
@@ -18,6 +19,23 @@ export const SubmissionStatusSchema = z.enum([
   "FAILED",
 ]);
 export type SubmissionStatus = z.infer<typeof SubmissionStatusSchema>;
+
+export const CampaignVisibilitySchema = z.enum(["public", "unlisted"]);
+export type CampaignVisibility = z.infer<typeof CampaignVisibilitySchema>;
+
+export const VerificationModeSchema = z.enum(["auto", "manual"]);
+export type VerificationMode = z.infer<typeof VerificationModeSchema>;
+
+export const AutoPlatformSchema = z.enum(["x", "github", "web"]);
+export type AutoPlatform = z.infer<typeof AutoPlatformSchema>;
+
+export const AutoVerificationRulesSchema = z.object({
+  platform: AutoPlatformSchema,
+  requiredTokens: z.array(z.string().trim().min(1).max(120)).min(1).max(12),
+  minAuthorFollowers: z.number().int().min(0).max(100_000).default(10),
+  minAccountAgeDays: z.number().int().min(0).max(3650).default(30),
+});
+export type AutoVerificationRules = z.infer<typeof AutoVerificationRulesSchema>;
 
 export const PolicyRuleCodeSchema = z.enum([
   "UNIQUE_DELIVERABLE_HASH",
@@ -107,8 +125,35 @@ export const CreateSubmissionRequestSchema = z.object({
   deliverableUrl: z.string().url().max(2048),
   deliverableNotes: z.string().max(2000).default(""),
   referralCode: z.string().max(128).optional(),
+  inviteCode: z.string().max(64).optional(),
 });
 export type CreateSubmissionRequest = z.infer<typeof CreateSubmissionRequestSchema>;
+
+export const PublishCampaignRequestSchema = z.object({
+  campaignId: z.string().regex(/^0x[a-fA-F0-9]{64}$/, "Invalid bytes32 campaignId"),
+  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/, "Invalid transaction hash").optional(),
+  slug: z
+    .string()
+    .min(3)
+    .max(96)
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, "Slug must be lowercase letters, numbers, and hyphens"),
+  partnerName: z.string().trim().min(2).max(80),
+  partnerLocation: z.string().trim().min(2).max(80).default("Global"),
+  title: z.string().trim().min(4).max(120),
+  description: z.string().trim().min(10).max(1200),
+  criteria: z.string().trim().min(10).max(1500),
+  deliverableType: DeliverableTypeSchema,
+  corridor: CorridorSymbolSchema,
+  rewardLocalHuman: z.string().regex(/^\d+(\.\d+)?$/, "Invalid reward amount"),
+  visibility: CampaignVisibilitySchema.default("public"),
+  verificationMode: VerificationModeSchema.default("auto"),
+  autoRules: AutoVerificationRulesSchema.nullable().optional(),
+  inviteCode: z.string().trim().max(64).optional(),
+  endsAt: z.number().int().positive().nullable().optional(),
+  maxSpreadBps: z.number().int().min(50).max(1000).default(250),
+  maxPayoutsPerRecipient: z.number().int().min(1).max(10).default(1),
+});
+export type PublishCampaignRequest = z.infer<typeof PublishCampaignRequestSchema>;
 
 export const X402VerifyRequestSchema = z.object({
   deliverableUrl: z.string().url().max(2048),

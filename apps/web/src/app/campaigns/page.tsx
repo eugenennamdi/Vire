@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight } from "@phosphor-icons/react";
+import { ArrowRight, Plus } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -44,6 +44,10 @@ interface CampaignView {
   maxSpreadBps: number;
   minPassScore: number;
   spotsRemaining?: number;
+  verificationMode?: "auto" | "manual";
+  endsAt?: number | null;
+  isExpired?: boolean;
+  approvalStats?: { approved: number; rejected: number; pending: number };
   active: boolean;
 }
 
@@ -105,11 +109,17 @@ function CampaignsInner() {
           </p>
         </div>
 
-        <SegmentedTabs
-          options={tabOptions}
-          value={corridorFilter}
-          onChange={setCorridorFilter}
-        />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <SegmentedTabs
+            options={tabOptions}
+            value={corridorFilter}
+            onChange={setCorridorFilter}
+          />
+          <Link href="/create" className={buttonVariants({ variant: "primary", size: "sm" })}>
+            <Plus weight="bold" className="h-3.5 w-3.5" />
+            Launch campaign
+          </Link>
+        </div>
       </div>
 
       {isLoading ? (
@@ -137,7 +147,7 @@ function CampaignsInner() {
             No active campaigns for {corridorFilter} yet.
           </p>
           <p className="mt-1 text-[13px] text-[#71717A]">
-            Launch a new local-currency campaign anytime from the developer console.
+            Launch a new local-currency campaign anytime with your own non-custodial USDT pool.
           </p>
           <div className="mt-5 flex justify-center gap-2">
             <button
@@ -147,8 +157,8 @@ function CampaignsInner() {
             >
               Show all
             </button>
-            <Link href="/console" className={buttonVariants({ variant: "primary", size: "sm" })}>
-              Developer console
+            <Link href="/create" className={buttonVariants({ variant: "primary", size: "sm" })}>
+              Launch a campaign
             </Link>
           </div>
         </Card>
@@ -178,7 +188,14 @@ function CampaignsInner() {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#71717A]">
-                          {camp.isLaunchPartner && <Badge tone="ink">Launch Partner</Badge>}
+                          {camp.isLaunchPartner ? (
+                            <Badge tone="ink">Verified Partner</Badge>
+                          ) : (
+                            <Badge tone="outline">Community</Badge>
+                          )}
+                          <Badge tone="outline">
+                            {camp.verificationMode === "manual" ? "Manual review" : "Instant auto-pay"}
+                          </Badge>
                           <span className="font-mono font-medium text-[#0A0A0C]">
                             {camp.corridor}
                           </span>
@@ -220,7 +237,7 @@ function CampaignsInner() {
                       </div>
 
                       <Link
-                        href={`/claim?campaign=${encodeURIComponent(camp.slug)}`}
+                        href={`/c/${encodeURIComponent(camp.slug)}`}
                         className={buttonVariants({
                           variant: camp.isLaunchPartner ? "primary" : "secondary",
                           size: "md",
@@ -324,8 +341,8 @@ function CampaignsInner() {
                 <span className="font-mono text-[#0A0A0C]">cNGN, wARS, wBRL, IDRX, or wMXN</span>.
               </p>
             </div>
-            <Link href="/console" className={buttonVariants({ variant: "secondary", size: "md" })}>
-              Developer console
+            <Link href="/create" className={buttonVariants({ variant: "primary", size: "md" })}>
+              Launch a campaign
               <ArrowRight weight="bold" className="h-3.5 w-3.5" />
             </Link>
           </Card>

@@ -194,3 +194,12 @@ export function buildIdentityBindMessage(params: {
     "Purpose: Bind external identity for non-team proof-of-work settlement on Vire.",
   ].join("\n");
 }
+
+/** Deterministic EIP-191 message campaign owners / contributors sign to authenticate a wallet session. */
+export function buildWalletAuthMessage(walletAddress: string): string {
+  return [
+    "Vire Wallet Session Authentication (Celo Mainnet 42220)",
+    `Wallet: ${walletAddress.toLowerCase()}`,
+    "Purpose: Verify wallet ownership to launch or manage Vire campaigns and view submissions.",
+  ].join("\n");
+}

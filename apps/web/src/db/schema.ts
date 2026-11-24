@@ -24,6 +24,14 @@ export const campaigns = sqliteTable("campaigns", {
   maxSpreadBps: integer("max_spread_bps").notNull().default(250),
   minPassScore: integer("min_pass_score").notNull().default(75),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
+  creatorWallet: text("creator_wallet"),
+  visibility: text("visibility").notNull().default("public"), // public | unlisted
+  verificationMode: text("verification_mode").notNull().default("auto"), // auto | manual
+  autoRulesJson: text("auto_rules_json"),
+  inviteCodeHash: text("invite_code_hash"),
+  endsAt: integer("ends_at"),
+  hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+  createdTxHash: text("created_tx_hash"),
   createdViaX402TxHash: text("created_via_x402_tx_hash"),
   createdAt: integer("created_at").notNull(),
 });
@@ -35,6 +43,7 @@ export const contributors = sqliteTable("contributors", {
   identityProfileUrl: text("identity_profile_url"),
   eip191Signature: text("eip191_signature"),
   oauthVerified: integer("oauth_verified", { mode: "boolean" }).notNull().default(false),
+  gasDripTxHash: text("gas_drip_tx_hash"),
   verifiedAt: integer("verified_at").notNull(),
 });
 
@@ -48,7 +57,7 @@ export const submissions = sqliteTable("submissions", {
   deliverableUrl: text("deliverable_url").notNull(),
   deliverableNotes: text("deliverable_notes").notNull().default(""),
   deliverableHash: text("deliverable_hash").notNull().unique(),
-  status: text("status").notNull(), // SUBMITTED | VERIFYING | REJECTED | AUTHORIZED | SWAPPING | PAYING | COMPLETED | REFUNDED | FAILED
+  status: text("status").notNull(), // SUBMITTED | VERIFYING | PENDING_REVIEW | REJECTED | AUTHORIZED | SWAPPING | PAYING | COMPLETED | REFUNDED | FAILED
   policyPassed: integer("policy_passed", { mode: "boolean" }),
   failedPolicyRule: text("failed_policy_rule"),
   policyDetailsJson: text("policy_details_json"),
@@ -57,6 +66,9 @@ export const submissions = sqliteTable("submissions", {
   aiConfidence: real("ai_confidence"),
   aiReason: text("ai_reason"),
   aiEvidenceSummary: text("ai_evidence_summary"),
+  reviewedByWallet: text("reviewed_by_wallet"),
+  reviewNote: text("review_note"),
+  reviewedAt: integer("reviewed_at"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });

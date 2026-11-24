@@ -25,6 +25,8 @@ contract VireVaultTest is Test {
 
     address internal owner = makeAddr("owner");
     address internal agent = makeAddr("settlementAgent");
+    address internal merchant = makeAddr("merchant");
+    address internal merchantMultisig = makeAddr("merchantMultisig");
     address internal recipient1 = makeAddr("recipient1");
     address internal recipient2 = makeAddr("recipient2");
     address internal attacker = makeAddr("attacker");
@@ -40,21 +42,26 @@ contract VireVaultTest is Test {
         vault = new VireVault(address(usdt), owner, agent);
 
         usdt.mint(owner, 10_000 * ONE_USDT);
+        usdt.mint(merchant, 10_000 * ONE_USDT);
+
         vm.prank(owner);
+        usdt.approve(address(vault), type(uint256).max);
+
+        vm.prank(merchant);
         usdt.approve(address(vault), type(uint256).max);
 
         vm.prank(agent);
         usdt.approve(address(vault), type(uint256).max);
     }
 
-    function _createDefaultCampaign() internal {
-        vm.prank(owner);
+    function _createDefaultCampaignAs(address creator) internal {
+        vm.prank(creator);
         vault.createCampaign(
             CAMPAIGN_CNGN,
             500 * ONE_USDT, // budget
             25 * ONE_USDT,  // maxPerPayout
             100 * ONE_USDT, // dailyLimit
-            3,              // maxPayoutsPerRecipient (Stage 1/2/3)
+            3,              // maxPayoutsPerRecipient
             true
         );
     }
@@ -70,8 +77,13 @@ contract VireVaultTest is Test {
         new VireVault(address(usdt), owner, owner);
     }
 
-    function test_CreateCampaignAndReleaseAndCompleteWithRefund() public {
-        _createDefaultCampaign();
+    function test_PermissionlessMerchantCreateReleaseCompleteAndRefund() public {
+        _createDefaultCampaignAs(merchant);
+
+        VireVault.Campaign memory c = vault.getCampaign(CAMPAIGN_CNGN);
+        assertEq(c.creator, merchant);
+        assertEq(c.budgetUsdt, 500 * ONE_USDT);
+        assertEq(c.remainingBudget, 500 * ONE_USDT);
 
         bytes32 deliverableHash = keccak256("promo-post-stage-1");
         uint256 released = 12 * ONE_USDT;
@@ -110,8 +122,55 @@ contract VireVaultTest is Test {
         vault.releaseForSettlement(CAMPAIGN_CNGN, deliverableHash, recipient1, 5 * ONE_USDT);
     }
 
+    function test_NonCustodialCreatorCustodyAndTransfer() public {
+        _createDefaultCampaignAs(merchant);
+
+        // Protocol admin CANNOT withdraw, pause, top up, or change limits on a merchant's campaign.
+        vm.prank(owner);
+        vm.expectRevert(VireVault.UnauthorizedCampaignCreator.selector);
+        vault.withdrawUnused(CAMPAIGN_CNGN, owner, 10 * ONE_USDT);
+
+        vm.prank(owner);
+        vm.expectRevert(VireVault.UnauthorizedCampaignCreator.selector);
+        vault.setCampaignActive(CAMPAIGN_CNGN, false);
+
+        vm.prank(attacker);
+        vm.expectRevert(VireVault.UnauthorizedCampaignCreator.selector);
+        vault.withdrawUnused(CAMPAIGN_CNGN, attacker, 10 * ONE_USDT);
+
+        // Merchant can top up and pause their own campaign.
+        vm.prank(merchant);
+        vault.topUpCampaign(CAMPAIGN_CNGN, 50 * ONE_USDT);
+        assertEq(vault.getCampaign(CAMPAIGN_CNGN).remainingBudget, 550 * ONE_USDT);
+
+        // Even if protocol owner pauses the vault globally, merchant retains non-custodial withdrawal right.
+        vm.prank(owner);
+        vault.pause();
+
+        uint256 merchantBefore = usdt.balanceOf(merchant);
+        vm.prank(merchant);
+        vault.withdrawUnused(CAMPAIGN_CNGN, merchant, 200 * ONE_USDT);
+        assertEq(usdt.balanceOf(merchant), merchantBefore + 200 * ONE_USDT);
+        assertEq(vault.getCampaign(CAMPAIGN_CNGN).remainingBudget, 350 * ONE_USDT);
+
+        // Merchant hands custody to Safe multisig.
+        vm.prank(merchant);
+        vault.transferCampaignCreator(CAMPAIGN_CNGN, merchantMultisig);
+        assertEq(vault.getCampaign(CAMPAIGN_CNGN).creator, merchantMultisig);
+
+        // Old merchant loses control; new multisig controls remaining funds.
+        vm.prank(merchant);
+        vm.expectRevert(VireVault.UnauthorizedCampaignCreator.selector);
+        vault.withdrawUnused(CAMPAIGN_CNGN, merchant, 10 * ONE_USDT);
+
+        vm.prank(merchantMultisig);
+        vault.withdrawUnused(CAMPAIGN_CNGN, merchantMultisig, 350 * ONE_USDT);
+        assertEq(usdt.balanceOf(merchantMultisig), 350 * ONE_USDT);
+        assertEq(vault.getCampaign(CAMPAIGN_CNGN).remainingBudget, 0);
+    }
+
     function test_RefundUnusedUsdtRestoresBudgetAndAllowsRetry() public {
-        _createDefaultCampaign();
+        _createDefaultCampaignAs(merchant);
 
         bytes32 deliverableHash = keccak256("quote-expired-deliverable");
         uint256 released = 10 * ONE_USDT;
@@ -144,7 +203,7 @@ contract VireVaultTest is Test {
     }
 
     function test_EnforcesPerPayoutCapDailyLimitAndRecipientCap() public {
-        _createDefaultCampaign();
+        _createDefaultCampaignAs(merchant);
 
         // Exceeds maxPerPayoutUsdt (25)
         vm.prank(agent);
@@ -176,20 +235,26 @@ contract VireVaultTest is Test {
         vault.releaseForSettlement(CAMPAIGN_CNGN, keccak256("r2-2-nextday"), recipient2, 20 * ONE_USDT);
     }
 
-    function test_BlocksSelfTradingAndUnauthorizedCallers() public {
-        _createDefaultCampaign();
+    function test_BlocksSelfTradingCreatorWashAndUnauthorizedCallers() public {
+        _createDefaultCampaignAs(merchant);
+
+        // Agent cannot create a campaign
+        usdt.mint(agent, 50 * ONE_USDT);
+        vm.prank(agent);
+        vm.expectRevert(VireVault.CreatorCannotBeAgent.selector);
+        vault.createCampaign(keccak256("agent-camp"), 50 * ONE_USDT, 10 * ONE_USDT, 50 * ONE_USDT, 1, true);
 
         // Non-agent cannot release
         vm.prank(attacker);
         vm.expectRevert(VireVault.UnauthorizedAgent.selector);
         vault.releaseForSettlement(CAMPAIGN_CNGN, keccak256("h1"), recipient1, 5 * ONE_USDT);
 
-        // Owner cannot impersonate settlementAgent
-        vm.prank(owner);
+        // Merchant cannot impersonate settlementAgent
+        vm.prank(merchant);
         vm.expectRevert(VireVault.UnauthorizedAgent.selector);
         vault.releaseForSettlement(CAMPAIGN_CNGN, keccak256("h2"), recipient1, 5 * ONE_USDT);
 
-        // Cannot settle to settlementAgent or owner
+        // Cannot settle to settlementAgent, owner, OR campaign creator (anti-wash-trade)
         vm.prank(agent);
         vm.expectRevert(VireVault.RecipientNotExternal.selector);
         vault.releaseForSettlement(CAMPAIGN_CNGN, keccak256("h3"), agent, 5 * ONE_USDT);
@@ -197,10 +262,14 @@ contract VireVaultTest is Test {
         vm.prank(agent);
         vm.expectRevert(VireVault.RecipientNotExternal.selector);
         vault.releaseForSettlement(CAMPAIGN_CNGN, keccak256("h4"), owner, 5 * ONE_USDT);
+
+        vm.prank(agent);
+        vm.expectRevert(VireVault.RecipientNotExternal.selector);
+        vault.releaseForSettlement(CAMPAIGN_CNGN, keccak256("h5"), merchant, 5 * ONE_USDT);
     }
 
-    function test_PauseAndAdminWithdrawUnused() public {
-        _createDefaultCampaign();
+    function test_PauseStopsNewReleasesAndCreates() public {
+        _createDefaultCampaignAs(merchant);
 
         vm.prank(owner);
         vault.pause();
@@ -209,12 +278,9 @@ contract VireVaultTest is Test {
         vm.expectRevert(Pausable.EnforcedPause.selector);
         vault.releaseForSettlement(CAMPAIGN_CNGN, keccak256("paused"), recipient1, 5 * ONE_USDT);
 
-        uint256 ownerBefore = usdt.balanceOf(owner);
-        vm.prank(owner);
-        vault.adminWithdrawUnused(CAMPAIGN_CNGN, owner, 200 * ONE_USDT);
-
-        assertEq(usdt.balanceOf(owner), ownerBefore + 200 * ONE_USDT);
-        assertEq(vault.getCampaign(CAMPAIGN_CNGN).remainingBudget, 300 * ONE_USDT);
+        vm.prank(merchant);
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        vault.createCampaign(keccak256("paused-create"), 10 * ONE_USDT, 5 * ONE_USDT, 10 * ONE_USDT, 1, true);
     }
 
     function test_TwoStepOwnershipCannotCollapseWithAgent() public {
@@ -240,7 +306,7 @@ contract VireVaultTest is Test {
         requested = bound(requested, 1, budget + 100 * ONE_USDT);
 
         bytes32 cid = keccak256(abi.encode("fuzz", budget, maxPerPayout, dailyLimit));
-        vm.prank(owner);
+        vm.prank(merchant);
         vault.createCampaign(cid, budget, maxPerPayout, dailyLimit, 2, true);
 
         bool shouldSucceed = requested <= maxPerPayout && requested <= dailyLimit && requested <= budget;

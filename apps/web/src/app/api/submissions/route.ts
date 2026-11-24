@@ -4,15 +4,18 @@ import {
   CORRIDORS,
   CreateSubmissionRequestSchema,
   parseTeamBlocklist,
+  toPlainDecimalAmount,
+  type AutoVerificationRules,
   type CampaignStage,
   type CorridorSymbol,
   type DeliverableType,
 } from "@vire/shared";
 import { and, eq, gt, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
-import { getAddress, type Hex } from "viem";
+import { getAddress, type Address, type Hex } from "viem";
 import { ensureDatabaseReady, getDb, schema } from "@/db";
 import { ensureDefaultCampaignsSeeded } from "@/db/seed";
+import { getLiveCorridors } from "@/lib/corridors-live";
 import { verifyWalletSessionCookie, WALLET_SESSION_COOKIE } from "@/lib/session";
 import {
   createDrizzlePersistenceAdapter,
@@ -23,6 +26,7 @@ import {
   getTextileClient,
   getVaultAddress,
   getVaultSnapshot,
+  hashInviteCode,
   mergeCampaignWithOnchain,
 } from "@/lib/runtime";
 
@@ -47,7 +51,6 @@ export async function POST(req: NextRequest) {
   const walletLower = wallet.toLowerCase();
 
   // Require signed HttpOnly wallet session issued during Step 01 EIP-191 profile link
-  // (prevents unauthenticated curl/bot scripts from impersonating other wallets).
   const walletSession = verifyWalletSessionCookie(req.cookies.get(WALLET_SESSION_COOKIE)?.value);
   if (!walletSession || walletSession.wallet !== walletLower) {
     return NextResponse.json(
@@ -72,6 +75,32 @@ export async function POST(req: NextRequest) {
   }
 
   const now = Date.now();
+
+  // Enforce optional campaign deadline immediately ($0.00 spent)
+  if (campaignRow.endsAt && now > campaignRow.endsAt) {
+    return NextResponse.json(
+      {
+        status: "REJECTED",
+        failedRule: "CAMPAIGN_ACTIVE_AND_FUNDED",
+        error: "This campaign has ended and is no longer accepting new submissions.",
+      },
+      { status: 422 }
+    );
+  }
+
+  // Enforce optional invite code for link-only private campaigns
+  if (campaignRow.inviteCodeHash) {
+    const provided = parsed.data.inviteCode?.trim();
+    if (!provided || hashInviteCode(provided) !== campaignRow.inviteCodeHash) {
+      return NextResponse.json(
+        {
+          status: "REJECTED",
+          error: "A valid campaign invite code is required to submit work for this private campaign.",
+        },
+        { status: 403 }
+      );
+    }
+  }
 
   // Atomic in-flight concurrency lock (closes 2-tab simultaneous double-spend race)
   const inFlight = await db
@@ -131,6 +160,24 @@ export async function POST(req: NextRequest) {
     .limit(1);
   const contributor = contributorRows[0] ?? null;
 
+  const vaultAddress = getVaultAddress();
+  const agentAddress = getAgentAddress();
+  const onchainMap = await getOnchainCampaignStates([campaignRow.id as Hex]);
+  const syncedCampaign = mergeCampaignWithOnchain(campaignRow, onchainMap);
+
+  // Anti-wash-trade: block campaign creator from claiming their own campaign immediately
+  const creatorLower = syncedCampaign.creatorWallet?.toLowerCase();
+  if (creatorLower && walletLower === creatorLower) {
+    return NextResponse.json(
+      {
+        status: "REJECTED",
+        failedRule: "VERIFIED_EXTERNAL_IDENTITY",
+        error: "Campaign creators cannot claim payouts from their own campaign.",
+      },
+      { status: 422 }
+    );
+  }
+
   const deliverableHash = computeDeliverableHash({
     campaignIdBytes32: campaignRow.id as Hex,
     deliverableUrl: parsed.data.deliverableUrl,
@@ -144,18 +191,178 @@ export async function POST(req: NextRequest) {
     .where(eq(schema.submissions.deliverableHash, deliverableHash))
     .limit(1);
 
-  if (existingSub[0] && ["AUTHORIZED", "SWAPPING", "PAYING", "COMPLETED"].includes(existingSub[0].status)) {
+  if (
+    existingSub[0] &&
+    ["PENDING_REVIEW", "AUTHORIZED", "SWAPPING", "PAYING", "COMPLETED"].includes(existingSub[0].status)
+  ) {
     return NextResponse.json(
       {
         status: "REJECTED",
         failedRule: "UNIQUE_DELIVERABLE_HASH",
-        error: "Deliverable proof hash was already claimed or settled.",
+        error:
+          existingSub[0].status === "PENDING_REVIEW"
+            ? "This link is already in the campaign owner's review queue."
+            : "Deliverable proof hash was already claimed or settled.",
         deliverableHash,
       },
       { status: 409 }
     );
   }
 
+  // MANUAL REVIEW MODE: free anti-spam + 1-claim-per-person lock + queue cap → PENDING_REVIEW
+  if (syncedCampaign.verificationMode === "manual") {
+    if (!syncedCampaign.active || BigInt(syncedCampaign.remainingUsdtAtomic) <= 0n) {
+      return NextResponse.json(
+        {
+          status: "REJECTED",
+          failedRule: "CAMPAIGN_ACTIVE_AND_FUNDED",
+          error: "This campaign is paused or its payout pool is currently full.",
+        },
+        { status: 422 }
+      );
+    }
+
+    if (!contributor) {
+      return NextResponse.json(
+        {
+          status: "REJECTED",
+          failedRule: "VERIFIED_EXTERNAL_IDENTITY",
+          error: "Please complete Step 01 (Link your profile) before submitting work.",
+        },
+        { status: 422 }
+      );
+    }
+
+    // Validate safe http/https URL
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(parsed.data.deliverableUrl);
+      if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+        throw new Error("Only http(s) URLs are supported.");
+      }
+    } catch {
+      return NextResponse.json(
+        { status: "REJECTED", error: "Please enter a valid public https:// deliverable URL." },
+        { status: 422 }
+      );
+    }
+
+    const persistence = createDrizzlePersistenceAdapter();
+    const stats = await persistence.getContributorPayoutStats(
+      campaignRow.id as Hex,
+      wallet,
+      contributor.identityHandle
+    );
+    if (stats.count >= syncedCampaign.maxPayoutsPerRecipient) {
+      return NextResponse.json(
+        {
+          status: "REJECTED",
+          failedRule: "STAGE_CAP_AND_COOLDOWN",
+          error: "You have already claimed the maximum payouts allowed for this campaign.",
+        },
+        { status: 422 }
+      );
+    }
+
+    // Block same wallet from stacking multiple pending submissions in the same campaign
+    const existingPendingForWallet = await db
+      .select({ id: schema.submissions.id })
+      .from(schema.submissions)
+      .where(
+        and(
+          eq(schema.submissions.campaignId, campaignRow.id),
+          eq(schema.submissions.contributorWallet, walletLower),
+          eq(schema.submissions.status, "PENDING_REVIEW")
+        )
+      )
+      .limit(1);
+
+    if (existingPendingForWallet.length > 0) {
+      return NextResponse.json(
+        {
+          status: "REJECTED",
+          error: "You already have a submission awaiting review for this campaign.",
+        },
+        { status: 409 }
+      );
+    }
+
+    // Cap total pending queue size (max 3× remaining spots, capped at 50) to protect owner inbox from spam floods
+    const allPending = await db
+      .select({ id: schema.submissions.id })
+      .from(schema.submissions)
+      .where(
+        and(
+          eq(schema.submissions.campaignId, campaignRow.id),
+          eq(schema.submissions.status, "PENDING_REVIEW")
+        )
+      );
+
+    const corridor = syncedCampaign.corridor as CorridorSymbol;
+    const liveCorridors = await getLiveCorridors().catch(() => ({ asOf: "", corridors: [] }));
+    const rate =
+      liveCorridors.corridors.find((c) => c.corridor === corridor)?.impliedRateLocalPerUsdt ??
+      CORRIDORS[corridor].typicalFiatPerUsd;
+    const rewardFloat = Number(toPlainDecimalAmount(selectedStage.rewardLocalAtomic, corridor));
+    const remFloat = Number(toPlainDecimalAmount(syncedCampaign.remainingUsdtAtomic, "USDT"));
+    const estSpots = rate > 0 && rewardFloat > 0 ? Math.max(1, Math.floor(remFloat / ((rewardFloat / rate) * 1.015))) : 5;
+    const maxQueueSize = Math.min(50, Math.max(15, estSpots * 3));
+
+    if (allPending.length >= maxQueueSize) {
+      return NextResponse.json(
+        {
+          status: "REJECTED",
+          error: "The review queue for this campaign is currently full. Please check back shortly.",
+        },
+        { status: 429 }
+      );
+    }
+
+    const submissionId = existingSub[0]?.id ?? `sub_${randomUUID()}`;
+    if (!existingSub[0]) {
+      await db.insert(schema.submissions).values({
+        id: submissionId,
+        campaignId: campaignRow.id,
+        stageIndex: selectedStage.stageIndex,
+        contributorWallet: walletLower,
+        deliverableUrl: parsedUrl.toString(),
+        deliverableNotes: parsed.data.deliverableNotes,
+        deliverableHash,
+        status: "PENDING_REVIEW",
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else {
+      await db
+        .update(schema.submissions)
+        .set({
+          stageIndex: selectedStage.stageIndex,
+          contributorWallet: walletLower,
+          deliverableUrl: parsedUrl.toString(),
+          deliverableNotes: parsed.data.deliverableNotes,
+          status: "PENDING_REVIEW",
+          failedPolicyRule: null,
+          reviewNote: null,
+          reviewedByWallet: null,
+          reviewedAt: null,
+          updatedAt: now,
+        })
+        .where(eq(schema.submissions.id, submissionId));
+    }
+
+    return NextResponse.json(
+      {
+        submissionId,
+        deliverableHash,
+        status: "PENDING_REVIEW",
+        message:
+          "Submitted for review. Once the campaign owner approves, Vire will automatically swap and send your exact local currency payout.",
+      },
+      { status: 202 }
+    );
+  }
+
+  // AUTO VERIFICATION MODE
   const submissionId = existingSub[0]?.id ?? `sub_${randomUUID()}`;
   if (!existingSub[0]) {
     await db.insert(schema.submissions).values({
@@ -171,7 +378,6 @@ export async function POST(req: NextRequest) {
       updatedAt: now,
     });
   } else {
-    // Cleanly reset a previously REJECTED/REFUNDED/FAILED submission row on retry
     await db
       .update(schema.submissions)
       .set({
@@ -186,13 +392,11 @@ export async function POST(req: NextRequest) {
       .where(eq(schema.submissions.id, submissionId));
   }
 
-  const vaultAddress = getVaultAddress();
-  const agentAddress = getAgentAddress();
+  const autoRules = syncedCampaign.autoRulesJson
+    ? (JSON.parse(syncedCampaign.autoRulesJson) as AutoVerificationRules)
+    : null;
   const hasLiveExecutionKeys = Boolean(vaultAddress && agentAddress);
-  const onchainMap = await getOnchainCampaignStates([campaignRow.id as Hex]);
-  const syncedCampaign = mergeCampaignWithOnchain(campaignRow, onchainMap);
 
-  // When mainnet vault & agent key are configured, run the full atomic SettlementOrchestrator.
   if (hasLiveExecutionKeys) {
     try {
       const orchestrator = await createLiveOrchestrator();
@@ -215,8 +419,10 @@ export async function POST(req: NextRequest) {
           maxSpreadBps: syncedCampaign.maxSpreadBps,
           minPassScore: syncedCampaign.minPassScore,
           createdAtMs: syncedCampaign.createdAt,
-          minAuthorFollowers: 10,
-          minAccountAgeDays: 30,
+          creatorWallet: (syncedCampaign.creatorWallet as Address | null) ?? null,
+          autoRules,
+          minAuthorFollowers: autoRules?.minAuthorFollowers ?? 10,
+          minAccountAgeDays: autoRules?.minAccountAgeDays ?? 30,
         },
         stageIndex: selectedStage.stageIndex,
         contributorWallet: wallet,
@@ -248,8 +454,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Pre-deployment inspection path: still runs REAL verification + REAL live Textile preview + REAL 7-rule Policy Gate.
-  // NEVER fakes a settlement or transaction hash when mainnet custody keys aren't configured.
+  // Pre-deployment inspection fallback (no mainnet keys)
   const persistence = createDrizzlePersistenceAdapter();
   const corridor = campaignRow.corridor as CorridorSymbol;
   const corridorMeta = CORRIDORS[corridor];
@@ -263,6 +468,7 @@ export async function POST(req: NextRequest) {
       campaignTitle: campaignRow.title,
       criteria: `${campaignRow.criteria}\nStage ${selectedStage.stageIndex}: ${selectedStage.instructions}`,
       contributorHandle: contributor?.identityHandle ?? undefined,
+      autoRules,
       deliverableNotes: parsed.data.deliverableNotes,
       referralCode: parsed.data.referralCode,
       githubApiToken: process.env.GITHUB_API_TOKEN?.trim() || undefined,
@@ -289,6 +495,7 @@ export async function POST(req: NextRequest) {
     identityHandle: contributor?.identityHandle ?? null,
     teamBlocklist: parseTeamBlocklist(process.env.TEAM_WALLET_BLOCKLIST),
     vaultOwnerAddress: vaultSnap.owner ?? undefined,
+    campaignCreatorAddress: syncedCampaign.creatorWallet ?? undefined,
     settlementAgentAddress: agentAddress ?? undefined,
     campaignActive: syncedCampaign.active,
     campaignRemainingBudgetUsdtAtomic: BigInt(syncedCampaign.remainingUsdtAtomic),
@@ -333,18 +540,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await persistence.updateSubmissionStatus(submissionId, {
-    status: "SUBMITTED",
-    policyPassed: true,
-    failedPolicyRule: null,
-    policyDetailsJson: JSON.stringify(policyDecision.checks),
-    aiVerdict: verification.verdict.verdict,
-    aiScore: verification.verdict.score,
-    aiConfidence: verification.verdict.confidence,
-    aiReason: verification.verdict.reason,
-    aiEvidenceSummary: verification.verdict.evidenceSummary,
-  });
-
   return NextResponse.json(
     {
       submissionId,
@@ -353,8 +548,7 @@ export async function POST(req: NextRequest) {
       verdict: verification.verdict,
       policyDecision,
       buyReceipts: verification.buyReceipts,
-      error:
-        "All 7 Policy Gate rules PASSED with live Textile preview, but onchain Celo Mainnet execution requires VIRE_VAULT_ADDRESS and VIRE_AGENT_PRIVATE_KEY configured in .env.",
+      error: "Mainnet custody keys are not configured on this environment.",
     },
     { status: 503 }
   );
