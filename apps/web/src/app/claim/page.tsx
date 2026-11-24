@@ -383,7 +383,7 @@ function ClaimFlowInner() {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1.5">
                   <FieldLabel htmlFor="claim-campaign">Campaign</FieldLabel>
                   <Select
                     id="claim-campaign"
@@ -401,7 +401,7 @@ function ClaimFlowInner() {
                   </Select>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1.5">
                   <FieldLabel htmlFor="claim-stage">Stage</FieldLabel>
                   <Select
                     id="claim-stage"
