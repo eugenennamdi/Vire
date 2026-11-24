@@ -105,19 +105,19 @@ export function HeroHyperboloid() {
       strands.sort((a, b) => a.depth - b.depth);
 
       for (const s of strands) {
-        const alpha = 0.022 + s.depth * 0.125;
+        const alpha = 0.032 + s.depth * 0.165;
         const grad = ctx.createLinearGradient(s.x1, s.y1, s.x2, s.y2);
-        grad.addColorStop(0, `rgba(10, 10, 16, ${alpha * 0.12})`);
-        grad.addColorStop(0.24, `rgba(10, 10, 16, ${alpha * 0.78})`);
+        grad.addColorStop(0, `rgba(10, 10, 16, ${alpha * 0.16})`);
+        grad.addColorStop(0.24, `rgba(10, 10, 16, ${alpha * 0.82})`);
         grad.addColorStop(0.5, `rgba(10, 10, 16, ${alpha * 1.2})`);
-        grad.addColorStop(0.76, `rgba(10, 10, 16, ${alpha * 0.74})`);
-        grad.addColorStop(1, `rgba(10, 10, 16, ${alpha * 0.1})`);
+        grad.addColorStop(0.76, `rgba(10, 10, 16, ${alpha * 0.78})`);
+        grad.addColorStop(1, `rgba(10, 10, 16, ${alpha * 0.12})`);
 
         ctx.beginPath();
         ctx.moveTo(s.x1, s.y1);
         ctx.lineTo(s.x2, s.y2);
         ctx.strokeStyle = grad;
-        ctx.lineWidth = s.depth > 0.65 ? 0.85 : 0.6;
+        ctx.lineWidth = s.depth > 0.65 ? 0.9 : 0.68;
         ctx.stroke();
       }
 
@@ -133,8 +133,8 @@ export function HeroHyperboloid() {
         0,
         Math.PI * 2
       );
-      ctx.strokeStyle = "rgba(10, 10, 16, 0.085)";
-      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = "rgba(10, 10, 16, 0.11)";
+      ctx.lineWidth = 0.85;
       ctx.stroke();
 
       // Subtle precision micro-nodes gliding along front strands

@@ -140,7 +140,7 @@ export default async function HomePage() {
               Pay verified work in exact local currency.
             </h1>
 
-            <p className="mt-5 max-w-[41ch] text-[15px] leading-[1.6] text-[#5C5C66]">
+            <p className="mt-5 max-w-[45ch] text-[15px] leading-[1.6] text-[#5C5C66]">
               Verify off-chain deliverables autonomously, enforce onchain vault limits, and settle
               exact local stablecoins over Textile FX.
             </p>
@@ -166,7 +166,7 @@ export default async function HomePage() {
 
           {/* Right: Floating Swiss Institutional Readouts (Zero Cards, Pure Type) */}
           <div className="flex flex-col gap-7 border-t border-black/[0.06] pt-7 lg:col-span-5 lg:items-end lg:border-t-0 lg:pb-1 lg:pt-0 lg:text-right">
-            <div>
+            <div className="flex flex-col lg:items-end">
               <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#7A7A86]">
                 Live Textile FX Depth
               </div>
@@ -175,12 +175,12 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div>
-              <div className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-[#7A7A86] lg:justify-end">
+            <div className="flex flex-col lg:items-end">
+              <div className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-[#7A7A86] lg:justify-end">
                 <span className="vire-live-dot h-1.5 w-1.5 rounded-full bg-[#16A34A]" />
                 <span>Active Payout Pool</span>
               </div>
-              <div className="mt-2 inline-flex items-center gap-2.5 lg:justify-end">
+              <div className="mt-2 flex items-center gap-2.5 lg:justify-end">
                 <TokenIcon symbol={featuredCorridor} size={24} />
                 <div className="inline-flex items-baseline gap-1.5">
                   <span className="text-[34px] font-light leading-none tracking-[-0.035em] text-[#0A0A0C] tabular-nums sm:text-[40px]">
