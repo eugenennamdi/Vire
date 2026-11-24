@@ -184,7 +184,7 @@ export default function LedgerPage() {
               aria-label="Filter by currency"
               value={corridor}
               onChange={(e) => setCorridor(e.target.value)}
-              className="h-[38px] rounded-full py-[8px] pl-4 pr-10 text-[12.5px] font-medium leading-5"
+              className="h-[38px] rounded-full px-4 text-[12.5px] font-medium"
             >
               <option value="">All currencies</option>
               <option value="cNGN">cNGN · Nigeria</option>
