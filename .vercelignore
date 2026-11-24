@@ -1,0 +1,13 @@
+.env
+.env.local
+.env.*.local
+apps/web/.env.local
+apps/web/data
+data
+contracts/lib
+contracts/out
+contracts/cache
+contracts/broadcast
+*.db
+*.db-wal
+*.db-shm

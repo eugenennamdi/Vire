@@ -66,6 +66,7 @@ vire/
 ## Judge Quickstart & Verification Walkthrough
 
 **Live Production App**: https://usevire.xyz  
+**ERC-8004 Agent ID**: `#10116` ([Registration Tx on Celoscan](https://celoscan.io/tx/0x27bbf093c2ce4348e2322088b73ecc9fcd8bcae69ddfeecb3f7c7ccfbc7da704))  
 **ERC-8004 Agent Manifest**: https://usevire.xyz/api/agent-card.json  
 **Public Live Audit Ledger**: https://usevire.xyz/ledger
 
