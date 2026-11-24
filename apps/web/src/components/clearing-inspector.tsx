@@ -42,9 +42,10 @@ interface ScenarioConfig {
   slug: string;
   corridor: "cNGN" | "wARS" | "wBRL" | "IDRX";
   tokenName: string;
+  useCaseLabel: string;
   deliverableLabel: string;
   deliverableUrl: string;
-  aiScore: number;
+  reviewCostLabel: string;
   localAmount: string;
   fallbackUsdt: string;
   offrampRail: string;
@@ -56,21 +57,23 @@ const SCENARIOS: ScenarioConfig[] = [
     slug: "launch-partner-blackfriday-cngn",
     corridor: "cNGN",
     tokenName: "Compliant Naira",
-    deliverableLabel: "Original Black Friday X promo tagging SWOT Gadgets with live swotgadgets.com product link",
-    deliverableUrl: "https://x.com/promoter/status/swot-black-friday-iphone",
-    aiScore: 92,
+    useCaseLabel: "Creator promo payout",
+    deliverableLabel: "Original product review post on X with live store link and campaign tag",
+    deliverableUrl: "https://x.com/creator_ng/status/189241038492014",
+    reviewCostLabel: "Automated check ($0.005)",
     localAmount: "2,500",
     fallbackUsdt: "1.73",
-    offrampRail: "Busha · Quidax · Yellow Card",
+    offrampRail: "MiniPay · Busha · Quidax",
   },
   {
     id: "wARS",
     slug: "latam-qa-regression-wars",
     corridor: "wARS",
     tokenName: "Argentine Peso",
-    deliverableLabel: "Reproducible GitHub QA issue on eugenennamdi/Vire with logs and fix notes",
-    deliverableUrl: "https://github.com/eugenennamdi/Vire/issues/12",
-    aiScore: 89,
+    useCaseLabel: "Open-source QA bounty",
+    deliverableLabel: "Reproducible GitHub bug report with logs and verified fix notes",
+    deliverableUrl: "https://github.com/acme-org/checkout/issues/12",
+    reviewCostLabel: "Automated check ($0.01)",
     localAmount: "2,500",
     fallbackUsdt: "1.43",
     offrampRail: "Ripio Portal (CBU)",
@@ -80,9 +83,10 @@ const SCENARIOS: ScenarioConfig[] = [
     slug: "brazil-ptbr-localization-wbrl",
     corridor: "wBRL",
     tokenName: "Brazilian Real",
-    deliverableLabel: "Portuguese translation pull request on GitHub paid in exact Brazilian Real (wBRL)",
-    deliverableUrl: "https://github.com/eugenennamdi/Vire/pull/18",
-    aiScore: 94,
+    useCaseLabel: "Product localization",
+    deliverableLabel: "Portuguese UI translation pull request verified on GitHub",
+    deliverableUrl: "https://github.com/acme-org/app/pull/18",
+    reviewCostLabel: "Automated check ($0.01)",
     localAmount: "12",
     fallbackUsdt: "2.04",
     offrampRail: "Ripio Portal (PIX)",
@@ -92,9 +96,10 @@ const SCENARIOS: ScenarioConfig[] = [
     slug: "indonesia-bahasa-qa-idrx",
     corridor: "IDRX",
     tokenName: "Indonesian Rupiah",
-    deliverableLabel: "Indonesian QA review on GitHub paid in exact Indonesian Rupiah (IDRX)",
-    deliverableUrl: "https://github.com/eugenennamdi/Vire/pull/21",
-    aiScore: 91,
+    useCaseLabel: "Community QA sprint",
+    deliverableLabel: "Bahasa Indonesia checkout QA report verified on GitHub",
+    deliverableUrl: "https://github.com/acme-org/app/pull/21",
+    reviewCostLabel: "Automated check ($0.01)",
     localAmount: "35,000",
     fallbackUsdt: "1.91",
     offrampRail: "IDRX Bank Redeem (IDR)",
@@ -235,7 +240,7 @@ export function ClearingInspector({
     ? [
         { label: "Unique submission", passed: false },
         { label: "External recipient wallet", passed: false },
-        { label: `Quality score ≥ ${matchedCampaign?.minPassScore ?? 75}/100`, passed: false },
+        { label: "Meets campaign rules", passed: false },
         { label: `Exchange spread ≤ ${maxSpreadPct}%`, passed: true },
         { label: `Per-payout limit ≤ $${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"}`, passed: true },
         { label: `Daily limit ≤ $${matchedCampaign?.dailyLimitUsdtFormatted ?? "20"}`, passed: true },
@@ -243,7 +248,7 @@ export function ClearingInspector({
     : [
         { label: "Unique submission", passed: true },
         { label: "External recipient wallet", passed: true },
-        { label: `Quality score ≥ ${matchedCampaign?.minPassScore ?? 75}/100`, passed: true },
+        { label: "Meets campaign rules", passed: true },
         { label: `Exchange spread ≤ ${maxSpreadPct}%`, passed: true },
         { label: `Per-payout limit ≤ $${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"}`, passed: true },
         { label: `Daily limit ≤ $${matchedCampaign?.dailyLimitUsdtFormatted ?? "20"}`, passed: true },
@@ -351,7 +356,7 @@ export function ClearingInspector({
                     </h3>
                   </div>
                   <Badge tone={isBlocked ? "destructive" : "positive"}>
-                    {isBlocked ? "Score 38/100" : `Score ${scenario.aiScore}/100`}
+                    {isBlocked ? "Rejected" : "Verified"}
                   </Badge>
                 </div>
                 <p className="mt-2 text-[13.5px] leading-relaxed text-[#52525B]">
@@ -362,7 +367,7 @@ export function ClearingInspector({
                 <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11.5px] text-[#71717A]">
                   <span className="truncate">{scenario.deliverableUrl}</span>
                   <span>·</span>
-                  <span>Automated review ($0.01)</span>
+                  <span>{scenario.reviewCostLabel}</span>
                 </div>
               </div>
 
@@ -526,9 +531,9 @@ export function ClearingInspector({
                 {/* Clean Key-Value Spec Rows */}
                 <dl className="divide-y divide-black/[0.06] text-[12.5px]">
                   <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Campaign</dt>
+                    <dt className="text-[#71717A]">Use case</dt>
                     <dd className="truncate font-medium text-[#0A0A0C]">
-                      {matchedCampaign?.partnerName ?? "Open Currency Network"}
+                      {scenario.useCaseLabel}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-2.5">
