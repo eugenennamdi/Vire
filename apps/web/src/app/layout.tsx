@@ -312,12 +312,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     <div className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#121210]">
                       Local Rails
                     </div>
-                    <ul className="space-y-2 font-mono text-xs text-[#68665F]">
-                      <li>cNGN · Nigeria (6dp)</li>
-                      <li>wARS · Argentina (18dp)</li>
-                      <li>wBRL · Brazil (18dp)</li>
-                      <li>IDRX · Indonesia (2dp)</li>
-                      <li>wMXN · Mexico (18dp)</li>
+                    <ul className="space-y-2 whitespace-nowrap font-mono text-[11px] text-[#68665F]">
+                      <li>cNGN · NG · 6dp</li>
+                      <li>wARS · AR · 18dp</li>
+                      <li>wBRL · BR · 18dp</li>
+                      <li>IDRX · ID · 2dp</li>
+                      <li>wMXN · MX · 18dp</li>
                     </ul>
                   </div>
                 </div>

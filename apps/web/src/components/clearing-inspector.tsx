@@ -508,14 +508,14 @@ export function ClearingInspector({
             <table className="w-full text-left text-xs">
               <thead className="border-b border-[#E4E2DC] bg-[#F3F1EC]/70 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#68665F]">
                 <tr>
-                  <th className="px-5 py-3 font-medium">Pair</th>
-                  <th className="px-4 py-3 font-medium">Market</th>
-                  <th className="px-4 py-3 font-medium">Precision</th>
+                  <th className="px-4 py-3 font-medium sm:px-5">Pair</th>
+                  <th className="hidden px-4 py-3 font-medium sm:table-cell">Market</th>
+                  <th className="hidden px-4 py-3 font-medium sm:table-cell">Precision</th>
                   <th className="px-4 py-3 text-right font-medium">Live Rate (1 USDT)</th>
-                  <th className="px-4 py-3 text-right font-medium">Maker Depth</th>
+                  <th className="hidden px-4 py-3 text-right font-medium sm:table-cell">Maker Depth</th>
                   <th className="hidden px-4 py-3 font-medium md:table-cell">Off-Ramp Rail</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 text-right font-medium">Missions</th>
+                  <th className="hidden px-5 py-3 text-right font-medium sm:table-cell">Missions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E4E2DC]">
@@ -538,13 +538,18 @@ export function ClearingInspector({
                           key={sym}
                           className="transition-colors hover:bg-[#FAF9F6]"
                         >
-                          <td className="whitespace-nowrap px-5 py-3.5 font-mono font-semibold text-[#121210]">
-                            USDT / {sym}
+                          <td className="whitespace-nowrap px-4 py-3.5 font-mono font-semibold text-[#121210] sm:px-5">
+                            <Link
+                              href={`/campaigns?corridor=${encodeURIComponent(sym)}`}
+                              className="hover:underline"
+                            >
+                              USDT / {sym}
+                            </Link>
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3.5 text-[#4F4E4A]">
+                          <td className="hidden whitespace-nowrap px-4 py-3.5 text-[#4F4E4A] sm:table-cell">
                             {c?.countryName ?? sym}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3.5 font-mono text-[#68665F] tabular-nums">
+                          <td className="hidden whitespace-nowrap px-4 py-3.5 font-mono text-[#68665F] tabular-nums sm:table-cell">
                             {c?.decimals ?? "—"}dp
                           </td>
                           <td className="whitespace-nowrap px-4 py-3.5 text-right font-mono font-semibold text-[#121210] tabular-nums">
@@ -561,7 +566,7 @@ export function ClearingInspector({
                                 ? `$${c.maxSellUsdtFormatted} USDT maker depth`
                                 : "$0 depth"
                             }
-                            className="whitespace-nowrap px-4 py-3.5 text-right font-mono text-[#4F4E4A] tabular-nums"
+                            className="hidden whitespace-nowrap px-4 py-3.5 text-right font-mono text-[#4F4E4A] tabular-nums sm:table-cell"
                           >
                             {formatCompactUsd(depth)}
                           </td>
@@ -584,7 +589,7 @@ export function ClearingInspector({
                               {isLive ? "Active" : "No makers"}
                             </span>
                           </td>
-                          <td className="whitespace-nowrap px-5 py-3.5 text-right">
+                          <td className="hidden whitespace-nowrap px-5 py-3.5 text-right sm:table-cell">
                             <Link
                               href={`/campaigns?corridor=${encodeURIComponent(sym)}`}
                               className="inline-flex items-center gap-1 font-mono text-[11px] font-medium text-[#121210] hover:underline"
