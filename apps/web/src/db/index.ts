@@ -90,6 +90,7 @@ const DDL_STATEMENTS = [
     eip191_signature TEXT,
     oauth_verified INTEGER NOT NULL DEFAULT 0,
     gas_drip_tx_hash TEXT,
+    gas_topup_tx_hash TEXT,
     verified_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS submissions (
@@ -184,6 +185,7 @@ const DDL_STATEMENTS = [
 const ADDITIVE_MIGRATIONS = [
   `ALTER TABLE contributors ADD COLUMN oauth_verified INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE contributors ADD COLUMN gas_drip_tx_hash TEXT`,
+  `ALTER TABLE contributors ADD COLUMN gas_topup_tx_hash TEXT`,
   `ALTER TABLE settlements ADD COLUMN identity_handle TEXT`,
   `ALTER TABLE settlements ADD COLUMN author_id TEXT`,
   `ALTER TABLE settlements ADD COLUMN content_hash TEXT`,

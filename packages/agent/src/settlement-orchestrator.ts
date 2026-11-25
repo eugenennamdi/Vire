@@ -125,16 +125,16 @@ export interface OrchestratorDeps {
   /** Optional explicit reference rate fetcher; defaults to Textile live levels top-of-book. */
   getReferenceRate?: (corridor: CorridorSymbol) => Promise<number | undefined>;
   /**
-   * Optional first-time recipient native CELO gas drip (default 0.01 CELO when recipient holds < 0.005 CELO).
-   * Ensures Privy social-login embedded wallets can immediately transfer cNGN or submit ERC-8004 feedback.
+   * Optional first-time recipient native CELO gas sponsorship (default 0.25 CELO when recipient holds < 0.20 CELO).
+   * Covers Celo's 200 gwei base fee across ERC-20 approve, Textile FX local→USDT conversion, MiniPay USDT transfer, and ERC-8004 rating.
    * Set to 0n to disable.
    */
   recipientGasDripWei?: bigint;
 }
 
-const DEFAULT_RECIPIENT_GAS_DRIP_WEI = 10_000_000_000_000_000n; // 0.01 CELO (~$0.005)
-const RECIPIENT_GAS_THRESHOLD_WEI = 5_000_000_000_000_000n; // 0.005 CELO
-const AGENT_MIN_CELO_RESERVE_WEI = 50_000_000_000_000_000n; // Keep >= 0.05 CELO reserve in agent wallet
+const DEFAULT_RECIPIENT_GAS_DRIP_WEI = 250_000_000_000_000_000n; // 0.25 CELO (~$0.013 at live Celo rates)
+const RECIPIENT_GAS_THRESHOLD_WEI = 200_000_000_000_000_000n; // 0.20 CELO
+const AGENT_MIN_CELO_RESERVE_WEI = 500_000_000_000_000_000n; // Keep >= 0.50 CELO reserve in agent wallet
 
 export interface ProcessSubmissionParams {
   submissionId: string;

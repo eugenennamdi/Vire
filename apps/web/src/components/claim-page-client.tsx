@@ -56,6 +56,7 @@ import { TokenIcon } from "@/components/ui/token-icon";
 import {
   executeConvertToUsdt,
   fetchConvertToUsdtPreview,
+  formatWalletTxError,
   isConvertibleLocalToken,
   type ConvertToUsdtPreview,
 } from "@/lib/convert-to-usdt";
@@ -600,15 +601,14 @@ function ClaimFlowInner({
           setConvertSendTo("");
           toast.success(`Sent ${swapRes.buyUsdtFormatted} USDT on Celo`);
         } catch (sendErr) {
-          const msg = sendErr instanceof Error ? sendErr.message : "USDT transfer cancelled.";
+          const msg = formatWalletTxError(sendErr, "USDT transfer cancelled.");
           setConvertError(
-            `Converted to ${swapRes.buyUsdtFormatted} USDT successfully, but the USDT send was not completed (${msg.slice(0, 100)}). Use the Send USDT button below to retry.`
+            `Converted to ${swapRes.buyUsdtFormatted} USDT successfully, but the USDT send was not completed (${msg}). Use the Send USDT button below to retry.`
           );
         }
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Conversion cancelled or failed.";
-      setConvertError(msg.slice(0, 180));
+      setConvertError(formatWalletTxError(err, "Conversion cancelled or failed."));
       toast.error("Conversion did not complete");
     } finally {
       setIsConverting(false);
@@ -638,8 +638,7 @@ function ClaimFlowInner({
       setConvertSendTo("");
       toast.success(`Sent ${convertedUsdt.buyUsdtFormatted} USDT on Celo`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "USDT transfer cancelled.";
-      setConvertError(msg.slice(0, 160));
+      setConvertError(formatWalletTxError(err, "USDT transfer cancelled."));
     } finally {
       setIsSendingConvertedUsdt(false);
     }
@@ -682,8 +681,7 @@ function ClaimFlowInner({
       setTransferTo("");
       toast.success(`Sent ${transferAmount.trim()} ${activeCampaign.corridor}`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Transfer cancelled.";
-      setTransferError(msg.slice(0, 140));
+      setTransferError(formatWalletTxError(err, "Transfer cancelled."));
     } finally {
       setIsTransferring(false);
     }
@@ -1528,12 +1526,12 @@ function ClaimFlowInner({
                             )}
                           </Button>
 
-                          {!isMiniPay && (
-                            <p className="text-[11px] leading-relaxed text-[#71717A]">
-                              Note: MiniPay displays USDT, USDC, and USAT on Celo and supports Nigerian bank
-                              transfers (OPay, Moniepoint) from 0.35 USDT.
-                            </p>
-                          )}
+                          <p className="text-[11px] leading-relaxed text-[#71717A]">
+                            <strong className="font-medium text-[#0A0A0C]">Launch perk:</strong> Vire
+                            covers your Celo network gas automatically on payouts and USDT conversions.
+                            {!isMiniPay &&
+                              " MiniPay supports USDT, USDC, and USAT on Celo with Nigerian bank transfers from 0.35 USDT."}
+                          </p>
                         </form>
                       ) : (
                         <div className="space-y-2.5">

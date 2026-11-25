@@ -56,11 +56,23 @@ export async function fetchConvertToUsdtPreview(params: {
   };
 }
 
+export function formatWalletTxError(err: unknown, fallback = "Transaction cancelled or failed."): string {
+  const raw = err instanceof Error ? err.message : fallback;
+  if (/insufficient funds for gas|insufficient funds/i.test(raw)) {
+    return "Not enough CELO in your wallet for Celo network gas (~0.25 CELO needed). Paid contributors get gas covered automatically on conversion — retry once or top up a small amount of CELO.";
+  }
+  if (/user rejected|user denied|rejected the request|cancelled/i.test(raw)) {
+    return "Transaction was cancelled in your wallet.";
+  }
+  return raw.slice(0, 180);
+}
+
 export interface ExecuteConvertToUsdtResult {
   swapTxHash: Hash;
   buyUsdtAtomic: string;
   buyUsdtFormatted: string;
   takerPaysFormatted: string;
+  gasTopupTxHash?: Hash;
 }
 
 export async function executeConvertToUsdt(params: {
@@ -129,6 +141,7 @@ export async function executeConvertToUsdt(params: {
       buyUsdtFormatted?: string;
       expiresAt?: string;
       spender?: Address;
+      gasTopupTxHash?: Hash;
       transactions?: {
         approval: { to: Address; data: Hex; value: string; chainId: number };
         swap: { to: Address; data: Hex; value: string; chainId: number };
@@ -138,6 +151,10 @@ export async function executeConvertToUsdt(params: {
 
     if (!quoteRes.ok || !quoteJson.rfqId || !quoteJson.transactions?.swap || !quoteJson.spender) {
       throw new Error(quoteJson.error || `No live ${sellToken} → USDT quote right now.`);
+    }
+
+    if (quoteJson.gasTopupTxHash) {
+      onStatus?.("Covered Celo network gas for your conversion…");
     }
 
     // Client-side defense-in-depth verification before prompting the wallet
@@ -218,6 +235,7 @@ export async function executeConvertToUsdt(params: {
       buyUsdtAtomic: quoteJson.buyAmountAtomic!,
       buyUsdtFormatted: quoteJson.buyUsdtFormatted ?? "0",
       takerPaysFormatted: quoteJson.takerPaysFormatted ?? "",
+      ...(quoteJson.gasTopupTxHash ? { gasTopupTxHash: quoteJson.gasTopupTxHash } : {}),
     };
   } catch (err) {
     if (activeRfqId) {

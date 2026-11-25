@@ -40,6 +40,7 @@ import {
   CONVERTIBLE_LOCAL_TOKENS,
   executeConvertToUsdt,
   fetchConvertToUsdtPreview,
+  formatWalletTxError,
   type ConvertibleLocalToken,
   type ConvertToUsdtPreview,
 } from "@/lib/convert-to-usdt";
@@ -165,7 +166,7 @@ function AccountPopover({
     },
   });
 
-  const { data: celoNative } = useBalance({
+  const { data: celoNative, refetch: refetchCelo } = useBalance({
     address: walletAddress,
     chainId: celo.id,
     query: {
@@ -309,10 +310,9 @@ function AccountPopover({
       setLastConvertTx({ hash: res.swapTxHash, usdt: res.buyUsdtFormatted });
       setConvertAmount("");
       toast.success(`Converted ${res.takerPaysFormatted} ${convertToken} → ${res.buyUsdtFormatted} USDT`);
-      void refetchBalances();
+      void Promise.all([refetchBalances(), refetchCelo()]);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Conversion cancelled or failed.";
-      setConvertError(msg.slice(0, 150));
+      setConvertError(formatWalletTxError(err, "Conversion cancelled or failed."));
       toast.error("Conversion failed");
     } finally {
       setIsConverting(false);
@@ -358,10 +358,9 @@ function AccountPopover({
       setWithdrawAmount("");
       setWithdrawTo("");
       toast.success(`Sent ${withdrawAmount.trim()} ${sendToken} on Celo Mainnet`);
-      void refetchBalances();
+      void Promise.all([refetchBalances(), refetchCelo()]);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Transfer cancelled or failed.";
-      setWithdrawError(msg.slice(0, 140));
+      setWithdrawError(formatWalletTxError(err, "Transfer cancelled or failed."));
       toast.error(`${sendToken} transfer failed`);
     }
   }
@@ -568,8 +567,10 @@ function AccountPopover({
                   </div>
 
                   <p className="text-[10.5px] leading-snug text-[#71717A]">
+                    <strong className="font-medium text-[#0A0A0C]">Launch perk:</strong> Network gas
+                    covered by Vire during launch.{" "}
                     {isMiniPay
-                      ? "Swaps straight into your MiniPay USDT balance for Pay to Bank Transfer (OPay / Moniepoint, min 0.35 USDT)."
+                      ? "Swaps straight into your MiniPay USDT balance (OPay / Moniepoint, min 0.35 USDT)."
                       : "Convert local payouts to Celo USDT before sending to MiniPay or exchanges."}
                   </p>
 

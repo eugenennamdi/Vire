@@ -8,7 +8,7 @@ import {
 import { NextRequest, NextResponse } from "next/server";
 import { encodeFunctionData, erc20Abi, formatUnits, getAddress, type Hash } from "viem";
 import { z } from "zod";
-import { getTextileClient } from "@/lib/runtime";
+import { ensureContributorConversionGas, getTextileClient } from "@/lib/runtime";
 import {
   FUNDING_RFQ_COOKIE,
   signFundingRfqCookie,
@@ -286,6 +286,19 @@ export async function POST(req: NextRequest) {
     const token = FUNDING_TOKENS[data.sellToken as FundingTokenSymbol];
     const taker = getAddress(session.wallet);
 
+    // Launch perk: ensure verified paid contributors have enough CELO headroom (0.25 CELO) BEFORE locking the firm quote
+    let gasTopupTxHash: Hash | null = null;
+    if (isExactInput) {
+      const topup = await ensureContributorConversionGas({
+        wallet: taker,
+        sellTokenAddress: token.address,
+        sellAmountAtomic: sellAmountTarget!,
+      }).catch(() => ({ toppedUp: false as const, txHash: undefined }));
+      if (topup.toppedUp && topup.txHash) {
+        gasTopupTxHash = topup.txHash;
+      }
+    }
+
     try {
       const outcome = isExactInput
         ? await textile.requestFirmExactInput({
@@ -370,6 +383,7 @@ export async function POST(req: NextRequest) {
         buyUsdtFormatted: formatDisplayAmount(quote.buyAmount, 6),
         expiresAt: quote.expiresAt,
         spender: quote.spender,
+        ...(gasTopupTxHash ? { gasTopupTxHash } : {}),
         transactions: {
           approval: safeApprovalTx,
           swap: swapTx,

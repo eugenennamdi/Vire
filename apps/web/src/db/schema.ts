@@ -44,6 +44,7 @@ export const contributors = sqliteTable("contributors", {
   eip191Signature: text("eip191_signature"),
   oauthVerified: integer("oauth_verified", { mode: "boolean" }).notNull().default(false),
   gasDripTxHash: text("gas_drip_tx_hash"),
+  gasTopupTxHash: text("gas_topup_tx_hash"),
   verifiedAt: integer("verified_at").notNull(),
 });
 

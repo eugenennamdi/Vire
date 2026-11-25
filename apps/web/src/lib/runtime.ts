@@ -7,6 +7,7 @@ import {
   createUntaggedTextileWalletClient,
   getAgentIdentity,
   getReputationSummary,
+  sendTaggedTx,
   type ReputationSummary,
 } from "@vire/celo-infra";
 import {
@@ -22,7 +23,7 @@ import {
   type CorridorSymbol,
 } from "@vire/shared";
 import { TextileClient } from "@vire/textile";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { erc20Abi, getAddress, isAddress, parseAbiItem, type Address, type Hash, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { ensureDatabaseReady, getDb, schema } from "@/db";
@@ -657,6 +658,109 @@ export function createDrizzlePersistenceAdapter(): OrchestratorPersistenceAdapte
       }
     },
   };
+}
+
+const CONVERSION_GAS_TARGET_WEI = 250_000_000_000_000_000n; // 0.25 CELO (~$0.013)
+const CONVERSION_GAS_THRESHOLD_WEI = 200_000_000_000_000_000n; // Top up if < 0.20 CELO
+const CONVERSION_GAS_AGENT_RESERVE_WEI = 500_000_000_000_000_000n; // Preserve >= 0.50 CELO in agent
+
+/**
+ * Launch perk: best-effort 1-time-ever Celo gas top-up (to 0.25 CELO) for verified paid Vire contributors
+ * converting their local payout into Celo USDT (for MiniPay / exchanges).
+ * Strictly gated to wallets with a COMPLETED settlement + sufficient onchain sellToken balance + DB atomic lock.
+ */
+export async function ensureContributorConversionGas(params: {
+  wallet: Address;
+  sellTokenAddress: Address;
+  sellAmountAtomic: bigint;
+}): Promise<{ toppedUp: boolean; txHash?: Hash }> {
+  const pk = process.env.VIRE_AGENT_PRIVATE_KEY?.trim();
+  if (!pk || !/^0x[0-9a-fA-F]{64}$/.test(pk)) {
+    return { toppedUp: false };
+  }
+
+  await ensureDatabaseReady();
+  const db = getDb();
+  const walletLower = params.wallet.toLowerCase();
+
+  // 1. Only sponsor wallets that have actually earned a COMPLETED settlement on Vire
+  const settled = await db
+    .select({ id: schema.settlements.id })
+    .from(schema.settlements)
+    .where(eq(schema.settlements.recipientWallet, walletLower))
+    .limit(1);
+  if (settled.length === 0) {
+    return { toppedUp: false };
+  }
+
+  // 2. Atomically claim the 1-time conversion gas top-up slot (prevents double-click race conditions)
+  const claimed = await db
+    .update(schema.contributors)
+    .set({ gasTopupTxHash: "PENDING" })
+    .where(and(eq(schema.contributors.walletAddress, walletLower), isNull(schema.contributors.gasTopupTxHash)))
+    .returning({ walletAddress: schema.contributors.walletAddress });
+  if (claimed.length === 0) {
+    return { toppedUp: false };
+  }
+
+  const releaseSlot = async () => {
+    await db
+      .update(schema.contributors)
+      .set({ gasTopupTxHash: null })
+      .where(and(eq(schema.contributors.walletAddress, walletLower), eq(schema.contributors.gasTopupTxHash, "PENDING")))
+      .catch(() => {});
+  };
+
+  try {
+    const publicClient = getPublicClient();
+    const agentWallet = createTaggedWalletClient({
+      privateKey: pk as Hex,
+      attributionCode: getAttributionCode(),
+      rpcUrl: getCeloRpcUrl(),
+    });
+
+    const [recipientCelo, agentCelo, sellBalance] = await Promise.all([
+      publicClient.getBalance({ address: params.wallet }),
+      publicClient.getBalance({ address: agentWallet.account.address }),
+      publicClient.readContract({
+        address: params.sellTokenAddress,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [params.wallet],
+      }),
+    ]);
+
+    // Only sponsor when the wallet actually holds the local token being converted and needs CELO gas
+    if (sellBalance < params.sellAmountAtomic || recipientCelo >= CONVERSION_GAS_THRESHOLD_WEI) {
+      await releaseSlot();
+      return { toppedUp: false };
+    }
+
+    const topUpWei = CONVERSION_GAS_TARGET_WEI - recipientCelo;
+    if (topUpWei <= 0n || agentCelo < CONVERSION_GAS_AGENT_RESERVE_WEI + topUpWei) {
+      await releaseSlot();
+      return { toppedUp: false };
+    }
+
+    const dripTx = await sendTaggedTx({
+      walletClient: agentWallet,
+      publicClient,
+      to: params.wallet,
+      value: topUpWei,
+      attributionCode: getAttributionCode(),
+      useUsdtFeeAbstraction: false,
+    });
+
+    await db
+      .update(schema.contributors)
+      .set({ gasTopupTxHash: dripTx.hash })
+      .where(eq(schema.contributors.walletAddress, walletLower));
+
+    return { toppedUp: true, txHash: dripTx.hash };
+  } catch {
+    await releaseSlot();
+    return { toppedUp: false };
+  }
 }
 
 export async function createLiveOrchestrator(): Promise<SettlementOrchestrator> {
