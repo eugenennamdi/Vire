@@ -153,7 +153,7 @@ const TABS: Array<{
       {
         segments: [
           { text: '  "vault": ', tone: "type" },
-          { text: '"0x86140c2aFd04c9dEC2AB71EA74953Bce70C5a9BF",', tone: "string" },
+          { text: '"0x8969060F1605A6C351210323169Efb226667b26f",', tone: "string" },
         ],
       },
       {
@@ -209,7 +209,11 @@ export function ProtocolProofBlock() {
 
       {/* Morpho-style flush folder tabs seamlessly joined to crisp code card */}
       <div className="mx-auto max-w-[780px]">
-        <div role="tablist" aria-label="Protocol source tabs" className="flex flex-wrap items-end gap-1">
+        <div
+          role="tablist"
+          aria-label="Protocol source tabs"
+          className="flex flex-nowrap items-end gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           {TABS.map((tab) => {
             const on = tab.id === active;
             return (
@@ -220,9 +224,9 @@ export function ProtocolProofBlock() {
                 aria-selected={on}
                 onClick={() => setActive(tab.id)}
                 className={cn(
-                  "vire-pressable relative inline-flex items-center gap-2 rounded-t-xl px-4 py-2.5 font-mono text-[12px] font-medium leading-none",
+                  "vire-pressable relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-xl px-3.5 py-2.5 font-mono text-[11.5px] font-medium leading-none sm:gap-2 sm:px-4 sm:text-[12px]",
                   on
-                    ? "z-10 -mb-px bg-white text-[#0A0A0C] border-x border-t border-black/[0.07]"
+                    ? "z-10 -mb-px border-x border-t border-black/[0.07] bg-white text-[#0A0A0C]"
                     : "text-[#71717A] hover:text-[#0A0A0C]"
                 )}
               >
@@ -239,10 +243,10 @@ export function ProtocolProofBlock() {
             active === "vault" && "rounded-tl-none"
           )}
         >
-          <div className="min-h-[312px] overflow-x-auto px-5 py-6 sm:px-7">
-            <pre className="font-mono text-[12.5px] leading-[1.75]">
+          <div className="min-h-[280px] overflow-x-auto px-4 py-5 sm:min-h-[312px] sm:px-7 sm:py-6">
+            <pre className="font-mono text-[11.5px] leading-[1.75] sm:text-[12.5px]">
               {current.lines.map((line, i) => (
-                <div key={i} className="flex gap-6">
+                <div key={i} className="flex gap-4 sm:gap-6">
                   <span className="w-5 shrink-0 select-none text-right text-[#A1A1AA] tabular-nums">
                     {i + 1}
                   </span>
@@ -258,13 +262,13 @@ export function ProtocolProofBlock() {
             </pre>
           </div>
 
-          <div className="flex items-center justify-between border-t border-black/[0.06] bg-[#FAFAFB] px-5 py-3 text-[12px] text-[#71717A] sm:px-7">
-            <span className="font-mono text-[11.5px]">{current.meta}</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/[0.06] bg-[#FAFAFB] px-4 py-3 text-[12px] text-[#71717A] sm:px-7">
+            <span className="font-mono text-[11px] sm:text-[11.5px]">{current.meta}</span>
             <a
               href={current.href}
               target={current.href.startsWith("http") ? "_blank" : undefined}
               rel={current.href.startsWith("http") ? "noreferrer" : undefined}
-              className="inline-flex items-center gap-1 font-medium text-[#0A0A0C] hover:underline"
+              className="inline-flex shrink-0 items-center gap-1 py-0.5 font-medium text-[#0A0A0C] hover:underline"
             >
               {current.linkLabel}
               <ArrowUpRight className="h-3.5 w-3.5" />

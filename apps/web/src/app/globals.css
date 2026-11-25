@@ -110,10 +110,20 @@
 /* Soft radial luminance veil preserving effortless contrast behind left display copy */
 .vire-hero-veil {
   background: radial-gradient(
-    ellipse 56% 92% at 16% 48%,
-    rgba(255, 255, 255, 0.9) 42%,
-    rgba(255, 255, 255, 0) 100%
+    ellipse 86% 94% at 22% 42%,
+    rgba(255, 255, 255, 0.92) 48%,
+    rgba(255, 255, 255, 0.12) 100%
   );
+}
+
+@media (min-width: 1024px) {
+  .vire-hero-veil {
+    background: radial-gradient(
+      ellipse 56% 92% at 16% 48%,
+      rgba(255, 255, 255, 0.9) 42%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
 }
 
 /* Tactile press feedback (Emil Kowalski) — explicit properties only */

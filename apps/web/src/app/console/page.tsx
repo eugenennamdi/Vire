@@ -247,13 +247,17 @@ console.log(await res.json());`;
             </div>
             <div className="divide-y divide-black/[0.055] font-mono text-[12px]">
               {Object.values(CELO_TOKENS).map((t) => (
-                <div key={t.symbol} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <span className="inline-flex items-center gap-2 font-medium text-[#0A0A0C]">
+                <div key={t.symbol} className="flex items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-5">
+                  <span className="inline-flex shrink-0 items-center gap-2 font-medium text-[#0A0A0C]">
                     <TokenIcon symbol={t.symbol} size={20} />
                     {t.symbol}
                   </span>
-                  <span className="text-[#71717A]">{truncateMiddle(t.address, 8, 5)}</span>
-                  <span className="text-[#3F3F46] tabular-nums">{t.decimals} decimals</span>
+                  <span className="min-w-0 truncate text-[#71717A]">{truncateMiddle(t.address, 6, 4)}</span>
+                  <span className="shrink-0 text-[#3F3F46] tabular-nums">
+                    {t.decimals}
+                    <span className="sm:hidden"> dec</span>
+                    <span className="hidden sm:inline"> decimals</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -288,7 +292,7 @@ console.log(await res.json());`;
             </div>
           </div>
 
-          <div className="space-y-5 p-6">
+          <div className="space-y-5 p-4 sm:p-6">
             {x402Status !== null ? (
               <div className="space-y-4">
                 <div className="vire-well flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 font-mono text-xs">

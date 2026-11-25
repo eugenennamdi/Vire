@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const FIELD_CHROME =
-  "w-full rounded-[10px] border border-black/[0.10] bg-white text-[13.5px] text-[#0A0A0C] placeholder:text-[#A1A1AA] " +
+  "w-full rounded-[10px] border border-black/[0.10] bg-white text-[16px] sm:text-[13.5px] text-[#0A0A0C] placeholder:text-[#A1A1AA] " +
   "transition-[border-color,box-shadow,background-color] duration-150 " +
   "hover:border-black/[0.20] focus:border-black/[0.35] focus:outline-none focus:ring-[3px] focus:ring-black/[0.05] " +
   "disabled:cursor-not-allowed disabled:bg-[#F4F4F6] disabled:text-[#A1A1AA]";
@@ -35,7 +35,7 @@ export function FieldLabel({ className, ...props }: LabelHTMLAttributes<HTMLLabe
 }
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(FIELD_BASE, "h-10", className)} {...props} />;
+  return <input className={cn(FIELD_BASE, "h-11 sm:h-10", className)} {...props} />;
 }
 
 interface ParsedOption {
@@ -139,7 +139,7 @@ export function Select({
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
           FIELD_CHROME,
-          "flex h-10 min-w-0 items-center justify-between gap-2.5 px-3.5 text-left cursor-pointer",
+          "flex h-11 min-w-0 cursor-pointer items-center justify-between gap-2.5 px-3.5 text-left sm:h-10",
           open && "border-black/[0.35] ring-[3px] ring-black/[0.05]",
           className
         )}

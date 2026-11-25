@@ -635,7 +635,7 @@ function ClaimFlowInner({
         {/* Left Action Column */}
         <div className="min-w-0 space-y-5 lg:col-span-7">
           {/* Step 1: Link Profile */}
-          <Card className="vire-enter vire-delay-1 p-6">
+          <Card className="vire-enter vire-delay-1 p-4 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
                 <span className="font-mono text-[12px] text-[#A1A1AA]">01</span>
@@ -703,7 +703,7 @@ function ClaimFlowInner({
                       variant="secondary"
                       disabled={isBinding}
                       onClick={handleBindIdentity}
-                      className="h-10 w-full"
+                      className="h-11 w-full sm:h-10"
                     >
                       <Signature weight="regular" className="h-3.5 w-3.5" />
                       {isBinding ? "Signing…" : "Sign"}
@@ -733,9 +733,9 @@ function ClaimFlowInner({
           </Card>
 
           {/* Step 2: Work Proof Form */}
-          <Card className="vire-enter vire-delay-2 p-6">
+          <Card className="vire-enter vire-delay-2 p-4 sm:p-6">
             <form onSubmit={handleSubmitDeliverable} className="space-y-4">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
                   <span className="font-mono text-[12px] text-[#A1A1AA]">02</span>
                   <h2 className="text-[15px] font-medium text-[#0A0A0C]">Work proof</h2>
@@ -1021,7 +1021,7 @@ function ClaimFlowInner({
         {/* Right Sticky Payout Progress */}
         <div className="min-w-0 lg:sticky lg:top-20 lg:col-span-5">
           <Card className="vire-enter vire-delay-2 overflow-visible">
-            <div className="flex items-center justify-between rounded-t-2xl border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
+            <div className="flex items-center justify-between rounded-t-2xl border-b border-black/[0.06] bg-[#FAFAFB] px-4 py-3.5 sm:px-6">
               <h2 className="text-[13px] font-medium text-[#0A0A0C]">
                 {result?.status === "COMPLETED"
                   ? "Payout receipt"
@@ -1038,7 +1038,7 @@ function ClaimFlowInner({
               )}
             </div>
 
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {!result && !isSubmitting && (
                 <ol className="divide-y divide-black/[0.06]">
                   {(isManualMode

@@ -569,7 +569,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-[#F5F5F7]/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-[1220px] items-center justify-between gap-4 px-4 sm:px-6 md:grid md:grid-cols-[1fr_auto_1fr] lg:px-8">
+      <div className="mx-auto flex h-14 max-w-[1220px] items-center justify-between gap-4 px-4 sm:h-16 sm:px-6 md:grid md:grid-cols-[1fr_auto_1fr] lg:px-8">
         {/* Left: Brand Anchor */}
         <div className="flex items-center justify-self-start">
           <Link
@@ -636,33 +636,39 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile navigation strip — clean horizontal strip fitting 390px cleanly */}
-      <nav
-        aria-label="Mobile navigation"
-        className="flex items-center justify-between gap-1 overflow-x-auto border-t border-black/[0.05] bg-[#F5F5F7]/95 px-3 py-2 md:hidden"
-      >
-        {NAV_LINKS.map((item) => {
-          const active = activeHref === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              onClick={() => {
-                if (item.href !== pathname) setPendingHref(item.href);
-              }}
-              className={cn(
-                "whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors",
-                active
-                  ? "vire-pill-surface text-[#0A0A0C]"
-                  : "text-[#71717A] hover:text-[#0A0A0C]"
-              )}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Mobile navigation strip — spacious touch pills with smooth horizontal glide & subtle right edge fade */}
+      <div className="relative border-t border-black/[0.05] bg-[#F5F5F7]/95 md:hidden">
+        <nav
+          aria-label="Mobile navigation"
+          className="flex items-center gap-1 overflow-x-auto px-3 py-1.5 pr-9 [scrollbar-width:none] sm:justify-center sm:pr-3 [&::-webkit-scrollbar]:hidden"
+        >
+          {NAV_LINKS.map((item) => {
+            const active = activeHref === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                onClick={() => {
+                  if (item.href !== pathname) setPendingHref(item.href);
+                }}
+                className={cn(
+                  "vire-pressable inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-[12.5px] font-medium transition-colors",
+                  active
+                    ? "vire-pill-surface text-[#0A0A0C]"
+                    : "text-[#71717A] hover:text-[#0A0A0C]"
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#F5F5F7] via-[#F5F5F7]/80 to-transparent sm:hidden"
+        />
+      </div>
     </header>
   );
 }

@@ -181,13 +181,13 @@ function CampaignsInner() {
                   idx >= 3 && "vire-delay-3"
                 )}
               >
-                <div className="p-6">
-                  <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
-                    <div className="flex min-w-0 flex-1 items-start gap-4">
-                      <TokenIcon symbol={camp.corridor} size={36} showChainBadge className="mt-0.5" />
+                <div className="p-4 sm:p-6">
+                  <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start lg:gap-6">
+                    <div className="flex min-w-0 flex-1 items-start gap-3.5 sm:gap-4">
+                      <TokenIcon symbol={camp.corridor} size={36} showChainBadge className="mt-0.5 shrink-0" />
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#71717A]">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12px] text-[#71717A]">
                           {camp.isLaunchPartner ? (
                             <Badge tone="ink">Verified Partner</Badge>
                           ) : (
@@ -196,15 +196,17 @@ function CampaignsInner() {
                           <Badge tone="outline">
                             {camp.verificationMode === "manual" ? "Manual review" : "Instant auto-pay"}
                           </Badge>
-                          <span className="font-mono font-medium text-[#0A0A0C]">
-                            {camp.corridor}
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="font-mono font-medium text-[#0A0A0C]">
+                              {camp.corridor}
+                            </span>
+                            <span aria-hidden="true">·</span>
+                            <span>{camp.partnerName}</span>
                           </span>
-                          <span>·</span>
-                          <span>{camp.partnerName}</span>
                           <span className="hidden sm:inline">({camp.partnerLocation})</span>
                         </div>
 
-                        <h2 className="mt-2 text-[18px] font-medium tracking-[-0.02em] text-[#0A0A0C]">
+                        <h2 className="mt-2 text-[17px] font-medium tracking-[-0.02em] text-[#0A0A0C] sm:text-[18px]">
                           {camp.title}
                         </h2>
                         <p className="mt-1.5 max-w-[66ch] text-[13.5px] leading-[1.6] text-[#52525B]">
@@ -214,13 +216,13 @@ function CampaignsInner() {
                     </div>
 
                     <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center lg:w-64 lg:flex-col lg:items-stretch">
-                      <div className="vire-well space-y-2 rounded-xl px-4 py-3">
-                        <div className="flex items-center justify-between text-[12px]">
-                          <span className="inline-flex items-center gap-1.5 text-[#71717A]">
+                      <div className="vire-well min-w-0 space-y-2 rounded-xl px-4 py-3 sm:min-w-[230px] sm:flex-1 lg:min-w-0 lg:flex-none">
+                        <div className="flex items-center justify-between gap-3 text-[12px]">
+                          <span className="inline-flex shrink-0 items-center gap-1.5 text-[#71717A]">
                             <TokenIcon symbol="USDT" size={14} />
                             Budget
                           </span>
-                          <span className="font-mono font-medium text-[#0A0A0C] tabular-nums">
+                          <span className="whitespace-nowrap font-mono font-medium text-[#0A0A0C] tabular-nums">
                             ${camp.remainingUsdtFormatted}
                             <span className="font-normal text-[#71717A]">
                               {" "}
@@ -241,7 +243,7 @@ function CampaignsInner() {
                         className={buttonVariants({
                           variant: camp.isLaunchPartner ? "primary" : "secondary",
                           size: "md",
-                          className: "w-full",
+                          className: "h-11 w-full sm:w-auto sm:shrink-0 sm:px-6 lg:h-10 lg:w-full",
                         })}
                       >
                         Submit work

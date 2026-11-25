@@ -21,10 +21,10 @@ export const buttonVariants = cva(
           "bg-transparent text-[#52525B] hover:bg-black/[0.045] hover:text-[#0A0A0C] disabled:text-[#A1A1AA]",
       },
       size: {
-        sm: "h-8 px-3.5 text-[12.5px]",
-        md: "h-9 px-4 text-[13.5px]",
-        lg: "h-10 px-5 text-[14px]",
-        icon: "h-8 w-8 p-0",
+        sm: "h-9 px-3.5 text-[12.5px] sm:h-8",
+        md: "h-10 px-4 text-[13.5px] sm:h-9",
+        lg: "h-11 px-5 text-[14px] sm:h-10",
+        icon: "h-9 w-9 p-0 sm:h-8 sm:w-8",
       },
     },
     defaultVariants: {

@@ -868,10 +868,10 @@ export default function CreateCampaignPage() {
         <div className="space-y-6 lg:col-span-7">
           {/* Section 1: Campaign Details */}
           <Card className="vire-enter overflow-hidden">
-            <div className="border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
+            <div className="border-b border-black/[0.06] bg-[#FAFAFB] px-4 py-3.5 sm:px-6">
               <h2 className="text-[13.5px] font-medium text-[#0A0A0C]">1. Campaign details</h2>
             </div>
-            <div className="space-y-4 p-6">
+            <div className="space-y-4 p-4 sm:p-6">
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block space-y-1.5">
                   <span className="text-[12px] font-medium text-[#3F3F46]">Brand or organization</span>
@@ -881,7 +881,7 @@ export default function CreateCampaignPage() {
                     value={partnerName}
                     onChange={(e) => setPartnerName(e.target.value)}
                     placeholder="e.g. Acme Studio"
-                    className="h-10 w-full rounded-xl bg-white px-3.5 text-[13.5px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25"
+                    className="h-11 w-full rounded-xl bg-white px-3.5 text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25 sm:h-10 sm:text-[13.5px]"
                   />
                 </label>
                 <label className="block space-y-1.5">
@@ -891,7 +891,7 @@ export default function CreateCampaignPage() {
                     value={partnerLocation}
                     onChange={(e) => setPartnerLocation(e.target.value)}
                     placeholder="e.g. Lagos, Nigeria · Global"
-                    className="h-10 w-full rounded-xl bg-white px-3.5 text-[13.5px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25"
+                    className="h-11 w-full rounded-xl bg-white px-3.5 text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25 sm:h-10 sm:text-[13.5px]"
                   />
                 </label>
               </div>
@@ -904,7 +904,7 @@ export default function CreateCampaignPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Launch Week Product Review Sprint"
-                  className="h-10 w-full rounded-xl bg-white px-3.5 text-[13.5px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25"
+                  className="h-11 w-full rounded-xl bg-white px-3.5 text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25 sm:h-10 sm:text-[13.5px]"
                 />
               </label>
 
@@ -916,7 +916,7 @@ export default function CreateCampaignPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="One or two sentences explaining the campaign shown on the listing card."
-                  className="w-full rounded-xl bg-white px-3.5 py-2.5 text-[13.5px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25"
+                  className="w-full rounded-xl bg-white px-3.5 py-2.5 text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25 sm:text-[13.5px]"
                 />
               </label>
 
@@ -930,7 +930,7 @@ export default function CreateCampaignPage() {
                   value={criteria}
                   onChange={(e) => setCriteria(e.target.value)}
                   placeholder="Spell out exactly what a contributor must submit to earn the payout (links, tags, format, or proof)."
-                  className="w-full rounded-xl bg-white px-3.5 py-2.5 text-[13.5px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25"
+                  className="w-full rounded-xl bg-white px-3.5 py-2.5 text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25 sm:text-[13.5px]"
                 />
               </label>
             </div>
@@ -938,7 +938,7 @@ export default function CreateCampaignPage() {
 
           {/* Section 2: Verification Mode */}
           <Card className="vire-enter vire-delay-1 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-[#FAFAFB] px-4 py-3.5 sm:px-6">
               <h2 className="text-[13.5px] font-medium text-[#0A0A0C]">2. Verification mode</h2>
               <SegmentedTabs
                 value={verificationMode}
@@ -950,7 +950,7 @@ export default function CreateCampaignPage() {
               />
             </div>
 
-            <div className="space-y-4 p-6">
+            <div className="space-y-4 p-4 sm:p-6">
               {verificationMode === "auto" ? (
                 <>
                   <p className="text-[13px] leading-relaxed text-[#52525B]">
@@ -963,9 +963,9 @@ export default function CreateCampaignPage() {
                     <div className="grid grid-cols-3 gap-2">
                       {(
                         [
-                          { id: "x", label: "X (Twitter) post" },
-                          { id: "github", label: "GitHub PR / Issue" },
-                          { id: "web", label: "Public web URL" },
+                          { id: "x", label: "X post" },
+                          { id: "github", label: "GitHub PR" },
+                          { id: "web", label: "Web URL" },
                         ] as const
                       ).map((p) => (
                         <button
@@ -973,7 +973,7 @@ export default function CreateCampaignPage() {
                           type="button"
                           onClick={() => setAutoPlatform(p.id)}
                           className={cn(
-                            "rounded-xl px-3 py-2.5 text-left text-[12.5px] font-medium transition-all",
+                            "h-10 rounded-xl px-2.5 text-center text-[12.5px] font-medium transition-all sm:px-3",
                             autoPlatform === p.id
                               ? "bg-[#0A0A0C] text-white"
                               : "bg-[#FAFAFB] text-[#3F3F46] ring-1 ring-black/[0.08] hover:bg-white"
@@ -996,12 +996,12 @@ export default function CreateCampaignPage() {
                       onChange={(e) => setRequiredTokensInput(e.target.value)}
                       placeholder={
                         autoPlatform === "x"
-                          ? "@yourhandle, yoursite.com, #CampaignTag"
+                          ? "@handle, site.com, #Tag"
                           : autoPlatform === "github"
                             ? "org/repo, bug"
                             : "yoursite.com, review"
                       }
-                      className="h-10 w-full rounded-xl bg-white px-3.5 font-mono text-[12.5px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25"
+                      className="h-11 w-full rounded-xl bg-white px-3.5 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#0A0A0C]/25 sm:h-10 sm:text-[12.5px]"
                     />
                     {parsedRequiredTokens.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 pt-1">
@@ -1015,10 +1015,10 @@ export default function CreateCampaignPage() {
                   </label>
 
                   {autoPlatform === "x" && (
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       <label className="block space-y-1.5">
                         <span className="text-[12px] font-medium text-[#3F3F46]">
-                          Min X followers (anti-bot)
+                          Min followers
                         </span>
                         <input
                           type="number"
@@ -1026,12 +1026,12 @@ export default function CreateCampaignPage() {
                           max={100000}
                           value={minFollowers}
                           onChange={(e) => setMinFollowers(Math.max(0, Number(e.target.value) || 0))}
-                          className="h-10 w-full rounded-xl bg-white px-3.5 font-mono text-[13px] text-[#0A0A0C] ring-1 ring-black/[0.1]"
+                          className="h-11 w-full rounded-xl bg-white px-3.5 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] sm:h-10 sm:text-[13px]"
                         />
                       </label>
                       <label className="block space-y-1.5">
                         <span className="text-[12px] font-medium text-[#3F3F46]">
-                          Min X account age (days)
+                          Min age (days)
                         </span>
                         <input
                           type="number"
@@ -1041,7 +1041,7 @@ export default function CreateCampaignPage() {
                           onChange={(e) =>
                             setMinAccountAgeDays(Math.max(0, Number(e.target.value) || 0))
                           }
-                          className="h-10 w-full rounded-xl bg-white px-3.5 font-mono text-[13px] text-[#0A0A0C] ring-1 ring-black/[0.1]"
+                          className="h-11 w-full rounded-xl bg-white px-3.5 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] sm:h-10 sm:text-[13px]"
                         />
                       </label>
                     </div>
@@ -1066,20 +1066,20 @@ export default function CreateCampaignPage() {
 
           {/* Section 3: Currency, Reward & Pool */}
           <Card className="vire-enter vire-delay-2 overflow-hidden">
-            <div className="border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
+            <div className="border-b border-black/[0.06] bg-[#FAFAFB] px-4 py-3.5 sm:px-6">
               <h2 className="text-[13.5px] font-medium text-[#0A0A0C]">3. Payout currency &amp; budget</h2>
             </div>
-            <div className="space-y-5 p-6">
+            <div className="space-y-5 p-4 sm:p-6">
               <div className="space-y-2">
                 <span className="text-[12px] font-medium text-[#3F3F46]">Local payout currency</span>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                   {PRIMARY_CORRIDORS.map((sym) => (
                     <button
                       key={sym}
                       type="button"
                       onClick={() => handleSelectCorridor(sym)}
                       className={cn(
-                        "inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-medium transition-all",
+                        "inline-flex h-10 items-center justify-center gap-2 rounded-full px-3 text-[13px] font-medium transition-all sm:h-9 sm:px-3.5",
                         corridor === sym
                           ? "bg-[#0A0A0C] text-white"
                           : "bg-white text-[#3F3F46] ring-1 ring-black/[0.1] hover:bg-[#FAFAFB]"
@@ -1106,7 +1106,7 @@ export default function CreateCampaignPage() {
                     required
                     value={rewardLocalHuman}
                     onChange={(e) => setRewardLocalHuman(e.target.value)}
-                    className="h-10 w-full rounded-xl bg-white px-3.5 font-mono text-[13.5px] text-[#0A0A0C] ring-1 ring-black/[0.1]"
+                    className="h-11 w-full rounded-xl bg-white px-3.5 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] sm:h-10 sm:text-[13.5px]"
                   />
                   <span
                     className={cn(
@@ -1127,7 +1127,7 @@ export default function CreateCampaignPage() {
                     required
                     value={spotsCount}
                     onChange={(e) => setSpotsCount(Math.max(1, Number(e.target.value) || 1))}
-                    className="h-10 w-full rounded-xl bg-white px-3.5 font-mono text-[13.5px] text-[#0A0A0C] ring-1 ring-black/[0.1]"
+                    className="h-11 w-full rounded-xl bg-white px-3.5 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] sm:h-10 sm:text-[13.5px]"
                   />
                   <span className="block font-mono text-[11px] text-[#71717A]">
                     Min ${MIN_BUDGET_USDT} USDT pool
@@ -1145,7 +1145,7 @@ export default function CreateCampaignPage() {
                     onChange={(e) =>
                       setMaxPayoutsPerRecipient(Math.min(5, Math.max(1, Number(e.target.value) || 1)))
                     }
-                    className="h-10 w-full rounded-xl bg-white px-3.5 font-mono text-[13.5px] text-[#0A0A0C] ring-1 ring-black/[0.1]"
+                    className="h-11 w-full rounded-xl bg-white px-3.5 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] sm:h-10 sm:text-[13.5px]"
                   />
                   <span className="block font-mono text-[11px] text-[#71717A]">
                     {maxPayoutsPerRecipient === 1 ? "Strict FCFS (recommended)" : `Up to ${maxPayoutsPerRecipient}× repeat`}
@@ -1157,7 +1157,7 @@ export default function CreateCampaignPage() {
 
           {/* Section 4: Access & Schedule */}
           <Card className="vire-enter vire-delay-3 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-[#FAFAFB] px-4 py-3.5 sm:px-6">
               <h2 className="text-[13.5px] font-medium text-[#0A0A0C]">4. Visibility &amp; deadline</h2>
               <SegmentedTabs
                 value={visibility}
@@ -1169,7 +1169,7 @@ export default function CreateCampaignPage() {
               />
             </div>
 
-            <div className="space-y-4 p-6">
+            <div className="space-y-4 p-4 sm:p-6">
               <p className="text-[12.5px] text-[#52525B]">
                 {visibility === "public"
                   ? "Listed publicly on usevire.xyz/campaigns so any eligible contributor can discover and claim."
@@ -1186,13 +1186,13 @@ export default function CreateCampaignPage() {
                     type="text"
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value)}
-                    placeholder="Leave blank for open link-only, or set e.g. TEAM-LAGOS"
-                    className="h-10 w-full rounded-xl bg-white px-3.5 font-mono text-[13px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA]"
+                    placeholder="Optional passcode, e.g. TEAM-LAGOS"
+                    className="h-11 w-full rounded-xl bg-white px-3.5 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] placeholder:text-[#A1A1AA] sm:h-10 sm:text-[13px]"
                   />
                 </label>
               )}
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-[#3F3F46]">
                   <input
                     type="checkbox"
@@ -1209,7 +1209,7 @@ export default function CreateCampaignPage() {
                     required
                     value={deadlineLocal}
                     onChange={(e) => setDeadlineLocal(e.target.value)}
-                    className="h-9 rounded-xl bg-white px-3 font-mono text-[12.5px] text-[#0A0A0C] ring-1 ring-black/[0.1]"
+                    className="h-10 w-full rounded-xl bg-white px-3 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] sm:h-9 sm:w-auto sm:text-[12.5px]"
                   />
                 )}
               </div>
@@ -1220,7 +1220,7 @@ export default function CreateCampaignPage() {
         {/* Right: Sticky Non-Custodial Funding Summary */}
         <div className="space-y-4 lg:sticky lg:top-24 lg:col-span-5">
           <Card className="vire-enter overflow-hidden">
-            <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#FAFAFB] px-6 py-4">
+            <div className="flex items-center justify-between border-b border-black/[0.06] bg-[#FAFAFB] px-4 py-4 sm:px-6">
               <div className="flex items-center gap-2">
                 <TokenIcon symbol="USDT" size={20} showChainBadge />
                 <span className="text-[13.5px] font-medium text-[#0A0A0C]">Funding summary</span>
@@ -1228,23 +1228,23 @@ export default function CreateCampaignPage() {
               <Badge tone="outline">0% Vire fee</Badge>
             </div>
 
-            <div className="space-y-5 p-6">
+            <div className="space-y-5 p-4 sm:p-6">
               {/* Fund with selector (USDT direct OR any Textile FX deep-liquidity Celo token) */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11.5px]">
+                <div className="flex flex-wrap items-center justify-between gap-1 text-[11.5px]">
                   <span className="font-medium text-[#52525B]">Fund with</span>
                   <span className="font-mono text-[11px] text-[#71717A]">
                     {isSwapFunding ? "Auto-swapped → USDT via Textile FX" : "Direct USDT vault deposit"}
                   </span>
                 </div>
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-1.5">
                   {FUNDING_TOKEN_LIST.map((sym) => (
                     <button
                       key={sym}
                       type="button"
                       onClick={() => setFundingToken(sym)}
                       className={cn(
-                        "inline-flex items-center justify-center gap-1.5 rounded-xl px-2 py-1.5 text-[12px] font-medium transition-all",
+                        "inline-flex h-10 items-center justify-center gap-1.5 rounded-xl px-2 text-[12.5px] font-medium transition-all sm:h-9 sm:text-[12px]",
                         fundingToken === sym
                           ? "bg-[#0A0A0C] text-white"
                           : "bg-[#FAFAFB] text-[#3F3F46] ring-1 ring-black/[0.08] hover:bg-white"
@@ -1259,10 +1259,10 @@ export default function CreateCampaignPage() {
 
               {/* Big deposit figure */}
               <div className="vire-well space-y-2.5 rounded-xl px-4 py-3.5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <span className="block text-[11.5px] text-[#71717A]">Vault pool (USDT)</span>
-                    <span className="font-mono text-[24px] font-medium tracking-[-0.03em] text-[#0A0A0C] tabular-nums">
+                    <span className="font-mono text-[22px] font-medium tracking-[-0.03em] text-[#0A0A0C] tabular-nums sm:text-[24px]">
                       ${depositUsdt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -1276,7 +1276,7 @@ export default function CreateCampaignPage() {
                 </div>
 
                 {isSwapFunding && (
-                  <div className="flex items-center justify-between border-t border-black/[0.06] pt-2.5 font-mono text-[11.5px]">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/[0.06] pt-2.5 font-mono text-[11.5px]">
                     <span className="text-[#71717A]">Est. you pay ({fundingToken})</span>
                     {isFetchingFundingQuote ? (
                       <span className="text-[#71717A]">Quoting…</span>
@@ -1299,27 +1299,33 @@ export default function CreateCampaignPage() {
               )}
 
               <dl className="divide-y divide-black/[0.055] font-mono text-[12px]">
-                <div className="flex justify-between py-2.5">
-                  <dt className="text-[#71717A]">Estimated spots</dt>
-                  <dd className="font-medium text-[#0A0A0C] tabular-nums">
+                <div className="flex items-center justify-between gap-3 py-2.5">
+                  <dt className="shrink-0 text-[#71717A]">Estimated spots</dt>
+                  <dd className="text-right font-medium text-[#0A0A0C] tabular-nums">
                     ~{estUsdtPerPayout > 0 ? Math.floor(depositUsdt / (estUsdtPerPayout * 1.03)) : 0} payouts
                   </dd>
                 </div>
-                <div className="flex justify-between py-2.5">
-                  <dt className="text-[#71717A]">Onchain per-payout cap</dt>
-                  <dd className="text-[#0A0A0C] tabular-nums">
-                    ${maxPerPayoutUsdt.toFixed(2)} USDT (+15% FX headroom)
+                <div className="flex items-center justify-between gap-3 py-2.5">
+                  <dt className="shrink-0 text-[#71717A]">Per-payout cap</dt>
+                  <dd className="text-right text-[#0A0A0C] tabular-nums">
+                    ${maxPerPayoutUsdt.toFixed(2)} USDT (+15%)
                   </dd>
                 </div>
-                <div className="flex justify-between py-2.5">
-                  <dt className="text-[#71717A]">Verification</dt>
-                  <dd className="text-[#0A0A0C]">
+                <div className="flex items-center justify-between gap-3 py-2.5">
+                  <dt className="shrink-0 text-[#71717A]">24h daily cap</dt>
+                  <dd className="text-right text-[#0A0A0C] tabular-nums">
+                    ${dailyLimitUsdt.toFixed(2)} USDT
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 py-2.5">
+                  <dt className="shrink-0 text-[#71717A]">Verification</dt>
+                  <dd className="text-right text-[#0A0A0C]">
                     {verificationMode === "auto" ? `Auto (${autoPlatform.toUpperCase()})` : "Manual review"}
                   </dd>
                 </div>
-                <div className="flex justify-between py-2.5">
-                  <dt className="text-[#71717A]">Visibility</dt>
-                  <dd className="text-[#0A0A0C]">
+                <div className="flex items-center justify-between gap-3 py-2.5">
+                  <dt className="shrink-0 text-[#71717A]">Visibility</dt>
+                  <dd className="text-right text-[#0A0A0C]">
                     {visibility === "public"
                       ? "Public directory"
                       : inviteCode.trim()

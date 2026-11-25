@@ -364,10 +364,10 @@ export function ClearingInspector({
                     ? "Duplicate link or unverified wallet detected — stopped before any funds moved."
                     : scenario.deliverableLabel}
                 </p>
-                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11.5px] text-[#71717A]">
-                  <span className="truncate">{scenario.deliverableUrl}</span>
-                  <span>·</span>
-                  <span>{scenario.reviewCostLabel}</span>
+                <div className="mt-2.5 flex flex-col gap-1 font-mono text-[11.5px] text-[#71717A] sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2.5">
+                  <span className="min-w-0 truncate">{scenario.deliverableUrl}</span>
+                  <span className="hidden sm:inline" aria-hidden="true">·</span>
+                  <span className="shrink-0">{scenario.reviewCostLabel}</span>
                 </div>
               </div>
 
@@ -476,23 +476,23 @@ export function ClearingInspector({
                 </div>
 
                 {/* Official Token Transfer Visual */}
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
-                  <div className="vire-card rounded-xl p-3.5">
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-2.5">
+                  <div className="vire-card min-w-0 rounded-xl p-3 sm:p-3.5">
                     <div className="flex items-center gap-2">
-                      <TokenIcon symbol="USDT" size={26} showChainBadge />
+                      <TokenIcon symbol="USDT" size={24} showChainBadge />
                       <div className="min-w-0">
-                        <div className="text-[11px] text-[#71717A]">Treasury cost</div>
-                        <div className="text-[12.5px] font-medium text-[#0A0A0C]">USDT</div>
+                        <div className="truncate text-[10.5px] text-[#71717A] sm:text-[11px]">Treasury cost</div>
+                        <div className="text-[12px] font-medium text-[#0A0A0C] sm:text-[12.5px]">USDT</div>
                       </div>
                     </div>
-                    <div className="mt-3 font-mono text-[19px] font-medium tracking-[-0.03em] text-[#0A0A0C] tabular-nums">
+                    <div className="mt-2.5 truncate font-mono text-[17px] font-medium tracking-[-0.03em] text-[#0A0A0C] tabular-nums sm:mt-3 sm:text-[19px]">
                       {isBlocked ? "$0.00" : `$${usdtCostDisplay}`}
                     </div>
                   </div>
 
                   <div
                     className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-medium shadow-[0_0_0_1px_rgba(10,10,12,0.08)]",
+                      "flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-medium shadow-[0_0_0_1px_rgba(10,10,12,0.08)] sm:h-8 sm:w-8",
                       isBlocked ? "text-[#DC2626]" : "text-[#0A0A0C]"
                     )}
                     aria-hidden="true"
@@ -502,24 +502,24 @@ export function ClearingInspector({
 
                   <div
                     className={cn(
-                      "rounded-xl p-3.5",
+                      "min-w-0 rounded-xl p-3 sm:p-3.5",
                       isBlocked
                         ? "bg-[#FEF2F2] shadow-[0_0_0_1px_rgba(220,38,38,0.18)]"
                         : "vire-card"
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <TokenIcon symbol={scenario.corridor} size={26} showChainBadge />
+                      <TokenIcon symbol={scenario.corridor} size={24} showChainBadge />
                       <div className="min-w-0">
-                        <div className="text-[11px] text-[#71717A]">Exact payout</div>
-                        <div className="text-[12.5px] font-medium text-[#0A0A0C]">
+                        <div className="truncate text-[10.5px] text-[#71717A] sm:text-[11px]">Exact payout</div>
+                        <div className="text-[12px] font-medium text-[#0A0A0C] sm:text-[12.5px]">
                           {scenario.corridor}
                         </div>
                       </div>
                     </div>
                     <div
                       className={cn(
-                        "mt-3 font-mono text-[19px] font-medium tracking-[-0.03em] tabular-nums",
+                        "mt-2.5 truncate font-mono text-[17px] font-medium tracking-[-0.03em] tabular-nums sm:mt-3 sm:text-[19px]",
                         isBlocked ? "text-[#B91C1C]" : "text-[#0A0A0C]"
                       )}
                     >
@@ -531,32 +531,32 @@ export function ClearingInspector({
                 {/* Clean Key-Value Spec Rows */}
                 <dl className="divide-y divide-black/[0.06] text-[12.5px]">
                   <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Use case</dt>
-                    <dd className="truncate font-medium text-[#0A0A0C]">
+                    <dt className="shrink-0 text-[#71717A]">Use case</dt>
+                    <dd className="min-w-0 truncate text-right font-medium text-[#0A0A0C]">
                       {scenario.useCaseLabel}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Local currency</dt>
-                    <dd className="truncate text-[#0A0A0C]">
+                    <dt className="shrink-0 text-[#71717A]">Local currency</dt>
+                    <dd className="min-w-0 truncate text-right text-[#0A0A0C]">
                       {scenarioMeta?.name ?? scenario.tokenName} ({scenarioMeta?.country ?? "Global"})
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Available liquidity</dt>
-                    <dd className="font-mono text-[#0A0A0C] tabular-nums">
+                    <dt className="shrink-0 text-[#71717A]">Available liquidity</dt>
+                    <dd className="shrink-0 font-mono text-[#0A0A0C] tabular-nums">
                       {makerDepth ? formatCompactUsd(makerDepth) : "Checking…"}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Spending limits</dt>
-                    <dd className="font-mono text-[#0A0A0C] tabular-nums">
+                    <dt className="shrink-0 text-[#71717A]">Spending limits</dt>
+                    <dd className="min-w-0 truncate text-right font-mono text-[#0A0A0C] tabular-nums">
                       Up to ${matchedCampaign?.maxPerPayoutUsdtFormatted ?? "6"} · {maxSpreadPct}% max spread
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3 py-2.5">
-                    <dt className="text-[#71717A]">Cash-out options</dt>
-                    <dd className="truncate text-[#0A0A0C]">{scenario.offrampRail}</dd>
+                    <dt className="shrink-0 text-[#71717A]">Cash-out options</dt>
+                    <dd className="min-w-0 truncate text-right text-[#0A0A0C]">{scenario.offrampRail}</dd>
                   </div>
                 </dl>
               </div>
@@ -616,13 +616,13 @@ export function ClearingInspector({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="vire-well inline-flex items-center gap-0.5 rounded-full p-1">
+          <div className="flex shrink-0 flex-nowrap items-center gap-2">
+            <div className="vire-well inline-flex shrink-0 items-center gap-0.5 rounded-full p-1">
               <button
                 type="button"
                 onClick={() => setCorridorFilter("all")}
                 className={cn(
-                  "vire-pressable rounded-full px-3 py-1 text-[12px] font-medium",
+                  "vire-pressable whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-medium",
                   corridorFilter === "all"
                     ? "bg-white text-[#0A0A0C] shadow-[0_0_0_1px_rgba(10,10,12,0.07)]"
                     : "text-[#71717A] hover:text-[#0A0A0C]"
@@ -634,7 +634,7 @@ export function ClearingInspector({
                 type="button"
                 onClick={() => setCorridorFilter("active")}
                 className={cn(
-                  "vire-pressable rounded-full px-3 py-1 text-[12px] font-medium",
+                  "vire-pressable whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-medium",
                   corridorFilter === "active"
                     ? "bg-white text-[#0A0A0C] shadow-[0_0_0_1px_rgba(10,10,12,0.07)]"
                     : "text-[#71717A] hover:text-[#0A0A0C]"
@@ -644,7 +644,7 @@ export function ClearingInspector({
               </button>
             </div>
 
-            <Button size="sm" variant="secondary" onClick={() => refetch()}>
+            <Button size="sm" variant="secondary" className="shrink-0" onClick={() => refetch()}>
               <ArrowClockwise className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
               Refresh
             </Button>
@@ -656,18 +656,18 @@ export function ClearingInspector({
             <table className="w-full text-left">
               <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-3.5 sm:px-6">Currency</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 sm:px-5 lg:px-6">Currency</th>
                   <th className="whitespace-nowrap px-4 py-3.5 text-right">
                     <span className="hidden sm:inline">Live </span>Rate (1 USDT)
                   </th>
                   <th className="hidden whitespace-nowrap px-4 py-3.5 text-right sm:table-cell">
                     Liquidity
                   </th>
-                  <th className="hidden whitespace-nowrap px-4 py-3.5 md:table-cell">
+                  <th className="hidden whitespace-nowrap px-4 py-3.5 lg:table-cell">
                     Cash-Out Options
                   </th>
                   <th className="hidden whitespace-nowrap px-4 py-3.5 sm:table-cell">Status</th>
-                  <th className="hidden whitespace-nowrap px-6 py-3.5 text-right sm:table-cell">
+                  <th className="hidden whitespace-nowrap px-5 py-3.5 text-right sm:table-cell lg:px-6">
                     Action
                   </th>
                 </tr>
@@ -676,7 +676,7 @@ export function ClearingInspector({
                 {!liveData
                   ? DISPLAY_CORRIDORS.map((sym) => (
                       <tr key={sym}>
-                        <td className="px-4 py-4 sm:px-6">
+                        <td className="px-4 py-4 sm:px-5 lg:px-6">
                           <div className="flex items-center gap-3">
                             <div className="vire-skeleton h-8 w-8 rounded-full" />
                             <div className="space-y-1.5">
@@ -691,13 +691,13 @@ export function ClearingInspector({
                         <td className="hidden px-4 py-4 sm:table-cell">
                           <div className="vire-skeleton ml-auto h-4 w-20 rounded" />
                         </td>
-                        <td className="hidden px-4 py-4 md:table-cell">
+                        <td className="hidden px-4 py-4 lg:table-cell">
                           <div className="vire-skeleton h-4 w-32 rounded" />
                         </td>
-                        <td className="px-4 py-4">
+                        <td className="hidden px-4 py-4 sm:table-cell">
                           <div className="vire-skeleton h-4 w-16 rounded-full" />
                         </td>
-                        <td className="hidden px-6 py-4 sm:table-cell">
+                        <td className="hidden px-5 py-4 sm:table-cell lg:px-6">
                           <div className="vire-skeleton ml-auto h-7 w-20 rounded-full" />
                         </td>
                       </tr>
@@ -718,7 +718,7 @@ export function ClearingInspector({
                           key={sym}
                           className="transition-colors duration-150 hover:bg-[#FAFAFB]"
                         >
-                          <td className="whitespace-nowrap px-4 py-4 sm:px-6">
+                          <td className="whitespace-nowrap px-4 py-4 sm:px-5 lg:px-6">
                             <Link
                               href={`/campaigns?corridor=${encodeURIComponent(sym)}`}
                               className="group flex items-center gap-3"
@@ -738,6 +738,11 @@ export function ClearingInspector({
                                   <span>
                                     {sym} · {meta?.country ?? ""}
                                   </span>
+                                  {depthRaw && (
+                                    <span className="text-[#A1A1AA] sm:hidden">
+                                      · {formatCompactUsd(depthRaw)}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </Link>
@@ -764,7 +769,7 @@ export function ClearingInspector({
                               <span>{formatCompactUsd(depthRaw)}</span>
                               <span
                                 aria-hidden="true"
-                                className="h-1.5 w-12 overflow-hidden rounded-full bg-black/[0.06]"
+                                className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-black/[0.06] md:block"
                               >
                                 <span
                                   className="block h-full rounded-full bg-[#0A0A0C]/65"
@@ -774,7 +779,7 @@ export function ClearingInspector({
                             </div>
                           </td>
 
-                          <td className="hidden whitespace-nowrap px-4 py-4 text-[13px] text-[#52525B] md:table-cell">
+                          <td className="hidden whitespace-nowrap px-4 py-4 text-[13px] text-[#52525B] lg:table-cell">
                             {meta?.rail ?? "—"}
                           </td>
 
@@ -794,7 +799,7 @@ export function ClearingInspector({
                             </span>
                           </td>
 
-                          <td className="hidden whitespace-nowrap px-6 py-4 text-right sm:table-cell">
+                          <td className="hidden whitespace-nowrap px-5 py-4 text-right sm:table-cell lg:px-6">
                             <Link
                               href={`/campaigns?corridor=${encodeURIComponent(sym)}`}
                               className={buttonVariants({ variant: "secondary", size: "sm" })}

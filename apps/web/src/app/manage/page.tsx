@@ -552,12 +552,12 @@ export default function ManagePage() {
           )}
 
           {totalPending > 0 && (
-            <div className="flex items-center justify-between rounded-2xl bg-[#0A0A0C] px-5 py-3.5 text-white">
+            <div className="flex flex-col gap-1 rounded-2xl bg-[#0A0A0C] px-4 py-3.5 text-white sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <span className="text-[13.5px] font-medium">
                 {totalPending} {totalPending === 1 ? "submission awaits" : "submissions await"} your
                 review
               </span>
-              <span className="font-mono text-[12px] text-white/70">
+              <span className="font-mono text-[11.5px] text-white/70 sm:text-[12px]">
                 1 click Approve &amp; Pay settles instantly via Textile FX
               </span>
             </div>
@@ -587,7 +587,7 @@ export default function ManagePage() {
               return (
                 <Card key={camp.id} className="overflow-hidden">
                   {/* Top Campaign Header */}
-                  <div className="p-6">
+                  <div className="p-4 sm:p-6">
                     <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
                       <div className="flex items-start gap-3.5">
                         <TokenIcon symbol={camp.corridor} size={34} showChainBadge className="mt-0.5" />
@@ -726,7 +726,7 @@ export default function ManagePage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="ml-auto"
+                          className="sm:ml-auto"
                           onClick={() => downloadCampaignCsv(camp)}
                         >
                           <DownloadSimple className="h-3.5 w-3.5" /> Export CSV
@@ -755,7 +755,7 @@ export default function ManagePage() {
                           placeholder={
                             activeToolForCamp === "transfer" ? "0x…" : "Amount in USDT (e.g. 20)"
                           }
-                          className="h-8 min-w-[200px] flex-1 rounded-lg bg-white px-3 font-mono text-[12px] text-[#0A0A0C] ring-1 ring-black/[0.1]"
+                          className="h-10 min-w-0 w-full rounded-lg bg-white px-3 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.1] sm:h-8 sm:min-w-[200px] sm:flex-1 sm:text-[12px]"
                         />
                         <Button
                           type="submit"
@@ -783,7 +783,7 @@ export default function ManagePage() {
 
                   {/* Pending Review Queue (Manual Mode) */}
                   {pendingSubs.length > 0 && (
-                    <div className="border-t border-black/[0.06] bg-[#FAFAFB] px-6 py-4">
+                    <div className="border-t border-black/[0.06] bg-[#FAFAFB] px-4 py-4 sm:px-6">
                       <h3 className="mb-3 text-[12.5px] font-semibold uppercase tracking-[0.06em] text-[#52525B]">
                         Pending review ({pendingSubs.length})
                       </h3>
@@ -836,7 +836,7 @@ export default function ManagePage() {
                                     setReviewNotes((prev) => ({ ...prev, [sub.id]: e.target.value }))
                                   }
                                   placeholder="Optional note…"
-                                  className="h-8 w-40 rounded-lg bg-[#FAFAFB] px-2.5 text-[12px] text-[#0A0A0C] ring-1 ring-black/[0.08]"
+                                  className="h-10 w-full rounded-lg bg-[#FAFAFB] px-2.5 text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.08] sm:h-8 sm:w-44 sm:text-[12px]"
                                 />
                                 <Button
                                   size="sm"

@@ -185,15 +185,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <Navbar />
             <main
               id="main-content"
-              className="mx-auto w-full max-w-[1220px] flex-1 px-4 pb-24 pt-8 sm:px-6 lg:px-8"
+              className="mx-auto w-full max-w-[1220px] flex-1 px-4 pb-20 pt-6 sm:px-6 sm:pb-24 sm:pt-8 lg:px-8"
             >
               {children}
             </main>
 
             <footer className="border-t border-black/[0.06] bg-white">
-              <div className="mx-auto max-w-[1220px] px-4 py-12 sm:px-6 lg:px-8">
-                <div className="grid grid-cols-2 gap-10 border-b border-black/[0.06] pb-10 md:grid-cols-12">
-                  <div className="col-span-2 space-y-3 md:col-span-5">
+              <div className="mx-auto max-w-[1220px] px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-9 border-b border-black/[0.06] pb-10 sm:grid-cols-3 lg:grid-cols-12 lg:gap-10">
+                  <div className="col-span-2 space-y-3 sm:col-span-3 lg:col-span-4">
                     <Link
                       href="/"
                       className="inline-flex items-center gap-2 text-[14.5px] font-semibold tracking-[-0.025em] text-[#0A0A0C]"
@@ -205,69 +205,74 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                       Automated work verification, onchain spending limits, and exact local-currency
                       payouts on Celo Mainnet.
                     </p>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 text-[12px] text-[#71717A]">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-[12.5px] text-[#71717A]">
                       <a
                         href="https://github.com/eugenennamdi/Vire"
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
+                        className="inline-flex items-center gap-1 py-0.5 transition-colors hover:text-[#0A0A0C]"
                       >
                         GitHub <ArrowUpRight className="h-3 w-3" />
                       </a>
                       <Link
                         href="/api/agent-card.json"
-                        className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
+                        className="inline-flex items-center gap-1 py-0.5 transition-colors hover:text-[#0A0A0C]"
                       >
                         agent-card.json <ArrowUpRight className="h-3 w-3" />
                       </Link>
                     </div>
                   </div>
 
-                  <nav aria-label="Protocol" className="space-y-3 md:col-span-2">
+                  <nav aria-label="Protocol" className="space-y-3 lg:col-span-2">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#A1A1AA]">
                       Protocol
                     </div>
-                    <ul className="space-y-2 text-[13px] text-[#52525B]">
+                    <ul className="space-y-2.5 text-[13px] text-[#52525B]">
                       <li>
-                        <Link href="/" className="transition-colors hover:text-[#0A0A0C]">
+                        <Link href="/" className="inline-block py-0.5 transition-colors hover:text-[#0A0A0C]">
                           Overview
                         </Link>
                       </li>
                       <li>
-                        <Link href="/campaigns" className="transition-colors hover:text-[#0A0A0C]">
+                        <Link href="/campaigns" className="inline-block py-0.5 transition-colors hover:text-[#0A0A0C]">
                           Campaigns
                         </Link>
                       </li>
                       <li>
-                        <Link href="/claim" className="transition-colors hover:text-[#0A0A0C]">
-                          Submit work
+                        <Link href="/create" className="inline-block py-0.5 transition-colors hover:text-[#0A0A0C]">
+                          Launch
                         </Link>
                       </li>
                       <li>
-                        <Link href="/ledger" className="transition-colors hover:text-[#0A0A0C]">
+                        <Link href="/manage" className="inline-block py-0.5 transition-colors hover:text-[#0A0A0C]">
+                          Workspace
+                        </Link>
+                      </li>
+                      <li>
+                        <Link href="/ledger" className="inline-block py-0.5 transition-colors hover:text-[#0A0A0C]">
                           Public ledger
                         </Link>
                       </li>
                       <li>
-                        <Link href="/console" className="transition-colors hover:text-[#0A0A0C]">
+                        <Link href="/console" className="inline-block py-0.5 transition-colors hover:text-[#0A0A0C]">
                           Developer console
                         </Link>
                       </li>
                     </ul>
                   </nav>
 
-                  <nav aria-label="Contracts" className="space-y-3 md:col-span-3">
+                  <nav aria-label="Contracts" className="space-y-3 lg:col-span-3">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#A1A1AA]">
                       Onchain
                     </div>
-                    <ul className="space-y-2 text-[13px] text-[#52525B]">
+                    <ul className="space-y-2.5 text-[13px] text-[#52525B]">
                       {vaultAddress && (
                         <li>
                           <a
                             href={celoscanAddressUrl(vaultAddress)}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
+                            className="inline-flex items-center gap-1 py-0.5 transition-colors hover:text-[#0A0A0C]"
                           >
                             VireVault <ArrowUpRight className="h-3 w-3" />
                           </a>
@@ -278,7 +283,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                           href={celoscanAddressUrl(CELO_CONTRACTS.TEXTILE_LIMIT_ORDER_REACTOR)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
+                          className="inline-flex items-center gap-1 py-0.5 transition-colors hover:text-[#0A0A0C]"
                         >
                           Textile FX Reactor <ArrowUpRight className="h-3 w-3" />
                         </a>
@@ -288,7 +293,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                           href={celoscanAddressUrl(CELO_CONTRACTS.ERC8004_IDENTITY_REGISTRY)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
+                          className="inline-flex items-center gap-1 py-0.5 transition-colors hover:text-[#0A0A0C]"
                         >
                           ERC-8004{agentId ? ` #${agentId}` : ""} <ArrowUpRight className="h-3 w-3" />
                         </a>
@@ -298,7 +303,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                           href="/api/corridors/live"
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 transition-colors hover:text-[#0A0A0C]"
+                          className="inline-flex items-center gap-1 py-0.5 transition-colors hover:text-[#0A0A0C]"
                         >
                           Live FX JSON <ArrowUpRight className="h-3 w-3" />
                         </a>
@@ -306,13 +311,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     </ul>
                   </nav>
 
-                  <div className="space-y-3 md:col-span-2">
+                  <div className="col-span-2 space-y-3 sm:col-span-1 lg:col-span-3">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#A1A1AA]">
                       Currencies
                     </div>
-                    <ul className="space-y-2 whitespace-nowrap font-mono text-[11.5px] text-[#52525B]">
+                    <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5 font-mono text-[11.5px] text-[#52525B] sm:grid-cols-1">
                       {FOOTER_RAILS.map((r) => (
-                        <li key={r.symbol} className="flex items-center gap-2">
+                        <li key={r.symbol} className="flex items-center gap-2 whitespace-nowrap">
                           <TokenIcon symbol={r.symbol} size={15} />
                           <span>{r.label}</span>
                         </li>
