@@ -15,6 +15,8 @@ export interface CampaignSeedBlueprint {
   partnerName: string;
   partnerLocation: string;
   isLaunchPartner: boolean;
+  active?: boolean;
+  hidden?: boolean;
   title: string;
   description: string;
   criteria: string;
@@ -43,24 +45,26 @@ export function buildDefaultCampaignBlueprints(): CampaignSeedBlueprint[] {
   return [
     {
       slug: "launch-partner-blackfriday-cngn",
-      partnerName: partner.name,
-      partnerLocation: partner.location,
-      isLaunchPartner: true,
-      title: `${partner.name} Black Friday Promo Sprint`,
-      description: `Pick any live product on ${storeHost} (iPhone, MacBook, PS5, or accessories), publish an original Black Friday promo on X tagging ${partner.name} with the live product URL and campaign hashtag, and earn exact cNGN settled on Celo Mainnet.`,
-      criteria: `Live, public, original X (Twitter) post promoting a real product listed on ${storeHost}, tagging ${partner.handle}, including a direct ${storeHost} product link and #SWOTBlackFriday.`,
+      partnerName: "Vire Protocol",
+      partnerLocation: "Celo Mainnet",
+      isLaunchPartner: false,
+      active: false,
+      hidden: true,
+      title: "Vire Mainnet Testflight",
+      description: `Pre-launch Celo Mainnet verification run testing end-to-end vault release, Textile FX USDT → cNGN clearing, x402 verification, and instant local payout before the ${partner.name} (${storeHost}) launch campaign.`,
+      criteria: `Live pre-launch verification run on Celo Mainnet.`,
       deliverableType: "promo_post",
       corridor: "cNGN",
       stages: [
         {
           stageIndex: 1,
-          title: "Black Friday Product Promo",
-          instructions: `Pick one live product from ${storeHost}, publish an original Black Friday post on X tagging ${partner.handle} with the direct product link and #SWOTBlackFriday, and submit your post URL. First-come, first-served — strictly 1 verified payout per person.`,
-          rewardLocalAtomic: parseTokenAmount("2500", "cNGN").toString(), // ~$1.73 clears $1 Textile floor cleanly; 50,000 cNGN budget = up to 20 FCFS payouts
+          title: "Mainnet Testflight Run",
+          instructions: `Pre-launch Celo Mainnet settlement verification run.`,
+          rewardLocalAtomic: parseTokenAmount("2500", "cNGN").toString(),
           cooldownHours: 0,
         },
       ],
-      budgetUsdtHuman: partner.campaignBudgetUsdt, // ~$35 USDT ≈ 50,000 cNGN
+      budgetUsdtHuman: partner.campaignBudgetUsdt,
       maxPerPayoutUsdtHuman: "6",
       dailyLimitUsdtHuman: "20",
       maxPayoutsPerRecipient: 1,
@@ -166,7 +170,8 @@ export async function ensureDefaultCampaignsSeeded(): Promise<number> {
         cooldownHours: bp.cooldownHours,
         maxSpreadBps: bp.maxSpreadBps,
         minPassScore: bp.minPassScore,
-        active: true,
+        active: bp.active ?? true,
+        hidden: bp.hidden ?? false,
         createdAt: Date.now(),
       });
       inserted += 1;
@@ -197,6 +202,8 @@ export async function ensureDefaultCampaignsSeeded(): Promise<number> {
           cooldownHours: bp.cooldownHours,
           maxSpreadBps: bp.maxSpreadBps,
           minPassScore: bp.minPassScore,
+          ...(bp.active !== undefined ? { active: bp.active } : {}),
+          ...(bp.hidden !== undefined ? { hidden: bp.hidden } : {}),
         })
         .where(eq(schema.campaigns.id, idBytes32));
     }
