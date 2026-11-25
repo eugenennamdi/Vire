@@ -668,11 +668,11 @@ function AccountPopover({
                     </Button>
                   </div>
 
-                  <p className="text-[10.5px] leading-snug text-[#71717A]">
-                    {sendToken === "USDT"
-                      ? "Network: Celo · Works with MiniPay (Pay to Bank Transfer to OPay / Moniepoint, min 0.35 USDT) & Celo-USDT exchanges."
-                      : `Note: MiniPay only shows USDT, USDC, and USAT. Convert ${sendToken} to USDT first for MiniPay or exchange cash-outs.`}
-                  </p>
+                  {sendToken !== "USDT" && (
+                    <p className="text-[10.5px] leading-snug text-[#71717A]">
+                      Note: MiniPay only shows USDT, USDC, and USAT. Convert {sendToken} to USDT first for MiniPay or exchange cash-outs.
+                    </p>
+                  )}
 
                   {withdrawError && (
                     <p className="text-[11px] leading-snug text-[#DC2626]">{withdrawError}</p>
