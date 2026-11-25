@@ -217,6 +217,97 @@ export class TextileClient {
   }
 
   /**
+   * Free indicative exact-input quote preview (sell exact token amount -> buy USDT or another token).
+   * Does NOT reserve maker inventory or consume an RFQ slot.
+   */
+  async previewExactInput(params: {
+    sellToken: Address;
+    sellAmountAtomic: string;
+    buyToken?: Address;
+    taker?: Address;
+    chainId?: number;
+  }): Promise<RfqPreviewData> {
+    const body: CreateRfqRequest = {
+      chainId: params.chainId ?? this.chainId,
+      sellToken: params.sellToken,
+      buyToken: params.buyToken ?? CELO_TOKENS.USDT.address,
+      sellAmount: params.sellAmountAtomic,
+      ...(params.taker ? { taker: params.taker } : {}),
+    };
+
+    const envelope = await this.requestJson<RfqPreviewEnvelope>("/rfq/preview", {
+      method: "POST",
+      body,
+      timeoutMs: 20_000,
+    });
+    return envelope.data;
+  }
+
+  private async executeFirmRequest(params: {
+    body: CreateRfqRequest;
+    taker: Address;
+    chainId: number;
+    takerAccount?: Account;
+    onClaimToken?: (outcome: RfqOutcomeData) => Promise<void> | void;
+  }): Promise<RfqOutcomeData> {
+    return this.limiter.run(async () => {
+      const body: CreateRfqRequest = { ...params.body };
+
+      if (this.apiKey) {
+        // Partner API key mode: omit takerProof, enable native Textile ERC-8021 attribution.
+        body.includeAttribution = true;
+        body.builderCodes = this.builderCodes;
+      } else {
+        if (!params.takerAccount) {
+          throw new Error("Keyless Textile RFQ mode requires takerAccount to sign TakerControl takerProof");
+        }
+        body.takerProof = await this.takerProofs.getOrCreateProof({
+          account: params.takerAccount as Account & { signTypedData?: (args: unknown) => Promise<Hex> },
+          chainId: params.chainId,
+        });
+      }
+
+      let envelope: RfqOutcomeEnvelope;
+      try {
+        envelope = await this.requestJson<RfqOutcomeEnvelope>("/rfq/request", {
+          method: "POST",
+          body,
+          timeoutMs: this.firmRequestTimeoutMs,
+        });
+      } catch (err) {
+        // If keyless takerProof was stale/replayed, refresh once and retry cleanly.
+        if (
+          !this.apiKey &&
+          params.takerAccount &&
+          err instanceof TextileApiError &&
+          err.statusCode === 401 &&
+          err.details?.reason?.startsWith("proof_of_control_")
+        ) {
+          this.takerProofs.invalidate(params.taker, params.chainId);
+          body.takerProof = await this.takerProofs.getOrCreateProof({
+            account: params.takerAccount as Account & { signTypedData?: (args: unknown) => Promise<Hex> },
+            chainId: params.chainId,
+            forceFresh: true,
+          });
+          envelope = await this.requestJson<RfqOutcomeEnvelope>("/rfq/request", {
+            method: "POST",
+            body,
+            timeoutMs: this.firmRequestTimeoutMs,
+          });
+        } else {
+          throw err;
+        }
+      }
+
+      const outcome = envelope.data;
+      if (params.onClaimToken) {
+        await params.onClaimToken(outcome);
+      }
+      return outcome;
+    });
+  }
+
+  /**
    * Request a firm exact-output quote (`POST /v2/rfq/request`).
    * - Respects max 4 concurrent open RFQs via in-process semaphore.
    * - Enforces HTTP timeout >= 75s.
@@ -237,66 +328,49 @@ export class TextileClient {
     const chainId = params.chainId ?? this.chainId;
     const sellToken = params.sellToken ?? CELO_TOKENS.USDT.address;
 
-    return this.limiter.run(async () => {
-      const body: CreateRfqRequest = {
+    return this.executeFirmRequest({
+      body: {
         chainId,
         sellToken,
         buyToken: params.buyToken,
         buyAmount: params.buyAmountAtomic,
         taker: params.taker,
-      };
+      },
+      taker: params.taker,
+      chainId,
+      takerAccount: params.takerAccount,
+      onClaimToken: params.onClaimToken,
+    });
+  }
 
-      if (this.apiKey) {
-        // Partner API key mode: omit takerProof, enable native Textile ERC-8021 attribution.
-        body.includeAttribution = true;
-        body.builderCodes = this.builderCodes;
-      } else {
-        if (!params.takerAccount) {
-          throw new Error("Keyless Textile RFQ mode requires takerAccount to sign TakerControl takerProof");
-        }
-        body.takerProof = await this.takerProofs.getOrCreateProof({
-          account: params.takerAccount as Account & { signTypedData?: (args: unknown) => Promise<Hex> },
-          chainId,
-        });
-      }
+  /**
+   * Request a firm exact-input quote (`POST /v2/rfq/request`) — e.g. selling an exact local payout
+   * (`2,500 cNGN`) into `USDT` with zero leftover dust.
+   */
+  async requestFirmExactInput(params: {
+    sellToken: Address;
+    sellAmountAtomic: string;
+    taker: Address;
+    buyToken?: Address;
+    chainId?: number;
+    takerAccount?: Account;
+    onClaimToken?: (outcome: RfqOutcomeData) => Promise<void> | void;
+  }): Promise<RfqOutcomeData> {
+    const chainId = params.chainId ?? this.chainId;
+    const buyToken = params.buyToken ?? CELO_TOKENS.USDT.address;
 
-      let envelope: RfqOutcomeEnvelope;
-      try {
-        envelope = await this.requestJson<RfqOutcomeEnvelope>("/rfq/request", {
-          method: "POST",
-          body,
-          timeoutMs: this.firmRequestTimeoutMs,
-        });
-      } catch (err) {
-        // If keyless takerProof was stale/replayed, refresh once and retry cleanly.
-        if (
-          !this.apiKey &&
-          params.takerAccount &&
-          err instanceof TextileApiError &&
-          err.statusCode === 401 &&
-          err.details?.reason?.startsWith("proof_of_control_")
-        ) {
-          this.takerProofs.invalidate(params.taker, chainId);
-          body.takerProof = await this.takerProofs.getOrCreateProof({
-            account: params.takerAccount as Account & { signTypedData?: (args: unknown) => Promise<Hex> },
-            chainId,
-            forceFresh: true,
-          });
-          envelope = await this.requestJson<RfqOutcomeEnvelope>("/rfq/request", {
-            method: "POST",
-            body,
-            timeoutMs: this.firmRequestTimeoutMs,
-          });
-        } else {
-          throw err;
-        }
-      }
-
-      const outcome = envelope.data;
-      if (params.onClaimToken) {
-        await params.onClaimToken(outcome);
-      }
-      return outcome;
+    return this.executeFirmRequest({
+      body: {
+        chainId,
+        sellToken: params.sellToken,
+        buyToken,
+        sellAmount: params.sellAmountAtomic,
+        taker: params.taker,
+      },
+      taker: params.taker,
+      chainId,
+      takerAccount: params.takerAccount,
+      onClaimToken: params.onClaimToken,
     });
   }
 

@@ -204,21 +204,36 @@ export function buildOfframpPackage(params: {
     return {
       provider: "cngn_venues",
       headline: `Cash Out ${formatTokenAmount(params.atomicAmount, "cNGN")} cNGN → Nigerian Naira (NGN)`,
-      primaryUrl: "https://docs.cngn.co/",
+      primaryUrl: "https://www.opera.com/products/minipay",
       tokenAddress: meta.tokenAddress,
       tokenDecimals: meta.decimals,
       humanAmount,
       instructions: [
         `Your exact payout of ${formatTokenAmount(params.atomicAmount, "cNGN")} cNGN (6 decimals) is live in ${params.recipientAddress} on Celo Mainnet.`,
-        `Copy the verified cNGN contract (${meta.tokenAddress}) if importing into MiniPay, Rabby, or MetaMask.`,
-        "Send cNGN on Celo network to your Busha, Quidax, Roqqu, Obiex, or MiniPay-linked Naira ramp for 1:1 NGN bank withdrawal.",
+        "For MiniPay bank transfers (OPay, Moniepoint, GTBank — min 0.35 USDT), convert cNGN to USDT inside Vire first, then send USDT on Celo to your MiniPay address.",
+        "For exchanges (Quidax, Bybit, Yellow Card, Busha), send Celo USDT — only send raw cNGN if your exchange explicitly lists Celo as a supported cNGN deposit network.",
       ],
       venues: [
-        { name: "MiniPay (Opera)", url: "https://www.opera.com/products/minipay", note: "Native Celo mobile wallet & NGN cash-out" },
-        { name: "Busha", url: "https://www.busha.io/", note: "SEC-licensed Nigerian exchange supporting cNGN → NGN bank payout" },
-        { name: "Quidax", url: "https://www.quidax.com/", note: "Direct cNGN deposit & instant Naira withdrawal" },
-        { name: "Roqqu", url: "https://roqqu.com/", note: "Nigerian crypto-to-bank off-ramp for cNGN" },
-        { name: "Obiex", url: "https://obiex.finance/", note: "Fast cNGN / NGN liquidity & bank payout" },
+        {
+          name: "MiniPay (via Celo USDT)",
+          url: "https://www.opera.com/products/minipay",
+          note: "Convert cNGN → USDT in Vire first, then Pay to Bank Transfer (OPay / Moniepoint, min 0.35 USDT)",
+        },
+        {
+          name: "Quidax",
+          url: "https://www.quidax.com/",
+          note: "Supports Celo USDT deposits & NGN bank payout (verify network before sending raw cNGN)",
+        },
+        {
+          name: "Busha",
+          url: "https://www.busha.io/",
+          note: "SEC-licensed Nigerian exchange — verify supported deposit network in-app before sending",
+        },
+        {
+          name: "Yellow Card",
+          url: "https://yellowcard.io/",
+          note: "Celo USDT → instant Nigerian Naira bank transfer",
+        },
       ],
     };
   }

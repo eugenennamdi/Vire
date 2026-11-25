@@ -63,7 +63,7 @@ const SCENARIOS: ScenarioConfig[] = [
     reviewCostLabel: "Automated check ($0.005)",
     localAmount: "2,500",
     fallbackUsdt: "1.73",
-    offrampRail: "MiniPay · Busha · Quidax",
+    offrampRail: "MiniPay Bank Transfer (via USDT) · Celo Exchanges",
   },
   {
     id: "wARS",
@@ -113,7 +113,7 @@ const ALL_CORRIDOR_META: Record<
   cNGN: {
     name: "Compliant Naira",
     country: "Nigeria",
-    rail: "Busha · Quidax · Yellow Card",
+    rail: "MiniPay (via USDT) · Celo Exchanges",
     decimals: 6,
     fiat: "NGN",
   },

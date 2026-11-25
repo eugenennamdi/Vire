@@ -21,6 +21,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const MAX_FUNDING_SWAP_USDT_ATOMIC = 100_000_000_000n; // $100,000 USDT sanity cap
+const MIN_EXACT_INPUT_USDT_OUTPUT_ATOMIC = 500_000n; // $0.50 USDT sanity floor on exact-input swaps
+const MAX_SELL_ATOMIC = 10n ** 30n;
 const FUNDING_RATE_WINDOW_MS = 10 * 60 * 1000;
 const FUNDING_MAX_REQUESTS_PER_WINDOW = 5;
 // ponytail: per-instance in-memory funding RFQ limiter (5 req / 10m per wallet); move to Redis/Turso if scaled across many hot lambdas.
@@ -51,19 +53,82 @@ function formatDisplayAmount(atomic: string, decimals: number): string {
 }
 
 /**
- * GET /api/funding?sellToken=wARS&buyUsdtAtomic=10000000
- * Free indicative Textile FX exact-output preview converting a supported Celo token into exact USDT.
+ * GET /api/funding
+ * - Exact-output mode (campaign funding): `?sellToken=wARS&buyUsdtAtomic=10000000`
+ * - Exact-input mode (contributor cash-out to USDT): `?sellToken=cNGN&sellAmountAtomic=2500000000`
  */
 export async function GET(req: NextRequest) {
   const sellParam = req.nextUrl.searchParams.get("sellToken") || "";
   const buyUsdtParam = req.nextUrl.searchParams.get("buyUsdtAtomic") || "";
+  const sellAmountParam = req.nextUrl.searchParams.get("sellAmountAtomic") || "";
 
   const symParsed = FundingSymbolSchema.safeParse(sellParam);
-  if (!symParsed.success || !/^\d+$/.test(buyUsdtParam)) {
-    return NextResponse.json({ error: "Invalid sellToken or buyUsdtAtomic" }, { status: 400 });
+  const hasBuy = buyUsdtParam.length > 0;
+  const hasSell = sellAmountParam.length > 0;
+  if (!symParsed.success || hasBuy === hasSell) {
+    return NextResponse.json(
+      { error: "Provide valid sellToken with either buyUsdtAtomic or sellAmountAtomic." },
+      { status: 400 }
+    );
   }
 
   const sym = symParsed.data as FundingTokenSymbol;
+
+  if (hasSell) {
+    if (sym === "USDT" || !/^\d+$/.test(sellAmountParam)) {
+      return NextResponse.json({ error: "Invalid sellToken or sellAmountAtomic" }, { status: 400 });
+    }
+    const sellAmountAtomic = BigInt(sellAmountParam);
+    if (sellAmountAtomic <= 0n || sellAmountAtomic > MAX_SELL_ATOMIC) {
+      return NextResponse.json({ error: "Invalid sell amount." }, { status: 400 });
+    }
+
+    const token = FUNDING_TOKENS[sym];
+    const textile = getTextileClient();
+    try {
+      const preview = await textile.previewExactInput({
+        sellToken: token.address,
+        buyToken: CELO_TOKENS.USDT.address,
+        sellAmountAtomic: sellAmountAtomic.toString(),
+      });
+
+      const hasValidBuy =
+        preview.status === "preview" &&
+        typeof preview.buyAmount === "string" &&
+        /^\d+$/.test(preview.buyAmount) &&
+        BigInt(preview.buyAmount) > 0n;
+      const takerPays = preview.takerPays ?? sellAmountAtomic.toString();
+
+      return NextResponse.json({
+        mode: "exact-input",
+        sellToken: sym,
+        sellTokenAddress: token.address,
+        sellDecimals: token.decimals,
+        status: hasValidBuy ? "preview" : preview.status,
+        reason: preview.reason ?? null,
+        takerPaysAtomic: takerPays,
+        takerPaysFormatted: formatDisplayAmount(takerPays, token.decimals),
+        buyUsdtAtomic: hasValidBuy ? preview.buyAmount! : null,
+        buyUsdtFormatted: hasValidBuy ? formatDisplayAmount(preview.buyAmount!, 6) : null,
+        feedStatus: preview.feed?.status ?? null,
+      });
+    } catch (err) {
+      return NextResponse.json(
+        {
+          mode: "exact-input",
+          sellToken: sym,
+          status: "error",
+          reason: err instanceof Error ? err.message : "Failed to fetch Textile FX preview",
+        },
+        { status: 502 }
+      );
+    }
+  }
+
+  if (!/^\d+$/.test(buyUsdtParam)) {
+    return NextResponse.json({ error: "Invalid sellToken or buyUsdtAtomic" }, { status: 400 });
+  }
+
   const buyUsdtAtomic = BigInt(buyUsdtParam);
   if (buyUsdtAtomic < 1_000_000n || buyUsdtAtomic > MAX_FUNDING_SWAP_USDT_ATOMIC) {
     return NextResponse.json(
@@ -74,6 +139,7 @@ export async function GET(req: NextRequest) {
 
   if (sym === "USDT") {
     return NextResponse.json({
+      mode: "exact-output",
       sellToken: sym,
       status: "direct",
       takerPaysAtomic: buyUsdtAtomic.toString(),
@@ -95,6 +161,7 @@ export async function GET(req: NextRequest) {
 
     const isAvailable = preview.status === "preview" && typeof preview.takerPays === "string";
     return NextResponse.json({
+      mode: "exact-output",
       sellToken: sym,
       sellTokenAddress: token.address,
       sellDecimals: token.decimals,
@@ -110,6 +177,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       {
+        mode: "exact-output",
         sellToken: sym,
         status: "error",
         reason: err instanceof Error ? err.message : "Failed to fetch Textile FX preview",
@@ -122,8 +190,9 @@ export async function GET(req: NextRequest) {
 const PostFundingSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("request"),
-    sellToken: FundingSymbolSchema.refine((s) => s !== "USDT", "USDT deposits do not need a swap"),
-    buyUsdtAtomic: z.string().regex(/^\d+$/),
+    sellToken: FundingSymbolSchema.refine((s) => s !== "USDT", "USDT does not need a swap"),
+    buyUsdtAtomic: z.string().regex(/^\d+$/).optional(),
+    sellAmountAtomic: z.string().regex(/^\d+$/).optional(),
   }),
   z.object({
     action: z.literal("submit"),
@@ -138,14 +207,16 @@ const PostFundingSchema = z.discriminatedUnion("action", [
 
 /**
  * POST /api/funding
- * Authenticated Textile FX v2 firm quote lifecycle for funding a VireVault v2 campaign with any supported token.
+ * Authenticated Textile FX v2 firm quote lifecycle for wallet swaps into USDT:
+ * - Exact-output (`buyUsdtAtomic`): campaign funding in any supported token.
+ * - Exact-input (`sellAmountAtomic`): contributor local-token cash-out into Celo USDT (for MiniPay / exchanges).
  * Keeps `claimToken` strictly server-private inside a short-lived HttpOnly signed cookie.
  */
 export async function POST(req: NextRequest) {
   const session = verifyWalletSessionCookie(req.cookies.get(WALLET_SESSION_COOKIE)?.value);
   if (!session) {
     return NextResponse.json(
-      { error: "Please sign with your wallet before requesting a firm Textile FX funding quote." },
+      { error: "Please sign with your wallet before requesting a firm Textile FX quote." },
       { status: 401 }
     );
   }
@@ -154,7 +225,7 @@ export async function POST(req: NextRequest) {
   const parsed = PostFundingSchema.safeParse(rawBody);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Invalid funding request", details: parsed.error.flatten() },
+      { error: "Invalid swap request", details: parsed.error.flatten() },
       { status: 400 }
     );
   }
@@ -165,28 +236,48 @@ export async function POST(req: NextRequest) {
   if (data.action === "request") {
     if (!textile.hasPartnerApiKey) {
       return NextResponse.json(
-        { error: "Textile Partner API key is required for multi-token wallet funding swaps." },
+        { error: "Textile Partner API key is required for wallet conversion swaps." },
         { status: 503 }
       );
     }
 
-    const buyAmount = BigInt(data.buyUsdtAtomic);
-    if (buyAmount < 1_000_000n || buyAmount > MAX_FUNDING_SWAP_USDT_ATOMIC) {
+    if (Boolean(data.buyUsdtAtomic) === Boolean(data.sellAmountAtomic)) {
+      return NextResponse.json(
+        { error: "Provide either buyUsdtAtomic or sellAmountAtomic." },
+        { status: 400 }
+      );
+    }
+
+    const isExactInput = Boolean(data.sellAmountAtomic);
+    const buyAmountTarget = data.buyUsdtAtomic ? BigInt(data.buyUsdtAtomic) : null;
+    const sellAmountTarget = data.sellAmountAtomic ? BigInt(data.sellAmountAtomic) : null;
+
+    if (
+      buyAmountTarget !== null &&
+      (buyAmountTarget < 1_000_000n || buyAmountTarget > MAX_FUNDING_SWAP_USDT_ATOMIC)
+    ) {
       return NextResponse.json(
         { error: "Swap output must be between $1.00 and $100,000 USDT." },
         { status: 400 }
       );
     }
 
+    if (
+      sellAmountTarget !== null &&
+      (sellAmountTarget <= 0n || sellAmountTarget > MAX_SELL_ATOMIC)
+    ) {
+      return NextResponse.json({ error: "Invalid sell amount." }, { status: 400 });
+    }
+
     const walletLower = session.wallet.toLowerCase();
     if (!checkFundingRateLimit(walletLower)) {
       return NextResponse.json(
-        { error: "Too many funding quote requests in the last 10 minutes. Please wait a moment and try again." },
+        { error: "Too many quote requests in the last 10 minutes. Please wait a moment and try again." },
         { status: 429 }
       );
     }
 
-    // Release any previous open funding RFQ from this wallet before requesting a new one (protects 4-slot cap)
+    // Release any previous open RFQ from this wallet before requesting a new one (protects 4-slot cap)
     const priorCookie = verifyFundingRfqCookie(req.cookies.get(FUNDING_RFQ_COOKIE)?.value);
     if (priorCookie && priorCookie.wallet === walletLower) {
       await textile.cancelQuote(priorCookie.rfqId, priorCookie.claimToken).catch(() => {});
@@ -196,17 +287,24 @@ export async function POST(req: NextRequest) {
     const taker = getAddress(session.wallet);
 
     try {
-      const outcome = await textile.requestFirmExactOutput({
-        sellToken: token.address,
-        buyToken: CELO_TOKENS.USDT.address,
-        buyAmountAtomic: buyAmount.toString(),
-        taker,
-      });
+      const outcome = isExactInput
+        ? await textile.requestFirmExactInput({
+            sellToken: token.address,
+            buyToken: CELO_TOKENS.USDT.address,
+            sellAmountAtomic: sellAmountTarget!.toString(),
+            taker,
+          })
+        : await textile.requestFirmExactOutput({
+            sellToken: token.address,
+            buyToken: CELO_TOKENS.USDT.address,
+            buyAmountAtomic: buyAmountTarget!.toString(),
+            taker,
+          });
 
       if (outcome.status !== "quoted" || !outcome.quote || !outcome.transactions?.swap) {
         return NextResponse.json(
           {
-            error: `Textile FX has no live firm quote for ${data.sellToken} → USDT right now (${outcome.reason ?? "empty book"}). Try USDT or USDC.`,
+            error: `Textile FX has no live firm quote for ${data.sellToken} → USDT right now (${outcome.reason ?? "amount may be below the $1.00 minimum or book is temporarily empty"}).`,
             status: outcome.status,
           },
           { status: 422 }
@@ -222,19 +320,27 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Strict security allowlist & output-amount validation BEFORE sending unsigned tx calldata to the user's wallet
+      // Strict security allowlist & exact-amount validation BEFORE sending unsigned tx calldata to the user's wallet
+      const quoteBuy = BigInt(quote.buyAmount);
+      const quoteTakerPays = BigInt(quote.takerPays);
+      const amountInvariantOk = isExactInput
+        ? quoteTakerPays === sellAmountTarget! &&
+          quoteBuy >= MIN_EXACT_INPUT_USDT_OUTPUT_ATOMIC &&
+          quoteBuy <= MAX_FUNDING_SWAP_USDT_ATOMIC
+        : quoteBuy === buyAmountTarget!;
+
       if (
         !isAllowedTextileTarget(quote.spender) ||
         !isAllowedTextileTarget(swapTx.to) ||
         swapTx.chainId !== CELO_MAINNET_CHAIN_ID ||
         swapTx.value !== "0" ||
-        BigInt(quote.buyAmount) !== buyAmount
+        !amountInvariantOk
       ) {
         if (outcome.claimToken) {
           await textile.cancelQuote(outcome.rfqId, outcome.claimToken).catch(() => {});
         }
         return NextResponse.json(
-          { error: "Blocked unexpected Textile FX contract target, chainId, value, or output amount." },
+          { error: "Blocked unexpected Textile FX contract target, chainId, value, or swap amount." },
           { status: 502 }
         );
       }
@@ -245,13 +351,14 @@ export async function POST(req: NextRequest) {
         data: encodeFunctionData({
           abi: erc20Abi,
           functionName: "approve",
-          args: [quote.spender, BigInt(quote.takerPays)],
+          args: [quote.spender, quoteTakerPays],
         }),
         value: "0",
         chainId: CELO_MAINNET_CHAIN_ID,
       };
 
       const res = NextResponse.json({
+        mode: isExactInput ? "exact-input" : "exact-output",
         rfqId: outcome.rfqId,
         status: outcome.status,
         sellToken: data.sellToken,
@@ -260,6 +367,7 @@ export async function POST(req: NextRequest) {
         takerPaysAtomic: quote.takerPays,
         takerPaysFormatted: formatDisplayAmount(quote.takerPays, token.decimals),
         buyAmountAtomic: quote.buyAmount,
+        buyUsdtFormatted: formatDisplayAmount(quote.buyAmount, 6),
         expiresAt: quote.expiresAt,
         spender: quote.spender,
         transactions: {

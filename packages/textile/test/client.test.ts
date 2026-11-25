@@ -263,4 +263,69 @@ describe("packages/textile RFQ v2 engine", () => {
     expect(sentTxs[0]?.data).toBe(expectedApproveData);
     expect(sentTxs[0]?.value).toBe(0n);
   });
+
+  it("sends exact-input sellAmount (never buyAmount) for local-token to USDT previews and firm quotes", async () => {
+    const capturedBodies: Array<Record<string, unknown>> = [];
+    const mockFetch: typeof fetch = vi.fn(async (_url, init) => {
+      capturedBodies.push(JSON.parse(String(init?.body ?? "{}")));
+      return new Response(
+        JSON.stringify({
+          data: {
+            rfqId: "rfq_EXACT_IN",
+            claimToken: "rfqc_in_once",
+            status: "quoted",
+            quote: {
+              sellAmount: "2500000000",
+              buyAmount: "1741086",
+              feeAmount: "499900",
+              takerPays: "2500000000",
+              rateRay: "696573686874427410505004",
+              expiresAt: new Date(Date.now() + 60_000).toISOString(),
+              orderDeadline: new Date(Date.now() + 90_000).toISOString(),
+              latestOrderDeadline: new Date(Date.now() + 90_000).toISOString(),
+              reactor: CELO_CONTRACTS.TEXTILE_LIMIT_ORDER_REACTOR,
+              spender: CELO_CONTRACTS.TEXTILE_LIMIT_ORDER_REACTOR,
+              taker: "0x1111111111111111111111111111111111111111",
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = new TextileClient({
+      apiKey: "tx_live_dummy_test",
+      builderCodes: [DEFAULT_ATTRIBUTION_CODE],
+      fetchImpl: mockFetch,
+    });
+
+    await client.previewExactInput({
+      sellToken: CELO_TOKENS.cNGN.address,
+      sellAmountAtomic: "2500000000",
+    });
+
+    await client.requestFirmExactInput({
+      sellToken: CELO_TOKENS.cNGN.address,
+      sellAmountAtomic: "2500000000",
+      taker: "0x1111111111111111111111111111111111111111",
+    });
+
+    expect(capturedBodies[0]).toMatchObject({
+      chainId: 42220,
+      sellToken: CELO_TOKENS.cNGN.address,
+      buyToken: CELO_TOKENS.USDT.address,
+      sellAmount: "2500000000",
+    });
+    expect(capturedBodies[0]?.buyAmount).toBeUndefined();
+
+    expect(capturedBodies[1]).toMatchObject({
+      chainId: 42220,
+      sellToken: CELO_TOKENS.cNGN.address,
+      buyToken: CELO_TOKENS.USDT.address,
+      sellAmount: "2500000000",
+      includeAttribution: true,
+      builderCodes: [DEFAULT_ATTRIBUTION_CODE],
+    });
+    expect(capturedBodies[1]?.buyAmount).toBeUndefined();
+  });
 });

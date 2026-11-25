@@ -1,7 +1,15 @@
 "use client";
 
-import { ArrowUpRight, CircleNotch, Key, PaperPlaneTilt, SignOut, Warning } from "@phosphor-icons/react";
-import { usePrivy } from "@privy-io/react-auth";
+import {
+  ArrowUpRight,
+  ArrowsLeftRight,
+  CircleNotch,
+  Key,
+  PaperPlaneTilt,
+  SignOut,
+  Warning,
+} from "@phosphor-icons/react";
+import { usePrivy, useSignMessage as usePrivySignMessage } from "@privy-io/react-auth";
 import { useQuery } from "@tanstack/react-query";
 import { CELO_TOKENS, celoscanAddressUrl, celoscanTxUrl } from "@vire/shared";
 import Link from "next/link";
@@ -15,7 +23,10 @@ import {
   useChainId,
   useConnect,
   useDisconnect,
+  usePublicClient,
   useReadContracts,
+  useSendTransaction,
+  useSignMessage,
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
@@ -25,6 +36,13 @@ import { useIsMiniPay } from "@/components/providers";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { TokenIcon } from "@/components/ui/token-icon";
+import {
+  CONVERTIBLE_LOCAL_TOKENS,
+  executeConvertToUsdt,
+  fetchConvertToUsdtPreview,
+  type ConvertibleLocalToken,
+  type ConvertToUsdtPreview,
+} from "@/lib/convert-to-usdt";
 import { cn, truncateMiddle } from "@/lib/utils";
 
 const PRIVY_ENABLED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim());
@@ -55,7 +73,10 @@ interface AccountPopoverProps {
   hasEmbeddedWallet?: boolean;
   onExportWallet?: () => void;
   onSignOut?: () => Promise<void> | void;
+  privySignMessage?: (message: string) => Promise<string>;
 }
+
+type WalletSendSymbol = "USDT" | ConvertibleLocalToken;
 
 function AccountPopover({
   walletAddress,
@@ -65,16 +86,31 @@ function AccountPopover({
   hasEmbeddedWallet = false,
   onExportWallet,
   onSignOut,
+  privySignMessage,
 }: AccountPopoverProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<"none" | "convert" | "send">("none");
+  const [convertToken, setConvertToken] = useState<ConvertibleLocalToken>("cNGN");
+  const [convertAmount, setConvertAmount] = useState("");
+  const [convertPreview, setConvertPreview] = useState<ConvertToUsdtPreview | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertStatus, setConvertStatus] = useState<string | null>(null);
+  const [convertError, setConvertError] = useState<string | null>(null);
+  const [lastConvertTx, setLastConvertTx] = useState<{ hash: string; usdt: string } | null>(null);
+
+  const [sendToken, setSendToken] = useState<WalletSendSymbol>("USDT");
   const [withdrawTo, setWithdrawTo] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [lastWithdrawTx, setLastWithdrawTx] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
+  const { isConnected: wagmiConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync, isPending: isSending } = useWriteContract();
+  const publicClient = usePublicClient({ chainId: celo.id });
 
   const { data: balances, refetch: refetchBalances } = useReadContracts({
     contracts: walletAddress
@@ -95,6 +131,27 @@ function AccountPopover({
           },
           {
             address: CELO_TOKENS.wARS.address,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [walletAddress],
+            chainId: celo.id,
+          },
+          {
+            address: CELO_TOKENS.wBRL.address,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [walletAddress],
+            chainId: celo.id,
+          },
+          {
+            address: CELO_TOKENS.wMXN.address,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [walletAddress],
+            chainId: celo.id,
+          },
+          {
+            address: CELO_TOKENS.IDRX.address,
             abi: erc20Abi,
             functionName: "balanceOf",
             args: [walletAddress],
@@ -138,9 +195,132 @@ function AccountPopover({
   const cngnRaw = balances?.[0]?.result as bigint | undefined;
   const usdtRaw = balances?.[1]?.result as bigint | undefined;
   const warsRaw = balances?.[2]?.result as bigint | undefined;
-  const hasCngn = Boolean(cngnRaw && cngnRaw > 0n);
+  const wbrlRaw = balances?.[3]?.result as bigint | undefined;
+  const wmxnRaw = balances?.[4]?.result as bigint | undefined;
+  const idrxRaw = balances?.[5]?.result as bigint | undefined;
 
-  async function handleWithdrawCngn(e: React.FormEvent) {
+  const balanceByToken: Record<WalletSendSymbol, bigint | undefined> = {
+    USDT: usdtRaw,
+    cNGN: cngnRaw,
+    wARS: warsRaw,
+    wBRL: wbrlRaw,
+    wMXN: wmxnRaw,
+    IDRX: idrxRaw,
+  };
+
+  const heldLocalTokens = CONVERTIBLE_LOCAL_TOKENS.filter((sym) => {
+    const bal = balanceByToken[sym];
+    return bal !== undefined && bal > 0n;
+  });
+  const hasAnyLocalBalance = heldLocalTokens.length > 0;
+  const convertRaw = balanceByToken[convertToken];
+  const sendRaw = balanceByToken[sendToken];
+
+  // Auto-select first held local token when Convert opens and current selection is empty
+  useEffect(() => {
+    if (activePanel !== "convert") return;
+    if ((!convertRaw || convertRaw === 0n) && heldLocalTokens.length > 0) {
+      const next = heldLocalTokens[0]!;
+      setConvertToken(next);
+      const bal = balanceByToken[next];
+      if (bal && bal > 0n) {
+        setConvertAmount(formatUnits(bal, CELO_TOKENS[next].decimals));
+      }
+    } else if (!convertAmount && convertRaw && convertRaw > 0n) {
+      setConvertAmount(formatUnits(convertRaw, CELO_TOKENS[convertToken].decimals));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePanel, heldLocalTokens.join(",")]);
+
+  // Live indicative Textile FX preview inside the navbar Convert panel
+  useEffect(() => {
+    if (activePanel !== "convert") return;
+    const tokenMeta = CELO_TOKENS[convertToken];
+    let atomic: bigint;
+    try {
+      atomic = parseUnits(convertAmount.trim(), tokenMeta.decimals);
+      if (atomic <= 0n) {
+        setConvertPreview(null);
+        return;
+      }
+    } catch {
+      setConvertPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsPreviewLoading(true);
+    const timer = setTimeout(() => {
+      void fetchConvertToUsdtPreview({
+        sellToken: convertToken,
+        sellAmountAtomic: atomic.toString(),
+      }).then((preview) => {
+        if (!cancelled) {
+          setConvertPreview(preview);
+          setIsPreviewLoading(false);
+        }
+      });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activePanel, convertToken, convertAmount]);
+
+  async function handleConvertLocalToUsdt(e: React.FormEvent) {
+    e.preventDefault();
+    if (!walletAddress) return;
+    setConvertError(null);
+    setLastConvertTx(null);
+
+    const tokenMeta = CELO_TOKENS[convertToken];
+    let atomic: bigint;
+    try {
+      atomic = parseUnits(convertAmount.trim(), tokenMeta.decimals);
+      if (atomic <= 0n) throw new Error("zero");
+    } catch {
+      setConvertError(`Enter a valid ${convertToken} amount.`);
+      return;
+    }
+
+    if (convertRaw !== undefined && atomic > convertRaw) {
+      setConvertError(`Amount exceeds your available ${convertToken} balance.`);
+      return;
+    }
+
+    setIsConverting(true);
+    setConvertStatus("Preparing swap…");
+    try {
+      const res = await executeConvertToUsdt({
+        wallet: walletAddress,
+        sellToken: convertToken,
+        sellAmountAtomic: atomic.toString(),
+        publicClient,
+        sendTransactionAsync: (args) => sendTransactionAsync(args),
+        signMessage: (msg) =>
+          wagmiConnected
+            ? signMessageAsync({ message: msg })
+            : privySignMessage
+              ? privySignMessage(msg)
+              : signMessageAsync({ message: msg }),
+        onStatus: setConvertStatus,
+      });
+      setLastConvertTx({ hash: res.swapTxHash, usdt: res.buyUsdtFormatted });
+      setConvertAmount("");
+      toast.success(`Converted ${res.takerPaysFormatted} ${convertToken} → ${res.buyUsdtFormatted} USDT`);
+      void refetchBalances();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Conversion cancelled or failed.";
+      setConvertError(msg.slice(0, 150));
+      toast.error("Conversion failed");
+    } finally {
+      setIsConverting(false);
+      setConvertStatus(null);
+    }
+  }
+
+  async function handleSendToken(e: React.FormEvent) {
     e.preventDefault();
     setWithdrawError(null);
     setLastWithdrawTx(null);
@@ -151,23 +331,24 @@ function AccountPopover({
       return;
     }
 
+    const tokenMeta = CELO_TOKENS[sendToken];
     let atomic: bigint;
     try {
-      atomic = parseUnits(withdrawAmount.trim(), CELO_TOKENS.cNGN.decimals);
+      atomic = parseUnits(withdrawAmount.trim(), tokenMeta.decimals);
       if (atomic <= 0n) throw new Error("Amount must be greater than 0");
     } catch {
-      setWithdrawError("Enter a valid cNGN amount.");
+      setWithdrawError(`Enter a valid ${sendToken} amount.`);
       return;
     }
 
-    if (cngnRaw !== undefined && atomic > cngnRaw) {
-      setWithdrawError("Amount exceeds your available cNGN balance.");
+    if (sendRaw !== undefined && atomic > sendRaw) {
+      setWithdrawError(`Amount exceeds your available ${sendToken} balance.`);
       return;
     }
 
     try {
       const hash = await writeContractAsync({
-        address: CELO_TOKENS.cNGN.address,
+        address: tokenMeta.address,
         abi: erc20Abi,
         functionName: "transfer",
         args: [getAddress(toTrimmed), atomic],
@@ -176,14 +357,20 @@ function AccountPopover({
       setLastWithdrawTx(hash);
       setWithdrawAmount("");
       setWithdrawTo("");
-      toast.success(`Sent ${withdrawAmount.trim()} cNGN on Celo Mainnet`);
+      toast.success(`Sent ${withdrawAmount.trim()} ${sendToken} on Celo Mainnet`);
       void refetchBalances();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Transfer cancelled or failed.";
       setWithdrawError(msg.slice(0, 140));
-      toast.error("cNGN transfer failed");
+      toast.error(`${sendToken} transfer failed`);
     }
   }
+
+  const sendTokenChoices: WalletSendSymbol[] = [
+    "USDT",
+    "cNGN",
+    ...heldLocalTokens.filter((t) => t !== "cNGN"),
+  ];
 
   return (
     <div ref={menuRef} className="relative">
@@ -218,7 +405,7 @@ function AccountPopover({
       {menuOpen && (
         <div
           role="menu"
-          className="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-white shadow-[0_0_0_1px_rgba(10,10,12,0.08),0_16px_36px_-10px_rgba(10,10,12,0.16)]"
+          className="absolute right-0 z-50 mt-2 max-h-[calc(100dvh-5rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl bg-white shadow-[0_0_0_1px_rgba(10,10,12,0.08),0_16px_36px_-10px_rgba(10,10,12,0.16)]"
         >
           {/* Identity & Wallet Address */}
           <div className="border-b border-black/[0.06] px-4 py-3.5">
@@ -266,15 +453,6 @@ function AccountPopover({
               <div className="space-y-2 text-[12.5px]">
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-2 text-[#3F3F46]">
-                    <TokenIcon symbol="cNGN" size={18} />
-                    cNGN
-                  </span>
-                  <span className="font-mono font-medium text-[#0A0A0C] tabular-nums">
-                    {formatCompactBalance(cngnRaw, CELO_TOKENS.cNGN.decimals)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-2 text-[#3F3F46]">
                     <TokenIcon symbol="USDT" size={18} />
                     USDT
                   </span>
@@ -282,32 +460,45 @@ function AccountPopover({
                     {formatCompactBalance(usdtRaw, CELO_TOKENS.USDT.decimals)}
                   </span>
                 </div>
-                {warsRaw !== undefined && warsRaw > 0n && (
-                  <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center gap-2 text-[#3F3F46]">
-                      <TokenIcon symbol="wARS" size={18} />
-                      wARS
-                    </span>
-                    <span className="font-mono font-medium text-[#0A0A0C] tabular-nums">
-                      {formatCompactBalance(warsRaw, CELO_TOKENS.wARS.decimals)}
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-2 text-[#3F3F46]">
+                    <TokenIcon symbol="cNGN" size={18} />
+                    cNGN
+                  </span>
+                  <span className="font-mono font-medium text-[#0A0A0C] tabular-nums">
+                    {formatCompactBalance(cngnRaw, CELO_TOKENS.cNGN.decimals)}
+                  </span>
+                </div>
+                {(["wARS", "wBRL", "wMXN", "IDRX"] as const).map((sym) => {
+                  const raw = balanceByToken[sym];
+                  if (!raw || raw === 0n) return null;
+                  return (
+                    <div key={sym} className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-2 text-[#3F3F46]">
+                        <TokenIcon symbol={sym} size={18} />
+                        {sym}
+                      </span>
+                      <span className="font-mono font-medium text-[#0A0A0C] tabular-nums">
+                        {formatCompactBalance(raw, CELO_TOKENS[sym].decimals)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* 1-Click Send / Withdraw cNGN to Busha, Quidax, Roqqu, or MiniPay */}
-              {withdrawOpen && (
+              {/* Convert local payout -> Celo USDT via Textile FX (for MiniPay & Exchanges) */}
+              {activePanel === "convert" && (
                 <form
-                  onSubmit={handleWithdrawCngn}
+                  onSubmit={handleConvertLocalToUsdt}
                   className="mt-3 space-y-2 rounded-xl bg-[#FAFAFB] p-3 ring-1 ring-black/[0.06]"
                 >
-                  <div className="flex items-center justify-between text-[11px] font-medium text-[#52525B]">
-                    <span>Send cNGN (Celo network)</span>
-                    {hasCngn && cngnRaw !== undefined && (
+                  <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-[#52525B]">
+                    <span>Convert to USDT (Celo)</span>
+                    {convertRaw !== undefined && convertRaw > 0n && (
                       <button
                         type="button"
                         onClick={() =>
-                          setWithdrawAmount(formatUnits(cngnRaw, CELO_TOKENS.cNGN.decimals))
+                          setConvertAmount(formatUnits(convertRaw, CELO_TOKENS[convertToken].decimals))
                         }
                         className="font-mono text-[10.5px] text-[#0A0A0C] underline underline-offset-2"
                       >
@@ -315,12 +506,146 @@ function AccountPopover({
                       </button>
                     )}
                   </div>
+
+                  {heldLocalTokens.length > 1 && (
+                    <div className="flex flex-wrap gap-1">
+                      {heldLocalTokens.map((sym) => (
+                        <button
+                          key={sym}
+                          type="button"
+                          onClick={() => {
+                            setConvertToken(sym);
+                            const bal = balanceByToken[sym];
+                            setConvertAmount(bal ? formatUnits(bal, CELO_TOKENS[sym].decimals) : "");
+                            setConvertError(null);
+                          }}
+                          className={cn(
+                            "rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                            convertToken === sym
+                              ? "bg-[#0A0A0C] text-white"
+                              : "bg-white text-[#52525B] ring-1 ring-black/[0.08] hover:text-[#0A0A0C]"
+                          )}
+                        >
+                          {sym}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={convertAmount}
+                      onChange={(e) => setConvertAmount(e.target.value)}
+                      placeholder={`Amount (${convertToken})`}
+                      className="h-9 min-w-0 flex-1 rounded-lg bg-white px-2.5 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.09] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-[#0A0A0C]/40 sm:h-8 sm:text-[11.5px]"
+                    />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="primary"
+                      disabled={isConverting || !convertRaw || convertRaw === 0n}
+                      className="h-9 shrink-0 px-3 text-[11.5px] sm:h-8"
+                    >
+                      {isConverting ? <CircleNotch className="h-3.5 w-3.5 animate-spin" /> : "Convert"}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-[#71717A]">
+                    <span>Textile FX quote</span>
+                    {isPreviewLoading ? (
+                      <span className="font-mono text-[#52525B]">Quoting…</span>
+                    ) : convertPreview?.status === "preview" && convertPreview.buyUsdtFormatted ? (
+                      <span className="font-mono font-medium text-[#0A0A0C] tabular-nums">
+                        ≈ {convertPreview.buyUsdtFormatted} USDT
+                      </span>
+                    ) : convertPreview?.status === "no_quote" ? (
+                      <span className="text-[#B45309]">Min ~$1.00 USDT</span>
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </div>
+
+                  <p className="text-[10.5px] leading-snug text-[#71717A]">
+                    {isMiniPay
+                      ? "Swaps straight into your MiniPay USDT balance for Pay to Bank Transfer (OPay / Moniepoint, min 0.35 USDT)."
+                      : "Convert local payouts to Celo USDT before sending to MiniPay or exchanges."}
+                  </p>
+
+                  {convertStatus && (
+                    <p className="text-[11px] text-[#52525B]">{convertStatus}</p>
+                  )}
+                  {convertError && (
+                    <p className="text-[11px] leading-snug text-[#DC2626]">{convertError}</p>
+                  )}
+                  {lastConvertTx && (
+                    <a
+                      href={celoscanTxUrl(lastConvertTx.hash)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-mono text-[11px] text-[#16A34A] underline underline-offset-2"
+                    >
+                      Swapped → {lastConvertTx.usdt} USDT · View tx
+                      <ArrowUpRight className="h-3 w-3" />
+                    </a>
+                  )}
+                </form>
+              )}
+
+              {/* Send Celo USDT (MiniPay / Exchanges) or raw local stablecoin */}
+              {activePanel === "send" && (
+                <form
+                  onSubmit={handleSendToken}
+                  className="mt-3 space-y-2 rounded-xl bg-[#FAFAFB] p-3 ring-1 ring-black/[0.06]"
+                >
+                  <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-[#52525B]">
+                    <span>Send {sendToken} (Celo)</span>
+                    {sendRaw !== undefined && sendRaw > 0n && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setWithdrawAmount(formatUnits(sendRaw, CELO_TOKENS[sendToken].decimals))
+                        }
+                        className="font-mono text-[10.5px] text-[#0A0A0C] underline underline-offset-2"
+                      >
+                        Max
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1">
+                    {sendTokenChoices.map((sym) => (
+                      <button
+                        key={sym}
+                        type="button"
+                        onClick={() => {
+                          setSendToken(sym);
+                          setWithdrawAmount("");
+                          setWithdrawError(null);
+                        }}
+                        className={cn(
+                          "rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                          sendToken === sym
+                            ? "bg-[#0A0A0C] text-white"
+                            : "bg-white text-[#52525B] ring-1 ring-black/[0.08] hover:text-[#0A0A0C]"
+                        )}
+                      >
+                        {sym}
+                      </button>
+                    ))}
+                  </div>
+
                   <input
                     type="text"
                     value={withdrawTo}
                     onChange={(e) => setWithdrawTo(e.target.value)}
-                    placeholder="Busha, Quidax, or MiniPay 0x…"
-                    className="h-8 w-full rounded-lg bg-white px-2.5 font-mono text-[11.5px] text-[#0A0A0C] ring-1 ring-black/[0.09] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-[#0A0A0C]/40"
+                    placeholder={
+                      sendToken === "USDT"
+                        ? "MiniPay, Quidax, or Bybit 0x…"
+                        : "Celo self-custody 0x… address"
+                    }
+                    className="h-9 w-full rounded-lg bg-white px-2.5 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.09] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-[#0A0A0C]/40 sm:h-8 sm:text-[11.5px]"
                   />
                   <div className="flex items-center gap-2">
                     <input
@@ -328,19 +653,26 @@ function AccountPopover({
                       inputMode="decimal"
                       value={withdrawAmount}
                       onChange={(e) => setWithdrawAmount(e.target.value)}
-                      placeholder="Amount (e.g. 2500)"
-                      className="h-8 min-w-0 flex-1 rounded-lg bg-white px-2.5 font-mono text-[11.5px] text-[#0A0A0C] ring-1 ring-black/[0.09] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-[#0A0A0C]/40"
+                      placeholder={sendToken === "USDT" ? "Amount (e.g. 1.74)" : `Amount (${sendToken})`}
+                      className="h-9 min-w-0 flex-1 rounded-lg bg-white px-2.5 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.09] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-[#0A0A0C]/40 sm:h-8 sm:text-[11.5px]"
                     />
                     <Button
                       type="submit"
                       size="sm"
                       variant="primary"
-                      disabled={isSending || !hasCngn}
-                      className="h-8 shrink-0 px-3 text-[11.5px]"
+                      disabled={isSending || !sendRaw || sendRaw === 0n}
+                      className="h-9 shrink-0 px-3 text-[11.5px] sm:h-8"
                     >
                       {isSending ? <CircleNotch className="h-3.5 w-3.5 animate-spin" /> : "Send"}
                     </Button>
                   </div>
+
+                  <p className="text-[10.5px] leading-snug text-[#71717A]">
+                    {sendToken === "USDT"
+                      ? "Network: Celo · Works with MiniPay (Pay to Bank Transfer to OPay / Moniepoint, min 0.35 USDT) & Celo-USDT exchanges."
+                      : `Note: MiniPay only shows USDT, USDC, and USAT. Convert ${sendToken} to USDT first for MiniPay or exchange cash-outs.`}
+                  </p>
+
                   {withdrawError && (
                     <p className="text-[11px] leading-snug text-[#DC2626]">{withdrawError}</p>
                   )}
@@ -363,23 +695,42 @@ function AccountPopover({
           {/* Actions */}
           <div className="p-1.5">
             {walletAddress && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setWithdrawOpen((prev) => !prev);
-                  setWithdrawError(null);
-                }}
-                className="flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2 text-[12.5px] font-medium text-[#3F3F46] transition-colors hover:bg-[#F5F5F7] hover:text-[#0A0A0C]"
-              >
-                <span className="inline-flex items-center gap-2.5">
-                  <PaperPlaneTilt weight="regular" className="h-3.5 w-3.5 text-[#71717A]" />
-                  <span>{withdrawOpen ? "Hide withdraw" : "Withdraw cNGN"}</span>
-                </span>
-                {hasCngn && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" />
-                )}
-              </button>
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setActivePanel((prev) => (prev === "convert" ? "none" : "convert"));
+                    setConvertError(null);
+                  }}
+                  className="flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2 text-[12.5px] font-medium text-[#3F3F46] transition-colors hover:bg-[#F5F5F7] hover:text-[#0A0A0C]"
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <ArrowsLeftRight weight="regular" className="h-3.5 w-3.5 text-[#71717A]" />
+                    <span>{activePanel === "convert" ? "Hide convert" : "Convert to USDT"}</span>
+                  </span>
+                  {hasAnyLocalBalance && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setActivePanel((prev) => (prev === "send" ? "none" : "send"));
+                    setWithdrawError(null);
+                  }}
+                  className="flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2 text-[12.5px] font-medium text-[#3F3F46] transition-colors hover:bg-[#F5F5F7] hover:text-[#0A0A0C]"
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <PaperPlaneTilt weight="regular" className="h-3.5 w-3.5 text-[#71717A]" />
+                    <span>{activePanel === "send" ? "Hide send" : "Send to MiniPay / Wallet"}</span>
+                  </span>
+                  {usdtRaw !== undefined && usdtRaw > 0n && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" />
+                  )}
+                </button>
+              </>
             )}
             {hasEmbeddedWallet && onExportWallet && (
               <button
@@ -418,6 +769,7 @@ function AccountPopover({
 
 function PrivyAccountControl() {
   const { ready, authenticated, user, login, logout, exportWallet } = usePrivy();
+  const { signMessage: privySignMessage } = usePrivySignMessage();
   const { address: wagmiAddress, isConnected } = useAccount();
   const chainId = useChainId();
   const { disconnect } = useDisconnect();
@@ -481,6 +833,10 @@ function PrivyAccountControl() {
       hasEmbeddedWallet={hasEmbeddedWallet}
       onExportWallet={() => {
         void exportWallet();
+      }}
+      privySignMessage={async (message) => {
+        const res = await privySignMessage({ message });
+        return res.signature;
       }}
       onSignOut={async () => {
         await fetch("/api/auth/wallet", { method: "DELETE" }).catch(() => {});

@@ -3,6 +3,7 @@
 import {
   ArrowRight,
   ArrowUpRight,
+  ArrowsLeftRight,
   Check,
   CircleNotch,
   Clock,
@@ -33,8 +34,15 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { erc20Abi, getAddress, isAddress, parseUnits, zeroHash, type Address } from "viem";
-import { useAccount, useConnect, useSignMessage, useWriteContract } from "wagmi";
+import { erc20Abi, formatUnits, getAddress, isAddress, parseUnits, zeroHash, type Address } from "viem";
+import {
+  useAccount,
+  useConnect,
+  usePublicClient,
+  useSendTransaction,
+  useSignMessage,
+  useWriteContract,
+} from "wagmi";
 import { celo } from "wagmi/chains";
 import { useIsMiniPay } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +53,12 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TokenIcon } from "@/components/ui/token-icon";
+import {
+  executeConvertToUsdt,
+  fetchConvertToUsdtPreview,
+  isConvertibleLocalToken,
+  type ConvertToUsdtPreview,
+} from "@/lib/convert-to-usdt";
 import { buildIdentityBindMessage, requestAuthNonce } from "@/lib/session-client";
 import { cn, truncateMiddle } from "@/lib/utils";
 
@@ -155,10 +169,13 @@ function ClaimFlowInner({
       ? initialStageParam
       : 1;
 
+  const isMiniPay = useIsMiniPay();
   const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount();
   const { connect, connectors } = useConnect();
   const { signMessageAsync } = useSignMessage();
   const { writeContractAsync, isPending: isRatingTxPending } = useWriteContract();
+  const { sendTransactionAsync } = useSendTransaction();
+  const publicClient = usePublicClient({ chainId: celo.id });
 
   const address = wagmiAddress ?? privyWalletAddress;
   const isSignedIn = Boolean(address);
@@ -183,6 +200,22 @@ function ClaimFlowInner({
   const [result, setResult] = useState<SubmissionResponse | null>(null);
   const [confettiKey, setConfettiKey] = useState<string | null>(null);
   const [cashOutOpen, setCashOutOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [convertAmount, setConvertAmount] = useState("");
+  const [convertSendTo, setConvertSendTo] = useState("");
+  const [convertPreview, setConvertPreview] = useState<ConvertToUsdtPreview | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertStatus, setConvertStatus] = useState<string | null>(null);
+  const [convertError, setConvertError] = useState<string | null>(null);
+  const [convertedUsdt, setConvertedUsdt] = useState<{
+    swapTxHash: string;
+    buyUsdtAtomic: string;
+    buyUsdtFormatted: string;
+    sentTxHash?: string;
+    sentTo?: string;
+  } | null>(null);
+  const [isSendingConvertedUsdt, setIsSendingConvertedUsdt] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTo, setTransferTo] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
@@ -418,6 +451,10 @@ function ClaimFlowInner({
       const json = (await res.json()) as SubmissionResponse;
       setResult(json);
       setCashOutOpen(false);
+      setConvertOpen(false);
+      setConvertedUsdt(null);
+      setConvertError(null);
+      setConvertStatus(null);
       setTransferOpen(false);
       setTransferError(null);
       setTransferTxHash(null);
@@ -429,6 +466,7 @@ function ClaimFlowInner({
         setConfettiKey(json.txHashes?.localPayout ?? String(Date.now()));
         if (json.offramp?.humanAmount) {
           setTransferAmount(json.offramp.humanAmount);
+          setConvertAmount(json.offramp.humanAmount);
         }
         toast.success(`${paidLabel} paid to your wallet`, {
           description: "Your work was verified and settled on Celo.",
@@ -457,6 +495,153 @@ function ClaimFlowInner({
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  // Fetch live indicative Textile FX preview when Convert to USDT panel is open
+  useEffect(() => {
+    if (!convertOpen || !activeCampaign || !isConvertibleLocalToken(activeCampaign.corridor)) {
+      return;
+    }
+    const corridorSym = activeCampaign.corridor;
+    const tokenMeta = CELO_TOKENS[corridorSym as CorridorSymbol];
+    let atomic: bigint;
+    try {
+      atomic = parseUnits(convertAmount.trim(), tokenMeta.decimals);
+      if (atomic <= 0n) {
+        setConvertPreview(null);
+        return;
+      }
+    } catch {
+      setConvertPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsPreviewLoading(true);
+    const timer = setTimeout(() => {
+      void fetchConvertToUsdtPreview({
+        sellToken: corridorSym,
+        sellAmountAtomic: atomic.toString(),
+      }).then((preview) => {
+        if (!cancelled) {
+          setConvertPreview(preview);
+          setIsPreviewLoading(false);
+        }
+      });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [convertOpen, convertAmount, activeCampaign]);
+
+  async function handleConvertToUsdt(e: React.FormEvent) {
+    e.preventDefault();
+    if (!address || !activeCampaign || !isConvertibleLocalToken(activeCampaign.corridor)) return;
+    setConvertError(null);
+
+    const corridorSym = activeCampaign.corridor;
+    const tokenMeta = CELO_TOKENS[corridorSym as CorridorSymbol];
+
+    let sellAtomic: bigint;
+    try {
+      sellAtomic = parseUnits(convertAmount.trim(), tokenMeta.decimals);
+      if (sellAtomic <= 0n) throw new Error("zero");
+    } catch {
+      setConvertError(`Enter a valid ${corridorSym} amount.`);
+      return;
+    }
+
+    const destTrimmed = isMiniPay ? "" : convertSendTo.trim();
+    if (destTrimmed && !isAddress(destTrimmed)) {
+      setConvertError("Enter a valid Celo 0x MiniPay or exchange deposit address (or leave blank to keep USDT here).");
+      return;
+    }
+
+    setIsConverting(true);
+    setConvertStatus("Preparing Textile FX conversion…");
+    try {
+      const swapRes = await executeConvertToUsdt({
+        wallet: address,
+        sellToken: corridorSym,
+        sellAmountAtomic: sellAtomic.toString(),
+        publicClient,
+        sendTransactionAsync: (args) => sendTransactionAsync(args),
+        signMessage: (msg) =>
+          wagmiConnected
+            ? signMessageAsync({ message: msg })
+            : privySignMessage
+              ? privySignMessage(msg)
+              : signMessageAsync({ message: msg }),
+        onStatus: setConvertStatus,
+      });
+
+      const baseState = {
+        swapTxHash: swapRes.swapTxHash,
+        buyUsdtAtomic: swapRes.buyUsdtAtomic,
+        buyUsdtFormatted: swapRes.buyUsdtFormatted,
+      };
+      setConvertedUsdt(baseState);
+      toast.success(`Converted ${swapRes.takerPaysFormatted} ${corridorSym} → ${swapRes.buyUsdtFormatted} USDT`);
+
+      if (destTrimmed) {
+        setConvertStatus(`Sending ${swapRes.buyUsdtFormatted} USDT (Celo) to ${truncateMiddle(destTrimmed, 6, 4)}…`);
+        try {
+          const usdtTx = await writeContractAsync({
+            address: CELO_TOKENS.USDT.address,
+            abi: erc20Abi,
+            functionName: "transfer",
+            args: [getAddress(destTrimmed), BigInt(swapRes.buyUsdtAtomic)],
+            chainId: celo.id,
+          });
+          setConvertedUsdt({ ...baseState, sentTxHash: usdtTx, sentTo: destTrimmed });
+          setConvertSendTo("");
+          toast.success(`Sent ${swapRes.buyUsdtFormatted} USDT on Celo`);
+        } catch (sendErr) {
+          const msg = sendErr instanceof Error ? sendErr.message : "USDT transfer cancelled.";
+          setConvertError(
+            `Converted to ${swapRes.buyUsdtFormatted} USDT successfully, but the USDT send was not completed (${msg.slice(0, 100)}). Use the Send USDT button below to retry.`
+          );
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Conversion cancelled or failed.";
+      setConvertError(msg.slice(0, 180));
+      toast.error("Conversion did not complete");
+    } finally {
+      setIsConverting(false);
+      setConvertStatus(null);
+    }
+  }
+
+  async function handleSendConvertedUsdt(e: React.FormEvent) {
+    e.preventDefault();
+    if (!convertedUsdt) return;
+    setConvertError(null);
+    const destTrimmed = convertSendTo.trim();
+    if (!isAddress(destTrimmed)) {
+      setConvertError("Enter a valid Celo 0x MiniPay or exchange deposit address.");
+      return;
+    }
+    setIsSendingConvertedUsdt(true);
+    try {
+      const usdtTx = await writeContractAsync({
+        address: CELO_TOKENS.USDT.address,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [getAddress(destTrimmed), BigInt(convertedUsdt.buyUsdtAtomic)],
+        chainId: celo.id,
+      });
+      setConvertedUsdt({ ...convertedUsdt, sentTxHash: usdtTx, sentTo: destTrimmed });
+      setConvertSendTo("");
+      toast.success(`Sent ${convertedUsdt.buyUsdtFormatted} USDT on Celo`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "USDT transfer cancelled.";
+      setConvertError(msg.slice(0, 160));
+    } finally {
+      setIsSendingConvertedUsdt(false);
     }
   }
 
@@ -1180,21 +1365,49 @@ function ClaimFlowInner({
                           role="menu"
                           className="absolute left-0 right-0 z-40 mt-2 overflow-hidden rounded-2xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(10,10,12,0.08),0_16px_36px_-10px_rgba(10,10,12,0.16)]"
                         >
+                          {activeCampaign && isConvertibleLocalToken(activeCampaign.corridor) && (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setCashOutOpen(false);
+                                setTransferOpen(false);
+                                setConvertOpen(true);
+                              }}
+                              className="flex w-full items-center justify-between gap-3 rounded-xl bg-[#F5F5F7]/75 px-3.5 py-2.5 text-left transition-colors hover:bg-[#ECECEF]"
+                            >
+                              <div className="min-w-0">
+                                <div className="text-[13px] font-medium text-[#0A0A0C]">
+                                  {isMiniPay
+                                    ? `Convert ${activeCampaign.corridor} to USDT (for MiniPay)`
+                                    : "Convert to USDT & send to MiniPay / Exchange"}
+                                </div>
+                                <div className="text-[11.5px] leading-snug text-[#71717A]">
+                                  {isMiniPay
+                                    ? "Swap into your MiniPay USDT balance, then Pay to Bank Transfer (min 0.35 USDT)"
+                                    : `Swap ${activeCampaign.corridor} → Celo USDT via Textile FX, then send to MiniPay or exchanges`}
+                                </div>
+                              </div>
+                              <ArrowsLeftRight className="h-4 w-4 shrink-0 text-[#0A0A0C]" />
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             role="menuitem"
                             onClick={() => {
                               setCashOutOpen(false);
+                              setConvertOpen(false);
                               setTransferOpen(true);
                             }}
-                            className="flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 text-left transition-colors hover:bg-[#F5F5F7]"
+                            className="mt-1 flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 text-left transition-colors hover:bg-[#F5F5F7]"
                           >
                             <div className="min-w-0">
                               <div className="text-[13px] font-medium text-[#0A0A0C]">
-                                Send to wallet or exchange
+                                Send raw {activeCampaign?.corridor} (Celo)
                               </div>
-                              <div className="truncate text-[11.5px] text-[#71717A]">
-                                Transfer {activeCampaign?.corridor} straight to MiniPay, Busha, or Quidax
+                              <div className="text-[11.5px] leading-snug text-[#71717A]">
+                                Only for self-custody Celo wallets or exchanges that explicitly list Celo
                               </div>
                             </div>
                             <PaperPlaneTilt className="h-4 w-4 shrink-0 text-[#52525B]" />
@@ -1216,7 +1429,7 @@ function ClaimFlowInner({
                                 <div className="text-[13px] font-medium text-[#0A0A0C]">
                                   {v.name}
                                 </div>
-                                <div className="truncate text-[11.5px] text-[#71717A]">
+                                <div className="text-[11.5px] leading-snug text-[#71717A]">
                                   {v.note}
                                 </div>
                               </div>
@@ -1228,13 +1441,194 @@ function ClaimFlowInner({
                     </div>
                   )}
 
+                  {convertOpen && activeCampaign && isConvertibleLocalToken(activeCampaign.corridor) && (
+                    <div className="vire-well space-y-3 rounded-xl p-4">
+                      <div className="flex items-center justify-between gap-2 text-[12px] font-medium text-[#0A0A0C]">
+                        <span>
+                          {isMiniPay
+                            ? `Convert ${activeCampaign.corridor} → MiniPay USDT`
+                            : `Convert ${activeCampaign.corridor} → Celo USDT`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setConvertOpen(false)}
+                          className="text-[11.5px] font-normal text-[#71717A] hover:text-[#0A0A0C]"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      {!convertedUsdt ? (
+                        <form onSubmit={handleConvertToUsdt} className="space-y-2.5">
+                          <div>
+                            <div className="mb-1 flex items-center justify-between text-[11px] text-[#71717A]">
+                              <span>Amount to convert ({activeCampaign.corridor})</span>
+                              {isPreviewLoading ? (
+                                <span className="inline-flex items-center gap-1 font-mono text-[#52525B]">
+                                  <CircleNotch className="h-3 w-3 animate-spin" />
+                                  Quoting…
+                                </span>
+                              ) : convertPreview?.status === "preview" && convertPreview.buyUsdtFormatted ? (
+                                <span className="font-mono font-medium text-[#0A0A0C] tabular-nums">
+                                  ≈ {convertPreview.buyUsdtFormatted} USDT
+                                </span>
+                              ) : convertPreview?.status === "no_quote" ? (
+                                <span className="text-[#B45309]">Min ~$1.00 USDT for swap</span>
+                              ) : null}
+                            </div>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={convertAmount}
+                              onChange={(e) => setConvertAmount(e.target.value)}
+                              placeholder={`Amount in ${activeCampaign.corridor}`}
+                              className="h-9 bg-white font-mono text-[16px] sm:text-[12px]"
+                            />
+                          </div>
+
+                          {!isMiniPay ? (
+                            <div>
+                              <div className="mb-1 text-[11px] text-[#71717A]">
+                                MiniPay or Exchange Celo USDT address (optional)
+                              </div>
+                              <Input
+                                type="text"
+                                value={convertSendTo}
+                                onChange={(e) => setConvertSendTo(e.target.value)}
+                                placeholder="0x… MiniPay, Quidax, or Bybit (Celo network)"
+                                className="h-9 bg-white font-mono text-[16px] sm:text-[12px]"
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-[11.5px] leading-relaxed text-[#52525B]">
+                              Swaps straight into your MiniPay USDT balance. Once done, tap{" "}
+                              <strong className="font-medium text-[#0A0A0C]">
+                                Withdraw → Pay to Bank Transfer
+                              </strong>{" "}
+                              inside MiniPay (OPay, Moniepoint, any bank · min 0.35 USDT).
+                            </p>
+                          )}
+
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant="primary"
+                            disabled={isConverting}
+                            className="h-9 w-full"
+                          >
+                            {isConverting ? (
+                              <>
+                                <CircleNotch className="h-3.5 w-3.5 animate-spin" />
+                                {convertStatus ?? "Converting…"}
+                              </>
+                            ) : !isMiniPay && convertSendTo.trim() ? (
+                              "Convert & Send USDT (Celo)"
+                            ) : (
+                              `Convert ${activeCampaign.corridor} → USDT`
+                            )}
+                          </Button>
+
+                          {!isMiniPay && (
+                            <p className="text-[11px] leading-relaxed text-[#71717A]">
+                              Note: MiniPay displays USDT, USDC, and USAT on Celo and supports Nigerian bank
+                              transfers (OPay, Moniepoint) from 0.35 USDT.
+                            </p>
+                          )}
+                        </form>
+                      ) : (
+                        <div className="space-y-2.5">
+                          <div className="rounded-lg bg-white p-3 ring-1 ring-[#16A34A]/25">
+                            <div className="text-[12.5px] font-medium text-[#16A34A]">
+                              Converted to {convertedUsdt.buyUsdtFormatted} USDT on Celo
+                            </div>
+                            <a
+                              href={celoscanTxUrl(convertedUsdt.swapTxHash)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] text-[#3F3F46] underline underline-offset-2 hover:text-[#0A0A0C]"
+                            >
+                              View Textile FX swap tx
+                              <ArrowUpRight className="h-3 w-3" />
+                            </a>
+                            {convertedUsdt.sentTxHash ? (
+                              <div className="mt-2 border-t border-black/[0.06] pt-2">
+                                <div className="text-[12px] font-medium text-[#0A0A0C]">
+                                  USDT sent to {truncateMiddle(convertedUsdt.sentTo ?? "", 8, 6)}
+                                </div>
+                                <a
+                                  href={celoscanTxUrl(convertedUsdt.sentTxHash)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-0.5 inline-flex items-center gap-1 font-mono text-[11px] text-[#16A34A] underline underline-offset-2"
+                                >
+                                  View USDT transfer tx
+                                  <ArrowUpRight className="h-3 w-3" />
+                                </a>
+                                <p className="mt-1.5 text-[11px] leading-relaxed text-[#52525B]">
+                                  Open MiniPay →{" "}
+                                  <strong className="font-medium text-[#0A0A0C]">
+                                    Pay to Bank Transfer
+                                  </strong>{" "}
+                                  to withdraw Naira to OPay, Moniepoint, or any Nigerian bank (min 0.35 USDT).
+                                </p>
+                              </div>
+                            ) : isMiniPay ? (
+                              <p className="mt-2 border-t border-black/[0.06] pt-2 text-[11.5px] leading-relaxed text-[#52525B]">
+                                Your <strong className="font-medium text-[#0A0A0C]">{convertedUsdt.buyUsdtFormatted} USDT</strong> is
+                                now live on MiniPay&apos;s home screen — tap{" "}
+                                <strong className="font-medium text-[#0A0A0C]">
+                                  Withdraw → Pay to Bank Transfer
+                                </strong>{" "}
+                                to cash out to OPay or Moniepoint (min 0.35 USDT).
+                              </p>
+                            ) : null}
+                          </div>
+
+                          {!isMiniPay && !convertedUsdt.sentTxHash && (
+                            <form onSubmit={handleSendConvertedUsdt} className="space-y-2">
+                              <div className="text-[11px] font-medium text-[#52525B]">
+                                Now send {convertedUsdt.buyUsdtFormatted} USDT (Celo) to MiniPay or Exchange:
+                              </div>
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                <Input
+                                  type="text"
+                                  value={convertSendTo}
+                                  onChange={(e) => setConvertSendTo(e.target.value)}
+                                  placeholder="0x… MiniPay or Exchange address"
+                                  className="h-9 bg-white font-mono text-[16px] sm:text-[12px]"
+                                />
+                                <Button
+                                  type="submit"
+                                  size="sm"
+                                  variant="primary"
+                                  disabled={isSendingConvertedUsdt}
+                                  className="h-9 shrink-0 px-4"
+                                >
+                                  {isSendingConvertedUsdt ? (
+                                    <CircleNotch className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    `Send ${formatUnits(BigInt(convertedUsdt.buyUsdtAtomic), 6).slice(0, 6)} USDT`
+                                  )}
+                                </Button>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+                      )}
+
+                      {convertError && (
+                        <p className="text-[11.5px] leading-relaxed text-[#DC2626]">{convertError}</p>
+                      )}
+                    </div>
+                  )}
+
                   {transferOpen && activeCampaign && (
                     <form
                       onSubmit={handleTransferPayout}
                       className="vire-well space-y-2.5 rounded-xl p-4"
                     >
                       <div className="flex items-center justify-between text-[12px] font-medium text-[#0A0A0C]">
-                        <span>Send {activeCampaign.corridor}</span>
+                        <span>Send raw {activeCampaign.corridor} (Celo)</span>
                         <button
                           type="button"
                           onClick={() => setTransferOpen(false)}
@@ -1243,12 +1637,18 @@ function ClaimFlowInner({
                           Close
                         </button>
                       </div>
+                      <p className="rounded-lg bg-white px-3 py-2 text-[11px] leading-relaxed text-[#52525B] ring-1 ring-black/[0.06]">
+                        <strong className="font-medium text-[#0A0A0C]">Important:</strong>{" "}
+                        {activeCampaign.corridor === "cNGN"
+                          ? "MiniPay only displays USDT, USDC, and USAT, and most exchanges do not accept Celo cNGN deposits. For MiniPay, OPay, or Moniepoint cash-outs, convert to USDT first."
+                          : `Only send raw ${activeCampaign.corridor} to a self-custody Celo wallet or ramp that explicitly supports ${activeCampaign.corridor} on Celo (Chain 42220).`}
+                      </p>
                       <Input
                         type="text"
                         value={transferTo}
                         onChange={(e) => setTransferTo(e.target.value)}
-                        placeholder="Paste MiniPay, Busha, or Quidax 0x… address"
-                        className="h-9 bg-white font-mono text-[12px]"
+                        placeholder="Paste Celo wallet 0x… address"
+                        className="h-9 bg-white font-mono text-[16px] sm:text-[12px]"
                       />
                       <div className="flex items-center gap-2">
                         <Input
@@ -1257,7 +1657,7 @@ function ClaimFlowInner({
                           value={transferAmount}
                           onChange={(e) => setTransferAmount(e.target.value)}
                           placeholder="Amount"
-                          className="h-9 bg-white font-mono text-[12px]"
+                          className="h-9 bg-white font-mono text-[16px] sm:text-[12px]"
                         />
                         <Button
                           type="submit"

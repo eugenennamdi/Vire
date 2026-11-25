@@ -70,7 +70,7 @@ export default async function HomePage() {
       minPassScore: row.minPassScore,
       offrampRail:
         meta?.offrampProvider === "cngn_venues"
-          ? "Busha · Quidax · Yellow Card"
+          ? "MiniPay Bank Transfer (via USDT) · Celo Exchanges"
           : meta?.offrampProvider === "idrx_guide"
             ? "IDRX Bank Redeem (IDR)"
             : "Ripio Portal (CBU / PIX / CLABE)",
