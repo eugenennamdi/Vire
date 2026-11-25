@@ -127,6 +127,23 @@ export const settlements = sqliteTable("settlements", {
   settledAt: integer("settled_at").notNull(),
 });
 
+export const vouchers = sqliteTable("vouchers", {
+  id: text("id").primaryKey(),
+  campaignId: text("campaign_id")
+    .notNull()
+    .references(() => campaigns.id),
+  codeHash: text("code_hash").notNull().unique(),
+  codeHint: text("code_hint").notNull(),
+  orderRef: text("order_ref"),
+  orderValueLocal: text("order_value_local"),
+  status: text("status").notNull().default("ACTIVE"), // ACTIVE | CLAIMING | CLAIMED | REVOKED
+  claimedByWallet: text("claimed_by_wallet"),
+  submissionId: text("submission_id"),
+  issuedByWallet: text("issued_by_wallet").notNull(),
+  createdAt: integer("created_at").notNull(),
+  claimedAt: integer("claimed_at"),
+});
+
 export const buyPayments = sqliteTable("buy_payments", {
   id: text("id").primaryKey(),
   submissionId: text("submission_id").references(() => submissions.id),

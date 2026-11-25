@@ -41,7 +41,7 @@ export async function GET(
 
   const session = verifyWalletSessionCookie(req.cookies.get(WALLET_SESSION_COOKIE)?.value);
 
-  const [onchainMap, liveCorridors, allSubs] = await Promise.all([
+  const [onchainMap, liveCorridors, allSubs, campaignVouchers] = await Promise.all([
     getOnchainCampaignStates([rawRow.id as Hex]),
     getLiveCorridors().catch(() => ({ asOf: new Date().toISOString(), corridors: [] })),
     db
@@ -59,7 +59,26 @@ export async function GET(
       .from(schema.submissions)
       .where(eq(schema.submissions.campaignId, rawRow.id))
       .orderBy(desc(schema.submissions.updatedAt)),
+    rawRow.verificationMode === "voucher"
+      ? db
+          .select({
+            status: schema.vouchers.status,
+            orderValueLocal: schema.vouchers.orderValueLocal,
+          })
+          .from(schema.vouchers)
+          .where(eq(schema.vouchers.campaignId, rawRow.id))
+      : Promise.resolve([]),
   ]);
+
+  let verifiedGmvLocal = 0;
+  let vouchersClaimed = 0;
+  for (const v of campaignVouchers) {
+    if (v.status === "CLAIMED") {
+      vouchersClaimed += 1;
+      const n = v.orderValueLocal ? Number(v.orderValueLocal) : 0;
+      if (Number.isFinite(n) && n > 0) verifiedGmvLocal += n;
+    }
+  }
 
   const row = mergeCampaignWithOnchain(rawRow, onchainMap);
   const corridor = row.corridor as CorridorSymbol;
@@ -142,6 +161,8 @@ export async function GET(
       autoRules,
       requiresInviteCode: Boolean(row.inviteCodeHash),
       spotsRemaining,
+      verifiedGmvLocal,
+      vouchersClaimed,
       approvalStats: { approved, rejected, pending },
       isOwner: Boolean(session && row.creatorWallet && session.wallet === row.creatorWallet.toLowerCase()),
       mySubmission,

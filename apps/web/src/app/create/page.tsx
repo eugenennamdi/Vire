@@ -9,6 +9,7 @@ import {
   LinkSimple,
   LockSimple,
   Sparkle,
+  Ticket,
   UserCheck,
   Warning,
 } from "@phosphor-icons/react";
@@ -659,13 +660,15 @@ export default function CreateCampaignPage() {
         stringToHex(`vire:campaign:${connectedWallet.toLowerCase()}:${slug}`)
       );
       const deliverableType: DeliverableType =
-        verificationMode === "auto"
-          ? autoPlatform === "github"
-            ? "qa_bug"
-            : autoPlatform === "x"
-              ? "promo_post"
-              : "referral"
-          : "promo_post";
+        verificationMode === "voucher"
+          ? "cashback_voucher"
+          : verificationMode === "auto"
+            ? autoPlatform === "github"
+              ? "qa_bug"
+              : autoPlatform === "x"
+                ? "promo_post"
+                : "referral"
+            : "promo_post";
 
       const draft: PendingDraft = {
         campaignId,
@@ -946,6 +949,7 @@ export default function CreateCampaignPage() {
                 options={[
                   { value: "auto", label: "Automatic", icon: <Sparkle className="h-3.5 w-3.5" /> },
                   { value: "manual", label: "Manual review", icon: <UserCheck className="h-3.5 w-3.5" /> },
+                  { value: "voucher", label: "Cashback voucher", icon: <Ticket className="h-3.5 w-3.5" /> },
                 ]}
               />
             </div>
@@ -1047,6 +1051,19 @@ export default function CreateCampaignPage() {
                     </div>
                   )}
                 </>
+              ) : verificationMode === "voucher" ? (
+                <div className="vire-well space-y-2 rounded-xl p-4">
+                  <p className="text-[13px] font-medium text-[#0A0A0C]">
+                    Best for retail cashback &amp; verified customer orders (website, WhatsApp, or in-store)
+                  </p>
+                  <p className="text-[12.5px] leading-relaxed text-[#52525B]">
+                    After launching, open <span className="font-medium text-[#0A0A0C]">Workspace</span>{" "}
+                    whenever a customer pays to generate a single-use cashback link tied to their order.
+                    Buyers sign in with Google or MiniPay (no social profile linking needed) and receive
+                    instant local currency payouts via Textile FX — reused or invalid codes are blocked
+                    automatically.
+                  </p>
+                </div>
               ) : (
                 <div className="vire-well space-y-2 rounded-xl p-4">
                   <p className="text-[13px] font-medium text-[#0A0A0C]">

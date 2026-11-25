@@ -39,7 +39,7 @@ export async function GET() {
     .where(and(eq(schema.campaigns.visibility, "public"), eq(schema.campaigns.hidden, false)))
     .orderBy(desc(schema.campaigns.isLaunchPartner), desc(schema.campaigns.createdAt));
 
-  const [onchainMap, liveCorridors, reviewSubs] = await Promise.all([
+  const [onchainMap, liveCorridors, reviewSubs, voucherRows] = await Promise.all([
     getOnchainCampaignStates(rows.map((r) => r.id as Hex)),
     getLiveCorridors().catch(() => ({ asOf: new Date().toISOString(), corridors: [] })),
     rows.length > 0
@@ -52,7 +52,28 @@ export async function GET() {
           .from(schema.submissions)
           .where(inArray(schema.submissions.campaignId, rows.map((r) => r.id)))
       : Promise.resolve([]),
+    rows.length > 0
+      ? db
+          .select({
+            campaignId: schema.vouchers.campaignId,
+            status: schema.vouchers.status,
+            orderValueLocal: schema.vouchers.orderValueLocal,
+          })
+          .from(schema.vouchers)
+          .where(inArray(schema.vouchers.campaignId, rows.map((r) => r.id)))
+      : Promise.resolve([]),
   ]);
+
+  const gmvByCampaign = new Map<string, { verifiedGmvLocal: number; vouchersClaimed: number }>();
+  for (const v of voucherRows) {
+    if (v.status === "CLAIMED") {
+      const cur = gmvByCampaign.get(v.campaignId) ?? { verifiedGmvLocal: 0, vouchersClaimed: 0 };
+      cur.vouchersClaimed += 1;
+      const n = v.orderValueLocal ? Number(v.orderValueLocal) : 0;
+      if (Number.isFinite(n) && n > 0) cur.verifiedGmvLocal += n;
+      gmvByCampaign.set(v.campaignId, cur);
+    }
+  }
 
   const approvalByCampaign = new Map<string, { approved: number; rejected: number; pending: number }>();
   for (const s of reviewSubs) {
@@ -92,6 +113,8 @@ export async function GET() {
       autoRules,
       requiresInviteCode: Boolean(row.inviteCodeHash),
       approvalStats: approvalByCampaign.get(row.id) ?? { approved: 0, rejected: 0, pending: 0 },
+      verifiedGmvLocal: gmvByCampaign.get(row.id)?.verifiedGmvLocal ?? 0,
+      vouchersClaimed: gmvByCampaign.get(row.id)?.vouchersClaimed ?? 0,
       spotsRemaining,
       stages: stages.map((st) => ({
         ...st,

@@ -12,6 +12,7 @@ import {
   Pause,
   Play,
   Plus,
+  Ticket,
   UserSwitch,
   X,
 } from "@phosphor-icons/react";
@@ -64,6 +65,27 @@ interface ManagedSubmission {
   } | null;
 }
 
+interface OwnedVoucher {
+  id: string;
+  codeHint: string;
+  orderRef: string | null;
+  orderValueLocal: string | null;
+  status: "ACTIVE" | "CLAIMING" | "CLAIMED" | "REVOKED";
+  claimedByWallet: string | null;
+  submissionId: string | null;
+  createdAt: number;
+  claimedAt: number | null;
+}
+
+interface NewlyIssuedVoucher {
+  id: string;
+  code: string;
+  codeHint: string;
+  claimUrl: string;
+  orderRef: string | null;
+  orderValueLocal: string | null;
+}
+
 interface OwnedCampaign {
   id: Hex;
   slug: string;
@@ -73,8 +95,9 @@ interface OwnedCampaign {
   description: string;
   criteria: string;
   corridor: string;
+  fiatCode?: string;
   visibility: "public" | "unlisted";
-  verificationMode: "auto" | "manual";
+  verificationMode: "auto" | "manual" | "voucher";
   requiresInviteCode: boolean;
   endsAt: number | null;
   isExpired: boolean;
@@ -89,6 +112,9 @@ interface OwnedCampaign {
   spotsRemaining: number;
   pendingCount: number;
   completedCount: number;
+  verifiedGmvLocal?: number;
+  issuedGmvLocal?: number;
+  vouchers?: OwnedVoucher[];
   createdAt: number;
   submissions: ManagedSubmission[];
 }
@@ -223,6 +249,61 @@ export default function ManagePage() {
   } | null>(null);
   const [toolInput, setToolInput] = useState("");
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [voucherInputs, setVoucherInputs] = useState<
+    Record<string, { orderRef: string; orderValueLocal: string }>
+  >({});
+  const [newlyIssuedByCamp, setNewlyIssuedByCamp] = useState<
+    Record<string, NewlyIssuedVoucher | null>
+  >({});
+
+  async function handleIssueVoucher(camp: OwnedCampaign, e: React.FormEvent) {
+    e.preventDefault();
+    const form = voucherInputs[camp.id] ?? { orderRef: "", orderValueLocal: "" };
+    setBusyKey(`voucher-issue:${camp.id}`);
+    try {
+      const res = await fetch(`/api/campaigns/${encodeURIComponent(camp.slug)}/vouchers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "issue",
+          orderRef: form.orderRef.trim() || undefined,
+          orderValueLocal: form.orderValueLocal.trim().replace(/,/g, "") || undefined,
+          count: 1,
+        }),
+      });
+      const json = (await res.json()) as { issued?: NewlyIssuedVoucher[]; error?: string };
+      if (!res.ok || !json.issued?.[0]) {
+        throw new Error(json.error || "Failed to issue cashback voucher.");
+      }
+      setNewlyIssuedByCamp((prev) => ({ ...prev, [camp.id]: json.issued![0]! }));
+      setVoucherInputs((prev) => ({ ...prev, [camp.id]: { orderRef: "", orderValueLocal: "" } }));
+      toast.success(`Issued single-use voucher ${json.issued[0].code}`);
+      await refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to issue voucher");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function handleRevokeVoucher(camp: OwnedCampaign, voucherId: string) {
+    setBusyKey(`voucher-revoke:${voucherId}`);
+    try {
+      const res = await fetch(`/api/campaigns/${encodeURIComponent(camp.slug)}/vouchers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "revoke", voucherId }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error || "Failed to revoke voucher.");
+      toast.success("Voucher revoked");
+      await refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to revoke voucher");
+    } finally {
+      setBusyKey(null);
+    }
+  }
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["manage-workspace", connectedWallet],
@@ -597,7 +678,11 @@ export default function ManagePage() {
                               {camp.isExpired ? "Ended" : camp.active ? "Active" : "Paused"}
                             </Badge>
                             <Badge tone="outline">
-                              {camp.verificationMode === "manual" ? "Manual review" : "Automatic"}
+                              {camp.verificationMode === "voucher"
+                                ? "Cashback voucher"
+                                : camp.verificationMode === "manual"
+                                  ? "Manual review"
+                                  : "Automatic"}
                             </Badge>
                             <Badge tone="outline">
                               {camp.visibility === "unlisted" ? "Link-only" : "Public"}
@@ -780,6 +865,180 @@ export default function ManagePage() {
                       </form>
                     )}
                   </div>
+
+                  {/* Cashback Voucher Issuer & Tracker (Voucher Mode) */}
+                  {camp.verificationMode === "voucher" && (() => {
+                    const vList = camp.vouchers ?? [];
+                    const activeVouchers = vList.filter((v) => v.status === "ACTIVE" || v.status === "CLAIMING").length;
+                    const claimedVouchers = vList.filter((v) => v.status === "CLAIMED").length;
+                    const formVal = voucherInputs[camp.id] ?? { orderRef: "", orderValueLocal: "" };
+                    const freshVoucher = newlyIssuedByCamp[camp.id];
+                    const fiat = camp.fiatCode ?? camp.corridor.replace(/^[cw]/, "");
+                    const freshClaimUrl = freshVoucher
+                      ? `${origin}/c/${camp.slug}?voucher=${encodeURIComponent(freshVoucher.code)}`
+                      : "";
+                    const whatsappText = freshVoucher
+                      ? `Thanks for shopping with ${camp.partnerName}! Claim your ${camp.rewardLocalFormatted} ${camp.corridor} instant cashback here (single-use link): ${freshClaimUrl}`
+                      : "";
+
+                    return (
+                      <div className="border-t border-black/[0.06] bg-[#FAFAFB] px-4 py-4 sm:px-6">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Ticket className="h-4 w-4 text-[#0A0A0C]" />
+                            <h3 className="text-[12.5px] font-semibold uppercase tracking-[0.06em] text-[#0A0A0C]">
+                              Cashback vouchers
+                            </h3>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 font-mono text-[11.5px] text-[#52525B] tabular-nums">
+                            <span>{activeVouchers} active</span>
+                            <span>{claimedVouchers} claimed</span>
+                            {(camp.verifiedGmvLocal ?? 0) > 0 && (
+                              <span className="font-medium text-[#15803D]">
+                                Verified sales: {Math.round(camp.verifiedGmvLocal!).toLocaleString("en-US")} {fiat}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <form
+                          onSubmit={(e) => handleIssueVoucher(camp, e)}
+                          className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                        >
+                          <input
+                            type="text"
+                            value={formVal.orderRef}
+                            onChange={(e) =>
+                              setVoucherInputs((prev) => ({
+                                ...prev,
+                                [camp.id]: { ...formVal, orderRef: e.target.value },
+                              }))
+                            }
+                            placeholder="Order ref (optional, e.g. #SWOT-1042)"
+                            className="h-10 min-w-0 flex-1 rounded-xl bg-white px-3 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.09] placeholder:text-[#A1A1AA] sm:h-9 sm:text-[12px]"
+                          />
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={formVal.orderValueLocal}
+                            onChange={(e) =>
+                              setVoucherInputs((prev) => ({
+                                ...prev,
+                                [camp.id]: { ...formVal, orderValueLocal: e.target.value },
+                              }))
+                            }
+                            placeholder={`Order value (${fiat}, e.g. 185000)`}
+                            className="h-10 min-w-0 sm:w-52 rounded-xl bg-white px-3 font-mono text-[16px] text-[#0A0A0C] ring-1 ring-black/[0.09] placeholder:text-[#A1A1AA] sm:h-9 sm:text-[12px]"
+                          />
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant="primary"
+                            disabled={busyKey === `voucher-issue:${camp.id}`}
+                            className="h-10 shrink-0 px-4 sm:h-9"
+                          >
+                            {busyKey === `voucher-issue:${camp.id}` ? (
+                              <CircleNotch className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Plus weight="bold" className="h-3.5 w-3.5" />
+                            )}
+                            Issue voucher
+                          </Button>
+                        </form>
+
+                        {freshVoucher && (
+                          <div className="mt-3 space-y-2.5 rounded-xl bg-white p-3.5 ring-1 ring-[#16A34A]/30">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-[12px] font-medium text-[#15803D]">
+                                Single-use voucher ready — copy now (stored hashed for security)
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setNewlyIssuedByCamp((prev) => ({ ...prev, [camp.id]: null }))
+                                }
+                                className="text-[11.5px] text-[#71717A] hover:text-[#0A0A0C]"
+                              >
+                                Dismiss
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[#FAFAFB] px-3 py-2 font-mono text-[13px] font-semibold text-[#0A0A0C] ring-1 ring-black/[0.06]">
+                              <span>{freshVoucher.code}</span>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <CopyButton
+                                  value={freshClaimUrl}
+                                  label="Copy claim link"
+                                  toastMessage="Single-use claim link copied"
+                                />
+                                <CopyButton
+                                  value={whatsappText}
+                                  label="Copy WhatsApp msg"
+                                  toastMessage="WhatsApp message copied"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {vList.length > 0 && (
+                          <div className="mt-3 divide-y divide-black/[0.05] overflow-hidden rounded-xl bg-white ring-1 ring-black/[0.07]">
+                            {vList.slice(0, 12).map((v) => (
+                              <div
+                                key={v.id}
+                                className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-[12px]"
+                              >
+                                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                  <Badge
+                                    tone={
+                                      v.status === "CLAIMED"
+                                        ? "positive"
+                                        : v.status === "REVOKED"
+                                          ? "neutral"
+                                          : "ink"
+                                    }
+                                  >
+                                    {v.status === "CLAIMED"
+                                      ? "Claimed"
+                                      : v.status === "REVOKED"
+                                        ? "Revoked"
+                                        : "Active"}
+                                  </Badge>
+                                  <span className="font-mono font-medium text-[#0A0A0C]">
+                                    {v.codeHint}
+                                  </span>
+                                  {v.orderRef && (
+                                    <span className="font-mono text-[#52525B]">{v.orderRef}</span>
+                                  )}
+                                  {v.orderValueLocal && Number.isFinite(Number(v.orderValueLocal)) && (
+                                    <span className="font-mono text-[#71717A] tabular-nums">
+                                      {Number(v.orderValueLocal).toLocaleString("en-US")} {fiat}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 font-mono text-[11px] text-[#71717A]">
+                                  {v.claimedByWallet && (
+                                    <span>{truncateMiddle(v.claimedByWallet, 6, 4)}</span>
+                                  )}
+                                  {v.status === "ACTIVE" && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      disabled={busyKey === `voucher-revoke:${v.id}`}
+                                      onClick={() => handleRevokeVoucher(camp, v.id)}
+                                      className="h-7 px-2.5 text-[11px] text-[#B91C1C] hover:bg-[#FEF2F2]"
+                                    >
+                                      Revoke
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Pending Review Queue (Manual Mode) */}
                   {pendingSubs.length > 0 && (

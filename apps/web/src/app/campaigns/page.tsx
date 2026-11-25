@@ -44,7 +44,9 @@ interface CampaignView {
   maxSpreadBps: number;
   minPassScore: number;
   spotsRemaining?: number;
-  verificationMode?: "auto" | "manual";
+  verifiedGmvLocal?: number;
+  vouchersClaimed?: number;
+  verificationMode?: "auto" | "manual" | "voucher";
   endsAt?: number | null;
   isExpired?: boolean;
   approvalStats?: { approved: number; rejected: number; pending: number };
@@ -194,7 +196,11 @@ function CampaignsInner() {
                             <Badge tone="outline">Community</Badge>
                           )}
                           <Badge tone="outline">
-                            {camp.verificationMode === "manual" ? "Manual review" : "Instant auto-pay"}
+                            {camp.verificationMode === "voucher"
+                              ? "Cashback voucher"
+                              : camp.verificationMode === "manual"
+                                ? "Manual review"
+                                : "Instant auto-pay"}
                           </Badge>
                           <span className="inline-flex items-center gap-1.5">
                             <span className="font-mono font-medium text-[#0A0A0C]">
@@ -246,7 +252,7 @@ function CampaignsInner() {
                           className: "h-11 w-full sm:w-auto sm:shrink-0 sm:px-6 lg:h-10 lg:w-full",
                         })}
                       >
-                        Submit work
+                        {camp.verificationMode === "voucher" ? "Claim cashback" : "Submit work"}
                         <ArrowRight weight="bold" className="h-3.5 w-3.5" />
                       </Link>
                     </div>
@@ -324,6 +330,12 @@ function CampaignsInner() {
                   <span>Up to ${camp.maxPerPayoutUsdtFormatted}/payout</span>
                   <span>${camp.dailyLimitUsdtFormatted}/day cap</span>
                   <span>{(camp.maxSpreadBps / 100).toFixed(1).replace(/\.0$/, "")}% max FX spread</span>
+                  {camp.verificationMode === "voucher" && (camp.verifiedGmvLocal ?? 0) > 0 && (
+                    <span className="font-medium text-[#15803D]">
+                      Verified sales: {Math.round(camp.verifiedGmvLocal!).toLocaleString("en-US")}{" "}
+                      {camp.corridor.replace(/^[cw]/, "")}
+                    </span>
+                  )}
                 </div>
               </Card>
             );

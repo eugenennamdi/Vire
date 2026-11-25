@@ -4,12 +4,14 @@ import {
   CELO_CONTRACTS,
   CELO_TOKENS,
   computeImpliedRateLocalPerUsdt,
+  CreateSubmissionRequestSchema,
   DEFAULT_ATTRIBUTION_CODE,
   formatTokenAmount,
   FUNDING_TOKEN_LIST,
   FUNDING_TOKENS,
   isAllowedTextileTarget,
   parseTokenAmount,
+  PublishCampaignRequestSchema,
   validateAttributionCode,
 } from "../src/index.js";
 
@@ -95,5 +97,34 @@ describe("Canonical Celo Mainnet token registry & decimals", () => {
     expect(FUNDING_TOKENS.USDT.decimals).toBe(6);
     expect(FUNDING_TOKENS.USDC.decimals).toBe(6);
     expect(FUNDING_TOKENS.cNGN.decimals).toBe(6);
+  });
+
+  it("validates cashback voucher campaign and single-use voucher submission payloads", () => {
+    const camp = PublishCampaignRequestSchema.parse({
+      campaignId: "0x" + "a".repeat(64),
+      slug: "swot-ember-cashback-2026",
+      partnerName: "SWOT Gadgets",
+      partnerLocation: "Abeokuta, Nigeria",
+      title: "SWOT Gadgets Ember Sales Cashback",
+      description: "Order any gadget 150,000 NGN+ and claim 10,000 cNGN instant cashback on Vire.",
+      criteria: "Single-use cashback voucher issued after confirmed 150,000 NGN+ SWOT Gadgets order.",
+      deliverableType: "cashback_voucher",
+      corridor: "cNGN",
+      rewardLocalHuman: "10000",
+      visibility: "public",
+      verificationMode: "voucher",
+      autoRules: null,
+      maxPayoutsPerRecipient: 1,
+    });
+    expect(camp.verificationMode).toBe("voucher");
+    expect(camp.deliverableType).toBe("cashback_voucher");
+
+    const sub = CreateSubmissionRequestSchema.parse({
+      campaignSlug: "swot-ember-cashback-2026",
+      contributorWallet: "0x1111111111111111111111111111111111111111",
+      voucherCode: "SWOT-7K9P-2M4X",
+    });
+    expect(sub.voucherCode).toBe("SWOT-7K9P-2M4X");
+    expect(sub.deliverableUrl).toBeUndefined();
   });
 });

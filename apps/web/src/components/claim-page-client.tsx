@@ -12,6 +12,7 @@ import {
   PaperPlaneTilt,
   Signature,
   SlidersHorizontal,
+  Ticket,
   WarningCircle,
 } from "@phosphor-icons/react";
 import {
@@ -60,7 +61,11 @@ import {
   isConvertibleLocalToken,
   type ConvertToUsdtPreview,
 } from "@/lib/convert-to-usdt";
-import { buildIdentityBindMessage, requestAuthNonce } from "@/lib/session-client";
+import {
+  buildIdentityBindMessage,
+  buildWalletAuthMessage,
+  requestAuthNonce,
+} from "@/lib/session-client";
 import { cn, truncateMiddle } from "@/lib/utils";
 
 const ERC8004_GIVE_FEEDBACK_ABI = [
@@ -88,9 +93,11 @@ interface CampaignItem {
   corridor: string;
   partnerName: string;
   deliverableType: string;
-  verificationMode?: "auto" | "manual";
+  verificationMode?: "auto" | "manual" | "voucher";
   visibility?: "public" | "unlisted";
   requiresInviteCode?: boolean;
+  verifiedGmvLocal?: number;
+  vouchersClaimed?: number;
   endsAt?: number | null;
   isExpired?: boolean;
   isOwner?: boolean;
@@ -164,6 +171,7 @@ function ClaimFlowInner({
 }: PrivyBridgeProps) {
   const searchParams = useSearchParams();
   const initialSlug = forcedSlug || searchParams.get("campaign") || "";
+  const initialVoucher = searchParams.get("voucher")?.trim() || "";
   const initialStageParam = Number(searchParams.get("stage") || "1");
   const validInitialStage =
     Number.isInteger(initialStageParam) && initialStageParam >= 1 && initialStageParam <= 3
@@ -192,6 +200,7 @@ function ClaimFlowInner({
   const [provider, setProvider] = useState<"github" | "x" | "signed_proof">("x");
   const [handle, setHandle] = useState("");
   const [deliverableUrl, setDeliverableUrl] = useState("");
+  const [voucherCode, setVoucherCode] = useState(initialVoucher);
   const [deliverableNotes, setDeliverableNotes] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -339,13 +348,16 @@ function ClaimFlowInner({
   }, [selectedSlug, expectedNextStage, hasExplicitStageParam, Boolean(activeCampaign)]);
 
   const isManualMode = activeCampaign?.verificationMode === "manual";
+  const isVoucherMode = activeCampaign?.verificationMode === "voucher";
   const isOwnerOfCampaign = Boolean(
     activeCampaign?.isOwner ||
       (address &&
         activeCampaign?.creatorWallet &&
         address.toLowerCase() === activeCampaign.creatorWallet.toLowerCase())
   );
-  const profileLinked = Boolean(identityData?.contributor && identityData?.hasWalletSession);
+  const profileLinked = isVoucherMode
+    ? isSignedIn
+    : Boolean(identityData?.contributor && identityData?.hasWalletSession);
   const maxPayoutsForCampaign = activeCampaign?.maxPayoutsPerRecipient ?? 1;
   const alreadyClaimedCampaign = completedCountForCampaign >= maxPayoutsForCampaign;
   const hasPendingManual = activeCampaign?.mySubmission?.status === "PENDING_REVIEW";
@@ -355,6 +367,7 @@ function ClaimFlowInner({
   const walletClaimCode = address ? `VIRE-${address.replace(/^0x/i, "").slice(-4).toUpperCase()}` : null;
   const needsAntiHijackCode = Boolean(
     !isManualMode &&
+      !isVoucherMode &&
       isSignedIn &&
       activeCampaign?.deliverableType === "promo_post" &&
       walletClaimCode &&
@@ -436,6 +449,26 @@ function ClaimFlowInner({
     setRatingTxHash(null);
 
     try {
+      // Cashback voucher buyers skip X/GitHub linking — confirm wallet ownership seamlessly on first claim
+      if (isVoucherMode && !identityData?.hasWalletSession) {
+        const nonce = await requestAuthNonce(address);
+        const message = buildWalletAuthMessage(address, nonce);
+        const signature = wagmiConnected
+          ? await signMessageAsync({ message })
+          : privySignMessage
+            ? await privySignMessage(message)
+            : await signMessageAsync({ message });
+        const authRes = await fetch("/api/auth/wallet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ walletAddress: address, signature }),
+        });
+        if (!authRes.ok) {
+          const authErr = (await authRes.json().catch(() => ({}))) as { error?: string };
+          throw new Error(authErr.error || "Please approve the wallet sign-in prompt to claim.");
+        }
+      }
+
       const res = await fetch("/api/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -443,7 +476,9 @@ function ClaimFlowInner({
           campaignSlug: selectedSlug,
           stageIndex,
           contributorWallet: address,
-          deliverableUrl: deliverableUrl.trim(),
+          ...(isVoucherMode
+            ? { voucherCode: voucherCode.trim() }
+            : { deliverableUrl: deliverableUrl.trim() }),
           deliverableNotes: deliverableNotes.trim(),
           referralCode: referralCode.trim() || undefined,
           inviteCode: inviteCode.trim() || undefined,
@@ -688,6 +723,9 @@ function ClaimFlowInner({
   }
 
   function friendlyFailureMessage(res: SubmissionResponse): string {
+    if (isVoucherMode) {
+      return res.error || res.policyDecision?.failedReason || "Unable to redeem cashback voucher right now.";
+    }
     const rule = res.policyDecision?.failedRule;
     if (rule === "UNIQUE_DELIVERABLE_HASH") {
       return "This post link has already been claimed.";
@@ -752,9 +790,11 @@ function ClaimFlowInner({
             {forcedSlug && activeCampaign ? activeCampaign.title : "Submit work"}
           </h1>
           <p className="mt-1 max-w-[60ch] text-[14px] leading-relaxed text-[#71717A]">
-            {isManualMode
-              ? "Sign in, link your profile, and submit your link. Once approved by the campaign owner, Vire automatically sends your exact local currency payout."
-              : "Sign in with Google, email, or a Celo wallet, link your profile, and submit your link to get automatically verified and paid in local currency."}
+            {isVoucherMode
+              ? "Sign in with Google, email, or MiniPay and redeem your single-use cashback voucher for an instant local currency payout on Celo."
+              : isManualMode
+                ? "Sign in, link your profile, and submit your link. Once approved by the campaign owner, Vire automatically sends your exact local currency payout."
+                : "Sign in with Google, email, or a Celo wallet, link your profile, and submit your link to get automatically verified and paid in local currency."}
           </p>
         </div>
 
@@ -817,15 +857,26 @@ function ClaimFlowInner({
       <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
         {/* Left Action Column */}
         <div className="min-w-0 space-y-5 lg:col-span-7">
-          {/* Step 1: Link Profile */}
+          {/* Step 1: Sign in (Voucher Mode) or Link Profile (Auto/Manual Mode) */}
           <Card className="vire-enter vire-delay-1 p-4 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
                 <span className="font-mono text-[12px] text-[#A1A1AA]">01</span>
-                <h2 className="text-[15px] font-medium text-[#0A0A0C]">Link your profile</h2>
+                <h2 className="text-[15px] font-medium text-[#0A0A0C]">
+                  {isVoucherMode ? "Sign in to receive cashback" : "Link your profile"}
+                </h2>
               </div>
 
-              {identityData?.contributor && identityData?.hasWalletSession ? (
+              {isVoucherMode ? (
+                isSignedIn ? (
+                  <Badge tone="positive">
+                    <Check weight="bold" className="h-3 w-3" />
+                    Wallet ready · {truncateMiddle(address ?? "", 6, 4)}
+                  </Badge>
+                ) : (
+                  <Badge tone="neutral">Sign in required</Badge>
+                )
+              ) : identityData?.contributor && identityData?.hasWalletSession ? (
                 <Badge tone="positive">
                   <Check weight="bold" className="h-3 w-3" />
                   {identityData.contributor.identityProvider}: @
@@ -842,11 +893,25 @@ function ClaimFlowInner({
               <div className="vire-well mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 text-[13px] text-[#52525B]">
                 <div className="flex items-center gap-2.5">
                   <WarningCircle weight="regular" className="h-4 w-4 shrink-0 text-[#0A0A0C]" />
-                  <span>Sign in to link your profile and receive payouts.</span>
+                  <span>
+                    {isVoucherMode
+                      ? "Sign in with Google, email, or MiniPay to receive your instant cashback."
+                      : "Sign in to link your profile and receive payouts."}
+                  </span>
                 </div>
                 <Button type="button" size="sm" variant="primary" onClick={triggerSignIn}>
                   Sign in
                 </Button>
+              </div>
+            ) : isVoucherMode ? (
+              <div className="vire-well mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 text-[12.5px] text-[#52525B]">
+                <span>
+                  Your cashback will be sent directly to{" "}
+                  <span className="font-mono font-medium text-[#0A0A0C]">
+                    {truncateMiddle(address ?? "", 8, 6)}
+                  </span>{" "}
+                  on Celo (network gas covered by Vire during launch).
+                </span>
               </div>
             ) : (
               <div className="mt-4 space-y-3">
@@ -921,12 +986,18 @@ function ClaimFlowInner({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
                   <span className="font-mono text-[12px] text-[#A1A1AA]">02</span>
-                  <h2 className="text-[15px] font-medium text-[#0A0A0C]">Work proof</h2>
+                  <h2 className="text-[15px] font-medium text-[#0A0A0C]">
+                    {isVoucherMode ? "Redeem cashback voucher" : "Work proof"}
+                  </h2>
                 </div>
                 {activeCampaign && (
                   <div className="flex items-center gap-2">
                     <Badge tone="outline">
-                      {isManualMode ? "Owner-reviewed" : "Instant auto-pay"}
+                      {isVoucherMode
+                        ? "Instant cashback"
+                        : isManualMode
+                          ? "Owner-reviewed"
+                          : "Instant auto-pay"}
                     </Badge>
                     <span className="inline-flex items-center gap-1.5 font-mono text-[12px] text-[#52525B]">
                       <TokenIcon symbol={activeCampaign.corridor} size={18} />
@@ -1034,78 +1105,116 @@ function ClaimFlowInner({
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <FieldLabel htmlFor="deliverable-url">Proof URL</FieldLabel>
-                <Input
-                  id="deliverable-url"
-                  type="url"
-                  required
-                  value={deliverableUrl}
-                  onChange={(e) => setDeliverableUrl(e.target.value)}
-                  placeholder={
-                    isManualMode
-                      ? "Paste your deliverable link (Figma, YouTube, TikTok, Doc, X, GitHub…)"
-                      : "Paste X post or GitHub URL"
-                  }
-                  className="font-mono"
-                />
-              </div>
+              {isVoucherMode ? (
+                <div className="space-y-4">
+                  {activeCampaign && (activeCampaign.verifiedGmvLocal ?? 0) > 0 && (
+                    <div className="flex items-center justify-between rounded-xl bg-[#F0FDF4] px-3.5 py-2.5 font-mono text-[12px] text-[#15803D] ring-1 ring-[#16A34A]/20">
+                      <span>Verified retail sales driven</span>
+                      <span className="font-semibold tabular-nums">
+                        {Math.round(activeCampaign.verifiedGmvLocal!).toLocaleString("en-US")}{" "}
+                        {activeCampaign.corridor.replace(/^[cw]/, "")}
+                      </span>
+                    </div>
+                  )}
 
-              {activeCampaign?.requiresInviteCode && (
-                <div className="space-y-1.5">
-                  <FieldLabel htmlFor="invite-code">
-                    <span className="inline-flex items-center gap-1.5">
-                      <LockSimple className="h-3.5 w-3.5 text-[#71717A]" />
-                      Campaign invite code (required)
-                    </span>
-                  </FieldLabel>
-                  <Input
-                    id="invite-code"
-                    type="text"
-                    required
-                    value={inviteCode}
-                    onChange={(e) => setInviteCode(e.target.value)}
-                    placeholder="Enter the invite passcode shared by the campaign owner"
-                    className="font-mono"
-                  />
+                  <div className="space-y-1.5">
+                    <FieldLabel htmlFor="voucher-code">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Ticket className="h-3.5 w-3.5 text-[#71717A]" />
+                        Single-use voucher code
+                      </span>
+                    </FieldLabel>
+                    <Input
+                      id="voucher-code"
+                      type="text"
+                      required
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. SWOT-7K9P-2M4X"
+                      className="font-mono uppercase tracking-[0.04em]"
+                    />
+                    <p className="text-[11.5px] text-[#71717A]">
+                      Issued by {activeCampaign?.partnerName ?? "the merchant"} after your order is
+                      confirmed. Each code works once.
+                    </p>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <FieldLabel htmlFor="deliverable-url">Proof URL</FieldLabel>
+                    <Input
+                      id="deliverable-url"
+                      type="url"
+                      required
+                      value={deliverableUrl}
+                      onChange={(e) => setDeliverableUrl(e.target.value)}
+                      placeholder={
+                        isManualMode
+                          ? "Paste your deliverable link (Figma, YouTube, TikTok, Doc, X, GitHub…)"
+                          : "Paste X post or GitHub URL"
+                      }
+                      className="font-mono"
+                    />
+                  </div>
+
+                  {activeCampaign?.requiresInviteCode && (
+                    <div className="space-y-1.5">
+                      <FieldLabel htmlFor="invite-code">
+                        <span className="inline-flex items-center gap-1.5">
+                          <LockSimple className="h-3.5 w-3.5 text-[#71717A]" />
+                          Campaign invite code (required)
+                        </span>
+                      </FieldLabel>
+                      <Input
+                        id="invite-code"
+                        type="text"
+                        required
+                        value={inviteCode}
+                        onChange={(e) => setInviteCode(e.target.value)}
+                        placeholder="Enter the invite passcode shared by the campaign owner"
+                        className="font-mono"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="min-w-0 space-y-1.5">
+                      <FieldLabel htmlFor="referral-code">Referral code (optional)</FieldLabel>
+                      <Input
+                        id="referral-code"
+                        type="text"
+                        value={referralCode}
+                        onChange={(e) => setReferralCode(e.target.value)}
+                        placeholder="Optional code"
+                        className="font-mono"
+                      />
+                    </div>
+
+                    <div className="min-w-0 space-y-1.5">
+                      <FieldLabel htmlFor="recipient-wallet">Payout wallet</FieldLabel>
+                      <Input
+                        id="recipient-wallet"
+                        type="text"
+                        readOnly
+                        value={address ?? "Sign in above"}
+                        className="font-mono text-[#71717A]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <FieldLabel htmlFor="deliverable-notes">Notes (optional)</FieldLabel>
+                    <Textarea
+                      id="deliverable-notes"
+                      rows={2}
+                      value={deliverableNotes}
+                      onChange={(e) => setDeliverableNotes(e.target.value)}
+                      placeholder="Short summary of the work completed."
+                    />
+                  </div>
+                </>
               )}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="min-w-0 space-y-1.5">
-                  <FieldLabel htmlFor="referral-code">Referral code (optional)</FieldLabel>
-                  <Input
-                    id="referral-code"
-                    type="text"
-                    value={referralCode}
-                    onChange={(e) => setReferralCode(e.target.value)}
-                    placeholder="Optional code"
-                    className="font-mono"
-                  />
-                </div>
-
-                <div className="min-w-0 space-y-1.5">
-                  <FieldLabel htmlFor="recipient-wallet">Payout wallet</FieldLabel>
-                  <Input
-                    id="recipient-wallet"
-                    type="text"
-                    readOnly
-                    value={address ?? "Sign in above"}
-                    className="font-mono text-[#71717A]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <FieldLabel htmlFor="deliverable-notes">Notes (optional)</FieldLabel>
-                <Textarea
-                  id="deliverable-notes"
-                  rows={2}
-                  value={deliverableNotes}
-                  onChange={(e) => setDeliverableNotes(e.target.value)}
-                  placeholder="Short summary of the work completed."
-                />
-              </div>
 
               {isOwnerOfCampaign && (
                 <div className="rounded-xl bg-[#FAFAFB] px-3.5 py-2.5 text-[12.5px] text-[#52525B] ring-1 ring-black/[0.08]">
@@ -1149,6 +1258,7 @@ function ClaimFlowInner({
                 disabled={
                   !isSignedIn ||
                   !profileLinked ||
+                  (isVoucherMode && !voucherCode.trim()) ||
                   isOwnerOfCampaign ||
                   alreadyClaimedCampaign ||
                   hasPendingManual ||
@@ -1161,7 +1271,11 @@ function ClaimFlowInner({
                 {isSubmitting ? (
                   <>
                     <CircleNotch className="h-4 w-4 animate-spin" />
-                    {isManualMode ? "Submitting for review…" : "Verifying and paying…"}
+                    {isVoucherMode
+                      ? "Verifying voucher & paying…"
+                      : isManualMode
+                        ? "Submitting for review…"
+                        : "Verifying and paying…"}
                   </>
                 ) : isOwnerOfCampaign ? (
                   <>Campaign owner wallet</>
@@ -1184,6 +1298,11 @@ function ClaimFlowInner({
                     {identityData?.contributor
                       ? "Re-sign Step 01 to confirm wallet"
                       : "Link your profile in Step 01 first"}
+                  </>
+                ) : isVoucherMode ? (
+                  <>
+                    Claim {activeStage?.rewardLocalFormatted ?? ""} {activeCampaign?.corridor ?? "cashback"}
+                    <ArrowRight weight="bold" className="h-4 w-4" />
                   </>
                 ) : isManualMode ? (
                   <>

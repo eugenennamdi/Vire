@@ -12,7 +12,7 @@ import {
 } from "@vire/shared";
 import { and, eq, gt, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
-import { getAddress, type Address, type Hex } from "viem";
+import { getAddress, keccak256, stringToHex, type Address, type Hex } from "viem";
 import { ensureDatabaseReady, getDb, schema } from "@/db";
 import { ensureDefaultCampaignsSeeded } from "@/db/seed";
 import { getLiveCorridors } from "@/lib/corridors-live";
@@ -26,6 +26,7 @@ import {
   getTextileClient,
   getVaultAddress,
   getVaultSnapshot,
+  hashVoucherCode,
   mergeCampaignWithOnchain,
   verifyInviteCodeHash,
 } from "@/lib/runtime";
@@ -178,9 +179,260 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // CASHBACK VOUCHER MODE: single-use HMAC-hashed voucher claim → instant autonomous Textile FX settlement
+  if (syncedCampaign.verificationMode === "voucher") {
+    const rawVoucher = parsed.data.voucherCode?.trim();
+    if (!rawVoucher) {
+      return NextResponse.json(
+        { status: "REJECTED", error: "Enter the single-use cashback voucher code from your order." },
+        { status: 400 }
+      );
+    }
+
+    if (!syncedCampaign.active || BigInt(syncedCampaign.remainingUsdtAtomic) <= 0n) {
+      return NextResponse.json(
+        {
+          status: "REJECTED",
+          failedRule: "CAMPAIGN_ACTIVE_AND_FUNDED",
+          error: "This cashback campaign is paused or its payout pool is full.",
+        },
+        { status: 422 }
+      );
+    }
+
+    const codeHash = hashVoucherCode(rawVoucher, campaignRow.id);
+
+    // Atomically lock ACTIVE voucher before touching any vault funds (closes double-claim races)
+    const claimedRows = await db
+      .update(schema.vouchers)
+      .set({
+        status: "CLAIMING",
+        claimedByWallet: walletLower,
+        claimedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.vouchers.campaignId, campaignRow.id),
+          eq(schema.vouchers.codeHash, codeHash),
+          eq(schema.vouchers.status, "ACTIVE")
+        )
+      )
+      .returning({
+        id: schema.vouchers.id,
+        codeHint: schema.vouchers.codeHint,
+        orderRef: schema.vouchers.orderRef,
+        orderValueLocal: schema.vouchers.orderValueLocal,
+      });
+
+    const voucher = claimedRows[0];
+    if (!voucher) {
+      const existingRows = await db
+        .select({
+          status: schema.vouchers.status,
+          codeHint: schema.vouchers.codeHint,
+        })
+        .from(schema.vouchers)
+        .where(
+          and(
+            eq(schema.vouchers.campaignId, campaignRow.id),
+            eq(schema.vouchers.codeHash, codeHash)
+          )
+        )
+        .limit(1);
+      const existingVoucher = existingRows[0];
+      const alreadyUsed =
+        existingVoucher?.status === "CLAIMED" || existingVoucher?.status === "CLAIMING";
+      const reason = alreadyUsed
+        ? "This cashback voucher has already been redeemed."
+        : existingVoucher?.status === "REVOKED"
+          ? "This cashback voucher was revoked by the campaign owner."
+          : "Invalid cashback voucher code. Double-check the claim link from the merchant.";
+      const failedRule = alreadyUsed ? "UNIQUE_DELIVERABLE_HASH" : "VERIFICATION_SCORE_THRESHOLD";
+
+      // Record blocked attempt transparently on Public Ledger (never storing raw secret voucher code)
+      const blockedSubId = `sub_${randomUUID()}`;
+      await db
+        .insert(schema.submissions)
+        .values({
+          id: blockedSubId,
+          campaignId: campaignRow.id,
+          stageIndex: selectedStage.stageIndex,
+          contributorWallet: walletLower,
+          deliverableUrl: existingVoucher?.codeHint
+            ? `voucher://${existingVoucher.codeHint}`
+            : "voucher://invalid",
+          deliverableNotes: "",
+          deliverableHash: keccak256(stringToHex(`vire:voucher-blocked:${blockedSubId}`)),
+          status: "REJECTED",
+          policyPassed: false,
+          failedPolicyRule: failedRule,
+          aiVerdict: "reject",
+          aiScore: 0,
+          aiConfidence: 1,
+          aiReason: reason,
+          aiEvidenceSummary: reason,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .catch(() => {});
+
+      return NextResponse.json(
+        {
+          submissionId: blockedSubId,
+          status: "REJECTED",
+          failedRule,
+          policyDecision: {
+            passed: false,
+            failedRule,
+            failedReason: reason,
+            checks: [{ rule: failedRule, passed: false, detail: reason }],
+            estimatedUsdtAtomic: null,
+            quotedSpreadBps: null,
+          },
+          error: reason,
+        },
+        { status: alreadyUsed ? 409 : 422 }
+      );
+    }
+
+    const releaseVoucherLock = async () => {
+      await db
+        .update(schema.vouchers)
+        .set({ status: "ACTIVE", claimedByWallet: null, claimedAt: null })
+        .where(and(eq(schema.vouchers.id, voucher.id), eq(schema.vouchers.status, "CLAIMING")))
+        .catch(() => {});
+    };
+
+    if (!vaultAddress || !agentAddress) {
+      await releaseVoucherLock();
+      return NextResponse.json(
+        { status: "FAILED", error: "Mainnet settlement keys are not configured on this environment." },
+        { status: 503 }
+      );
+    }
+
+    // Ensure contributor row exists so 0.25 CELO launch gas sponsorship & conversion top-ups work for shoppers
+    const effectiveHandle = contributor?.identityHandle ?? walletLower.slice(0, 10);
+    if (!contributor) {
+      await db
+        .insert(schema.contributors)
+        .values({
+          walletAddress: walletLower,
+          identityProvider: "signed_proof",
+          identityHandle: effectiveHandle,
+          identityProfileUrl: `https://celoscan.io/address/${wallet}`,
+          eip191Signature: null,
+          oauthVerified: false,
+          verifiedAt: now,
+        })
+        .onConflictDoNothing();
+    }
+
+    const voucherDeliverableUrl = `voucher://${voucher.codeHint}`;
+    const voucherDeliverableHash = keccak256(
+      stringToHex(`vire:voucher:${campaignRow.id.toLowerCase()}:${voucher.id}`)
+    );
+    const submissionId = `sub_${randomUUID()}`;
+    const corridorMeta = CORRIDORS[syncedCampaign.corridor as CorridorSymbol];
+    const orderSummaryParts = [
+      `Verified single-use cashback voucher (${voucher.codeHint})`,
+      voucher.orderRef ? `Order ${voucher.orderRef}` : null,
+      voucher.orderValueLocal && Number.isFinite(Number(voucher.orderValueLocal))
+        ? `${Number(voucher.orderValueLocal).toLocaleString("en-US")} ${corridorMeta.fiatCode} order`
+        : null,
+    ].filter(Boolean);
+    const reviewNote = orderSummaryParts.join(" · ");
+
+    await db.insert(schema.submissions).values({
+      id: submissionId,
+      campaignId: campaignRow.id,
+      stageIndex: selectedStage.stageIndex,
+      contributorWallet: walletLower,
+      deliverableUrl: voucherDeliverableUrl,
+      deliverableNotes: parsed.data.deliverableNotes || reviewNote,
+      deliverableHash: voucherDeliverableHash,
+      status: "SUBMITTED",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    try {
+      const orchestrator = await createLiveOrchestrator();
+      const result = await orchestrator.settleManuallyApprovedSubmission({
+        submissionId,
+        campaign: {
+          idBytes32: syncedCampaign.id as Hex,
+          slug: syncedCampaign.slug,
+          title: syncedCampaign.title,
+          deliverableType: syncedCampaign.deliverableType as DeliverableType,
+          criteria: syncedCampaign.criteria,
+          corridor: syncedCampaign.corridor as CorridorSymbol,
+          rewardLocalAtomic: selectedStage.rewardLocalAtomic,
+          active: syncedCampaign.active,
+          remainingBudgetUsdtAtomic: syncedCampaign.remainingUsdtAtomic,
+          maxPerPayoutUsdtAtomic: syncedCampaign.maxPerPayoutUsdtAtomic,
+          remainingDailyLimitUsdtAtomic: syncedCampaign.remainingDailyLimitUsdtAtomic,
+          maxPayoutsPerRecipient: syncedCampaign.maxPayoutsPerRecipient,
+          stageCooldownHours: selectedStage.cooldownHours,
+          maxSpreadBps: syncedCampaign.maxSpreadBps,
+          minPassScore: syncedCampaign.minPassScore,
+          createdAtMs: syncedCampaign.createdAt,
+          creatorWallet: (syncedCampaign.creatorWallet as Address | null) ?? null,
+        },
+        stageIndex: selectedStage.stageIndex,
+        contributorWallet: wallet,
+        identityVerified: true,
+        identityHandle: effectiveHandle,
+        identityOAuthVerified: Boolean(contributor?.oauthVerified),
+        deliverableUrl: voucherDeliverableUrl,
+        deliverableNotes: parsed.data.deliverableNotes || reviewNote,
+        reviewerWallet: (syncedCampaign.creatorWallet as Address | null) ?? agentAddress,
+        reviewNote,
+      });
+
+      if (result.status === "COMPLETED") {
+        await db
+          .update(schema.vouchers)
+          .set({ status: "CLAIMED", submissionId })
+          .where(eq(schema.vouchers.id, voucher.id));
+      } else {
+        // Release voucher lock so a legitimate buyer isn't burned by a daily cap / FX pause / wallet cap
+        await releaseVoucherLock();
+      }
+
+      return NextResponse.json(result, {
+        status: result.status === "COMPLETED" ? 200 : result.status === "REJECTED" ? 422 : 502,
+      });
+    } catch (err) {
+      console.error("[submissions] voucher settlement pipeline failed:", err);
+      await releaseVoucherLock();
+      await db
+        .update(schema.submissions)
+        .set({ status: "FAILED", updatedAt: Date.now() })
+        .where(eq(schema.submissions.id, submissionId));
+
+      return NextResponse.json(
+        {
+          submissionId,
+          status: "FAILED",
+          error: "Cashback settlement encountered a temporary error. Your voucher is still valid — please retry in a moment.",
+        },
+        { status: 500 }
+      );
+    }
+  }
+
+  const deliverableUrl = parsed.data.deliverableUrl?.trim();
+  if (!deliverableUrl) {
+    return NextResponse.json(
+      { status: "REJECTED", error: "A valid proof URL is required for this campaign." },
+      { status: 400 }
+    );
+  }
+
   const deliverableHash = computeDeliverableHash({
     campaignIdBytes32: campaignRow.id as Hex,
-    deliverableUrl: parsed.data.deliverableUrl,
+    deliverableUrl,
     contributorHandle: contributor?.identityHandle,
   });
 
@@ -262,7 +514,7 @@ export async function POST(req: NextRequest) {
     // Validate safe http/https URL
     let parsedUrl: URL;
     try {
-      parsedUrl = new URL(parsed.data.deliverableUrl);
+      parsedUrl = new URL(deliverableUrl);
       if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
         throw new Error("Only http(s) URLs are supported.");
       }
@@ -396,7 +648,7 @@ export async function POST(req: NextRequest) {
       campaignId: campaignRow.id,
       stageIndex: selectedStage.stageIndex,
       contributorWallet: walletLower,
-      deliverableUrl: parsed.data.deliverableUrl,
+      deliverableUrl,
       deliverableNotes: parsed.data.deliverableNotes,
       deliverableHash,
       status: "SUBMITTED",
@@ -409,7 +661,7 @@ export async function POST(req: NextRequest) {
       .set({
         stageIndex: selectedStage.stageIndex,
         contributorWallet: walletLower,
-        deliverableUrl: parsed.data.deliverableUrl,
+        deliverableUrl,
         deliverableNotes: parsed.data.deliverableNotes,
         status: "SUBMITTED",
         failedPolicyRule: null,
@@ -455,7 +707,7 @@ export async function POST(req: NextRequest) {
         identityVerified: Boolean(contributor),
         identityHandle: contributor?.identityHandle ?? null,
         identityOAuthVerified: Boolean(contributor?.oauthVerified),
-        deliverableUrl: parsed.data.deliverableUrl,
+        deliverableUrl,
         deliverableNotes: parsed.data.deliverableNotes,
         referralCode: parsed.data.referralCode,
       });
@@ -490,7 +742,7 @@ export async function POST(req: NextRequest) {
 
   const [verification, preview, stats, vaultSnap] = await Promise.all([
     verifyDeliverableWithBuy(buyClient, {
-      deliverableUrl: parsed.data.deliverableUrl,
+      deliverableUrl,
       deliverableType: campaignRow.deliverableType as DeliverableType,
       campaignTitle: campaignRow.title,
       criteria: `${campaignRow.criteria}\nStage ${selectedStage.stageIndex}: ${selectedStage.instructions}`,

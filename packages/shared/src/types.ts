@@ -1,7 +1,13 @@
 import { z } from "zod";
 import type { CorridorSymbol } from "./tokens.js";
 
-export const DeliverableTypeSchema = z.enum(["promo_post", "referral", "qa_bug", "localization"]);
+export const DeliverableTypeSchema = z.enum([
+  "promo_post",
+  "referral",
+  "qa_bug",
+  "localization",
+  "cashback_voucher",
+]);
 export type DeliverableType = z.infer<typeof DeliverableTypeSchema>;
 
 export const CorridorSymbolSchema = z.enum(["cNGN", "IDRX", "wARS", "wBRL", "wMXN", "wCOP"]);
@@ -23,7 +29,7 @@ export type SubmissionStatus = z.infer<typeof SubmissionStatusSchema>;
 export const CampaignVisibilitySchema = z.enum(["public", "unlisted"]);
 export type CampaignVisibility = z.infer<typeof CampaignVisibilitySchema>;
 
-export const VerificationModeSchema = z.enum(["auto", "manual"]);
+export const VerificationModeSchema = z.enum(["auto", "manual", "voucher"]);
 export type VerificationMode = z.infer<typeof VerificationModeSchema>;
 
 export const AutoPlatformSchema = z.enum(["x", "github", "web"]);
@@ -138,7 +144,8 @@ export const CreateSubmissionRequestSchema = z.object({
   campaignSlug: z.string().min(2).max(120),
   stageIndex: z.number().int().min(1).max(10).default(1),
   contributorWallet: EthAddressSchema,
-  deliverableUrl: HttpUrlSchema,
+  deliverableUrl: HttpUrlSchema.optional(),
+  voucherCode: z.string().trim().min(4).max(64).optional(),
   deliverableNotes: z.string().max(2000).default(""),
   referralCode: z.string().max(128).optional(),
   inviteCode: z.string().max(64).optional(),

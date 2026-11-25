@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
   const onchainMap = await getOnchainCampaignStates(allOwnedDbRows.map((r) => r.id as Hex));
 
   const ownedIds = allOwnedDbRows.map((r) => r.id);
-  const [ownedSubmissions, ownedSettlements, contributorsAll] = await Promise.all([
+  const [ownedSubmissions, ownedSettlements, ownedVouchers, contributorsAll] = await Promise.all([
     ownedIds.length > 0
       ? db
           .select()
@@ -84,6 +84,24 @@ export async function GET(req: NextRequest) {
           .from(schema.settlements)
           .where(inArray(schema.settlements.campaignId, ownedIds))
           .orderBy(desc(schema.settlements.settledAt))
+      : Promise.resolve([]),
+    ownedIds.length > 0
+      ? db
+          .select({
+            id: schema.vouchers.id,
+            campaignId: schema.vouchers.campaignId,
+            codeHint: schema.vouchers.codeHint,
+            orderRef: schema.vouchers.orderRef,
+            orderValueLocal: schema.vouchers.orderValueLocal,
+            status: schema.vouchers.status,
+            claimedByWallet: schema.vouchers.claimedByWallet,
+            submissionId: schema.vouchers.submissionId,
+            createdAt: schema.vouchers.createdAt,
+            claimedAt: schema.vouchers.claimedAt,
+          })
+          .from(schema.vouchers)
+          .where(inArray(schema.vouchers.campaignId, ownedIds))
+          .orderBy(desc(schema.vouchers.createdAt))
       : Promise.resolve([]),
     db.select().from(schema.contributors),
   ]);
@@ -143,6 +161,19 @@ export async function GET(req: NextRequest) {
 
       const pendingCount = subs.filter((s) => s.status === "PENDING_REVIEW").length;
       const completedCount = subs.filter((s) => s.status === "COMPLETED").length;
+      const campVouchers = ownedVouchers.filter((v) => v.campaignId === row.id);
+      let verifiedGmvLocal = 0;
+      let issuedGmvLocal = 0;
+      for (const v of campVouchers) {
+        const n = v.orderValueLocal ? Number(v.orderValueLocal) : 0;
+        const safeN = Number.isFinite(n) && n > 0 ? n : 0;
+        if (v.status === "CLAIMED") {
+          verifiedGmvLocal += safeN;
+          issuedGmvLocal += safeN;
+        } else if (v.status === "ACTIVE" || v.status === "CLAIMING") {
+          issuedGmvLocal += safeN;
+        }
+      }
 
       return {
         id: row.id,
@@ -153,6 +184,7 @@ export async function GET(req: NextRequest) {
         description: row.description,
         criteria: row.criteria,
         corridor,
+        fiatCode: CORRIDORS[corridor].fiatCode,
         visibility: row.visibility,
         verificationMode: row.verificationMode,
         requiresInviteCode: Boolean(row.inviteCodeHash),
@@ -169,6 +201,9 @@ export async function GET(req: NextRequest) {
         spotsRemaining,
         pendingCount,
         completedCount,
+        verifiedGmvLocal,
+        issuedGmvLocal,
+        vouchers: campVouchers,
         createdAt: row.createdAt,
         submissions: subs,
       };

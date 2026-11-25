@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { SettlementOrchestrator, type OrchestratorPersistenceAdapter } from "@vire/agent";
 import {
   CeloBuyClient,
@@ -32,6 +32,41 @@ export function getMinCampaignBudgetUsdtAtomic(): bigint {
   const raw = Number(process.env.VIRE_MIN_CAMPAIGN_BUDGET_USDT?.trim() || "10");
   const usd = Number.isFinite(raw) && raw >= 1 ? raw : 10;
   return BigInt(Math.round(usd * 1_000_000));
+}
+
+const VOUCHER_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+export function normalizeVoucherCode(raw: string): string {
+  return raw.trim().toUpperCase().replace(/\s+/g, "");
+}
+
+export function hashVoucherCode(code: string, campaignId: string): string {
+  const secret = process.env.SESSION_SECRET?.trim() || "vire-voucher-dev-key";
+  return createHmac("sha256", secret)
+    .update(`voucher:${campaignId.toLowerCase()}:${normalizeVoucherCode(code)}`)
+    .digest("hex");
+}
+
+export function generateVoucherCode(partnerName: string): { code: string; codeHint: string } {
+  const prefixRaw = partnerName
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 4);
+  const prefix = prefixRaw.length >= 2 ? prefixRaw : "VIRE";
+  const pickChars = (len: number) => {
+    const bytes = randomBytes(len);
+    let out = "";
+    for (let i = 0; i < len; i++) {
+      out += VOUCHER_ALPHABET[bytes[i]! % VOUCHER_ALPHABET.length]!;
+    }
+    return out;
+  };
+  const seg1 = pickChars(4);
+  const seg2 = pickChars(4);
+  return {
+    code: `${prefix}-${seg1}-${seg2}`,
+    codeHint: `${prefix}-••••-${seg2}`,
+  };
 }
 
 export function hashInviteCode(code: string, campaignId = ""): string {

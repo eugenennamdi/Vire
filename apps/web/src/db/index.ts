@@ -167,6 +167,20 @@ const DDL_STATEMENTS = [
     dry_run INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS vouchers (
+    id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id),
+    code_hash TEXT NOT NULL UNIQUE,
+    code_hint TEXT NOT NULL,
+    order_ref TEXT,
+    order_value_local TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    claimed_by_wallet TEXT,
+    submission_id TEXT,
+    issued_by_wallet TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    claimed_at INTEGER
+  )`,
   `CREATE TABLE IF NOT EXISTS x402_inflows (
     id TEXT PRIMARY KEY,
     endpoint TEXT NOT NULL,

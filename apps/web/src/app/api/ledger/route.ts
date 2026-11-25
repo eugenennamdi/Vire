@@ -101,7 +101,11 @@ export async function GET(req: NextRequest) {
         campaignTitle: isPrivate ? "Private Campaign" : (camp?.title ?? sub.campaignId),
         corridor: camp?.corridor ?? "unknown",
         contributorWallet: sub.contributorWallet,
-        deliverableUrl: isPrivate ? null : sub.deliverableUrl,
+        deliverableUrl: isPrivate
+          ? null
+          : sub.deliverableUrl.startsWith("voucher://")
+            ? null
+            : sub.deliverableUrl,
         failedPolicyRule: sub.failedPolicyRule,
         aiVerdict: sub.aiVerdict,
         aiScore: sub.aiScore,
