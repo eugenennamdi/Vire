@@ -948,8 +948,8 @@ export default function CreateCampaignPage() {
                 onChange={setVerificationMode}
                 options={[
                   { value: "auto", label: "Automatic", icon: <Sparkle className="h-3.5 w-3.5" /> },
-                  { value: "manual", label: "Manual review", icon: <UserCheck className="h-3.5 w-3.5" /> },
-                  { value: "voucher", label: "Cashback voucher", icon: <Ticket className="h-3.5 w-3.5" /> },
+                  { value: "manual", label: "Manual", icon: <UserCheck className="h-3.5 w-3.5" /> },
+                  { value: "voucher", label: "Voucher", icon: <Ticket className="h-3.5 w-3.5" /> },
                 ]}
               />
             </div>
@@ -1337,7 +1337,11 @@ export default function CreateCampaignPage() {
                 <div className="flex items-center justify-between gap-3 py-2.5">
                   <dt className="shrink-0 text-[#71717A]">Verification</dt>
                   <dd className="text-right text-[#0A0A0C]">
-                    {verificationMode === "auto" ? `Auto (${autoPlatform.toUpperCase()})` : "Manual review"}
+                    {verificationMode === "voucher"
+                      ? "Cashback voucher"
+                      : verificationMode === "auto"
+                        ? `Auto (${autoPlatform.toUpperCase()})`
+                        : "Manual review"}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 py-2.5">
