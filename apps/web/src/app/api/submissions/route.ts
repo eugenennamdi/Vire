@@ -328,11 +328,13 @@ export async function POST(req: NextRequest) {
         .onConflictDoNothing();
     }
 
-    const voucherDeliverableUrl = `voucher://${voucher.codeHint}`;
-    const voucherDeliverableHash = keccak256(
-      stringToHex(`vire:voucher:${campaignRow.id.toLowerCase()}:${voucher.id}`)
-    );
-    const submissionId = `sub_${randomUUID()}`;
+    // Use globally unique ASCII voucher ID so DB hash and onchain VireVault deliverableHash match bit-for-bit
+    const voucherDeliverableUrl = `voucher://${voucher.id}`;
+    const voucherDeliverableHash = computeDeliverableHash({
+      campaignIdBytes32: campaignRow.id as Hex,
+      deliverableUrl: voucherDeliverableUrl,
+      contributorHandle: effectiveHandle,
+    });
     const corridorMeta = CORRIDORS[syncedCampaign.corridor as CorridorSymbol];
     const orderSummaryParts = [
       `Verified single-use cashback voucher (${voucher.codeHint})`,
@@ -343,18 +345,41 @@ export async function POST(req: NextRequest) {
     ].filter(Boolean);
     const reviewNote = orderSummaryParts.join(" · ");
 
-    await db.insert(schema.submissions).values({
-      id: submissionId,
-      campaignId: campaignRow.id,
-      stageIndex: selectedStage.stageIndex,
-      contributorWallet: walletLower,
-      deliverableUrl: voucherDeliverableUrl,
-      deliverableNotes: parsed.data.deliverableNotes || reviewNote,
-      deliverableHash: voucherDeliverableHash,
-      status: "SUBMITTED",
-      createdAt: now,
-      updatedAt: now,
-    });
+    // Reuse any prior FAILED/REJECTED attempt row for this exact voucher so legitimate retries never hit UNIQUE errors
+    const priorVoucherSub = await db
+      .select({ id: schema.submissions.id })
+      .from(schema.submissions)
+      .where(eq(schema.submissions.deliverableHash, voucherDeliverableHash))
+      .limit(1);
+    const submissionId = priorVoucherSub[0]?.id ?? `sub_${randomUUID()}`;
+
+    if (!priorVoucherSub[0]) {
+      await db.insert(schema.submissions).values({
+        id: submissionId,
+        campaignId: campaignRow.id,
+        stageIndex: selectedStage.stageIndex,
+        contributorWallet: walletLower,
+        deliverableUrl: voucherDeliverableUrl,
+        deliverableNotes: parsed.data.deliverableNotes || reviewNote,
+        deliverableHash: voucherDeliverableHash,
+        status: "SUBMITTED",
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else {
+      await db
+        .update(schema.submissions)
+        .set({
+          stageIndex: selectedStage.stageIndex,
+          contributorWallet: walletLower,
+          deliverableUrl: voucherDeliverableUrl,
+          deliverableNotes: parsed.data.deliverableNotes || reviewNote,
+          status: "SUBMITTED",
+          failedPolicyRule: null,
+          updatedAt: now,
+        })
+        .where(eq(schema.submissions.id, submissionId));
+    }
 
     try {
       const orchestrator = await createLiveOrchestrator();

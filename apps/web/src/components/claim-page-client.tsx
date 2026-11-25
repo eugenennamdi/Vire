@@ -202,6 +202,12 @@ function ClaimFlowInner({
   const [deliverableUrl, setDeliverableUrl] = useState("");
   const [voucherCode, setVoucherCode] = useState(initialVoucher);
   const [deliverableNotes, setDeliverableNotes] = useState("");
+
+  useEffect(() => {
+    if (initialVoucher) {
+      setVoucherCode(initialVoucher.toUpperCase());
+    }
+  }, [initialVoucher]);
   const [referralCode, setReferralCode] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [bindError, setBindError] = useState<string | null>(null);
@@ -467,6 +473,7 @@ function ClaimFlowInner({
           const authErr = (await authRes.json().catch(() => ({}))) as { error?: string };
           throw new Error(authErr.error || "Please approve the wallet sign-in prompt to claim.");
         }
+        void refetchIdentity();
       }
 
       const res = await fetch("/api/submissions", {
