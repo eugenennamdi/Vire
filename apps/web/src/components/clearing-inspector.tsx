@@ -282,31 +282,31 @@ export function ClearingInspector({
           </div>
 
           {/* Valid vs Blocked Mode Capsule */}
-          <div className="vire-well inline-flex items-center gap-0.5 self-start rounded-full p-1 sm:self-auto">
+          <div className="vire-well inline-flex shrink-0 items-center gap-0.5 self-start rounded-full p-1 sm:self-auto">
             <button
               type="button"
               onClick={() => setMode("valid")}
               className={cn(
-                "vire-pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium",
+                "vire-pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12.5px] font-medium",
                 !isBlocked
                   ? "bg-white text-[#0A0A0C] shadow-[0_0_0_1px_rgba(10,10,12,0.07),0_1px_2px_rgba(10,10,12,0.06)]"
                   : "text-[#71717A] hover:text-[#0A0A0C]"
               )}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" />
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#16A34A]" />
               Valid payout
             </button>
             <button
               type="button"
               onClick={() => setMode("blocked")}
               className={cn(
-                "vire-pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium",
+                "vire-pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12.5px] font-medium",
                 isBlocked
                   ? "bg-white text-[#B91C1C] shadow-[0_0_0_1px_rgba(220,38,38,0.18),0_1px_2px_rgba(10,10,12,0.05)]"
                   : "text-[#71717A] hover:text-[#0A0A0C]"
               )}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-[#DC2626]" />
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#DC2626]" />
               Blocked claim
             </button>
           </div>
@@ -656,18 +656,18 @@ export function ClearingInspector({
             <table className="w-full text-left">
               <thead className="border-b border-black/[0.06] bg-[#FAFAFB] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#71717A]">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-3.5 sm:px-5 lg:px-6">Currency</th>
-                  <th className="whitespace-nowrap px-4 py-3.5 text-right">
-                    <span className="hidden sm:inline">Live </span>Rate (1 USDT)
+                  <th className="whitespace-nowrap px-4 py-3.5 sm:px-4 lg:px-6">Currency</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 text-right sm:px-3 lg:px-4">
+                    <span className="hidden lg:inline">Live </span>Rate (1 USDT)
                   </th>
-                  <th className="hidden whitespace-nowrap px-4 py-3.5 text-right sm:table-cell">
+                  <th className="hidden whitespace-nowrap px-3 py-3.5 text-right sm:table-cell lg:px-4">
                     Liquidity
                   </th>
                   <th className="hidden whitespace-nowrap px-4 py-3.5 lg:table-cell">
                     Cash-Out Options
                   </th>
-                  <th className="hidden whitespace-nowrap px-4 py-3.5 sm:table-cell">Status</th>
-                  <th className="hidden whitespace-nowrap px-5 py-3.5 text-right sm:table-cell lg:px-6">
+                  <th className="hidden whitespace-nowrap px-3 py-3.5 sm:table-cell lg:px-4">Status</th>
+                  <th className="hidden whitespace-nowrap px-4 py-3.5 text-right sm:table-cell lg:px-6">
                     Action
                   </th>
                 </tr>
@@ -718,7 +718,7 @@ export function ClearingInspector({
                           key={sym}
                           className="transition-colors duration-150 hover:bg-[#FAFAFB]"
                         >
-                          <td className="whitespace-nowrap px-4 py-4 sm:px-5 lg:px-6">
+                          <td className="whitespace-nowrap px-4 py-4 sm:px-4 lg:px-6">
                             <Link
                               href={`/campaigns?corridor=${encodeURIComponent(sym)}`}
                               className="group flex items-center gap-3"
@@ -748,7 +748,7 @@ export function ClearingInspector({
                             </Link>
                           </td>
 
-                          <td className="whitespace-nowrap px-4 py-4 text-right font-mono text-[13.5px] font-medium text-[#0A0A0C] tabular-nums">
+                          <td className="whitespace-nowrap px-4 py-4 text-right font-mono text-[13.5px] font-medium text-[#0A0A0C] tabular-nums sm:px-3 lg:px-4">
                             {isLive && c?.impliedRateLocalPerUsdt ? (
                               <>
                                 {formatRate(c.impliedRateLocalPerUsdt)}{" "}
@@ -763,13 +763,13 @@ export function ClearingInspector({
 
                           <td
                             title={depthRaw ? `$${depthRaw} USDT available` : "Currently unavailable"}
-                            className="hidden whitespace-nowrap px-4 py-4 text-right sm:table-cell"
+                            className="hidden whitespace-nowrap px-3 py-4 text-right sm:table-cell lg:px-4"
                           >
                             <div className="inline-flex items-center gap-2.5 font-mono text-[13px] text-[#3F3F46] tabular-nums">
                               <span>{formatCompactUsd(depthRaw)}</span>
                               <span
                                 aria-hidden="true"
-                                className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-black/[0.06] md:block"
+                                className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-black/[0.06] lg:block"
                               >
                                 <span
                                   className="block h-full rounded-full bg-[#0A0A0C]/65"
@@ -783,7 +783,7 @@ export function ClearingInspector({
                             {meta?.rail ?? "—"}
                           </td>
 
-                          <td className="hidden whitespace-nowrap px-4 py-4 sm:table-cell">
+                          <td className="hidden whitespace-nowrap px-3 py-4 sm:table-cell lg:px-4">
                             <span className="inline-flex items-center gap-2 text-[12.5px] font-medium text-[#3F3F46]">
                               <span
                                 className={cn(
@@ -799,7 +799,7 @@ export function ClearingInspector({
                             </span>
                           </td>
 
-                          <td className="hidden whitespace-nowrap px-5 py-4 text-right sm:table-cell lg:px-6">
+                          <td className="hidden whitespace-nowrap px-4 py-4 text-right sm:table-cell lg:px-6">
                             <Link
                               href={`/campaigns?corridor=${encodeURIComponent(sym)}`}
                               className={buttonVariants({ variant: "secondary", size: "sm" })}

@@ -212,7 +212,7 @@ export default function LedgerPage() {
               <div className="divide-y divide-black/[0.06] lg:hidden">
                 {data.completedSettlements.map((s) => (
                   <div key={s.id} className="space-y-3 p-4 sm:p-5">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                       <div className="min-w-0">
                         <div className="text-[14px] font-medium text-[#0A0A0C]">{s.campaignTitle}</div>
                         <div className="mt-1 flex items-center gap-1.5 font-mono text-[11.5px] text-[#71717A]">
@@ -220,16 +220,18 @@ export default function LedgerPage() {
                           <CopyButton value={s.recipientWallet} toastMessage="Recipient copied" />
                         </div>
                       </div>
-                      <div className="shrink-0 text-right">
+                      <div className="flex items-baseline justify-between gap-2 sm:block sm:shrink-0 sm:text-right">
                         <div className="inline-flex items-center gap-1.5 font-mono text-[14px] font-medium text-[#0A0A0C] tabular-nums">
                           <TokenIcon symbol={s.corridor} size={18} showChainBadge />
                           <span>
                             {s.localAmountFormatted} {s.corridor}
                           </span>
                         </div>
-                        <div className="mt-0.5 font-mono text-[11px] text-[#71717A] tabular-nums">
+                        <div className="font-mono text-[11px] text-[#71717A] tabular-nums sm:mt-0.5">
                           ${s.usdtSpentFormatted} USDT
-                          {s.usdtRefundedFormatted !== "0" ? ` · +$${s.usdtRefundedFormatted} refunded` : ""}
+                          {s.usdtRefundedFormatted !== "0" ? (
+                            <span className="hidden sm:inline"> · +${s.usdtRefundedFormatted} refunded</span>
+                          ) : null}
                         </div>
                       </div>
                     </div>
