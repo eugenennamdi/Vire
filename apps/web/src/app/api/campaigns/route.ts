@@ -242,19 +242,18 @@ export async function POST(req: NextRequest) {
       ? `${d.slug}-${campaignId.slice(2, 8)}`
       : d.slug;
 
-  const stages: CampaignStage[] = [
-    {
-      stageIndex: 1,
-      title: d.title,
-      instructions: d.criteria,
-      rewardLocalAtomic: rewardLocalAtomic.toString(),
-      cooldownHours: 0,
-    },
-  ];
+  const stageCount = Math.max(1, Math.min(10, onchain.maxPayoutsPerRecipient));
+  const stages: CampaignStage[] = Array.from({ length: stageCount }, (_, idx) => ({
+    stageIndex: idx + 1,
+    title: stageCount === 1 ? d.title : `${d.title} (Submission ${idx + 1}/${stageCount})`,
+    instructions: d.criteria,
+    rewardLocalAtomic: rewardLocalAtomic.toString(),
+    cooldownHours: 0,
+  }));
 
   const inviteCodeHash =
     d.visibility === "unlisted" && d.inviteCode?.trim()
-      ? hashInviteCode(d.inviteCode.trim())
+      ? hashInviteCode(d.inviteCode.trim(), campaignId)
       : null;
 
   const now = Date.now();

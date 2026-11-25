@@ -20,6 +20,7 @@ import {
   CORRIDORS,
   FUNDING_TOKEN_LIST,
   FUNDING_TOKENS,
+  isAllowedTextileTarget,
   parseTokenAmount,
   PRIMARY_CORRIDORS,
   VIRE_VAULT_ABI,
@@ -63,7 +64,7 @@ import { Card } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { TokenIcon } from "@/components/ui/token-icon";
-import { buildWalletAuthMessage } from "@/lib/session-client";
+import { buildWalletAuthMessage, requestAuthNonce } from "@/lib/session-client";
 import { cn, truncateMiddle } from "@/lib/utils";
 
 const PRIVY_ENABLED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim());
@@ -308,10 +309,13 @@ export default function CreateCampaignPage() {
   const depositUsdt = Math.max(MIN_BUDGET_USDT, Math.ceil(rawDepositUsdt * 100) / 100);
   const depositAtomic = parseUnits(depositUsdt.toFixed(6), 6);
 
-  // Auto-computed onchain safety caps: 15% FX headroom per payout, generous daily cap (min(budget, max(perPayout*10, 50% budget)))
+  // Auto-computed onchain safety caps: 15% FX headroom per payout, 24h UTC circuit breaker capped at 50% of budget (min 3x per-payout)
   const maxPerPayoutUsdt = Math.max(2, Math.ceil(estUsdtPerPayout * 1.15 * 100) / 100);
   const maxPerPayoutAtomic = parseUnits(maxPerPayoutUsdt.toFixed(6), 6);
-  const dailyLimitUsdt = Math.min(depositUsdt, Math.max(maxPerPayoutUsdt * 10, depositUsdt));
+  const dailyLimitUsdt = Math.max(
+    maxPerPayoutUsdt,
+    Math.min(depositUsdt, Math.max(maxPerPayoutUsdt * 3, Math.ceil(depositUsdt * 0.5 * 100) / 100))
+  );
   const dailyLimitAtomic = parseUnits(dailyLimitUsdt.toFixed(6), 6);
 
   const usdtBalanceRaw = walletReads?.[0]?.result as bigint | undefined;
@@ -385,7 +389,8 @@ export default function CreateCampaignPage() {
     if (isSessionMatched) return true;
     setStepStatus("signing");
     try {
-      const message = buildWalletAuthMessage(connectedWallet);
+      const nonce = await requestAuthNonce(connectedWallet);
+      const message = buildWalletAuthMessage(connectedWallet, nonce);
       const signature = await signMessageAsync({ message });
       const res = await fetch("/api/auth/wallet", {
         method: "POST",
@@ -550,6 +555,7 @@ export default function CreateCampaignPage() {
           rfqId?: string;
           takerPaysAtomic?: string;
           takerPaysFormatted?: string;
+          buyAmountAtomic?: string;
           expiresAt?: string;
           spender?: Address;
           transactions?: {
@@ -560,6 +566,16 @@ export default function CreateCampaignPage() {
         };
         if (!quoteRes.ok || !quoteJson.rfqId || !quoteJson.transactions?.swap || !quoteJson.spender) {
           throw new Error(quoteJson.error || `Failed to lock ${fundingToken} → USDT Textile FX quote.`);
+        }
+        if (
+          !isAllowedTextileTarget(quoteJson.spender) ||
+          !isAllowedTextileTarget(quoteJson.transactions.swap.to) ||
+          quoteJson.transactions.approval.to.toLowerCase() !== fundingTokenMeta.address.toLowerCase() ||
+          quoteJson.transactions.approval.value !== "0" ||
+          quoteJson.transactions.swap.value !== "0" ||
+          BigInt(quoteJson.buyAmountAtomic ?? "0") !== depositAtomic
+        ) {
+          throw new Error("Blocked unexpected swap contract target or output amount on funding quote.");
         }
         activeRfqId = quoteJson.rfqId;
 

@@ -9,7 +9,14 @@ import {
 
 export const GITHUB_SESSION_COOKIE = "vire_gh_identity";
 export const WALLET_SESSION_COOKIE = "vire_wallet_session";
+export const WALLET_CHALLENGE_COOKIE = "vire_auth_challenge";
 export const FUNDING_RFQ_COOKIE = "vire_funding_rfq";
+
+export interface AuthChallengePayload {
+  nonce: string;
+  wallet: string;
+  iat: number;
+}
 
 export interface FundingRfqCookiePayload {
   rfqId: string;
@@ -32,11 +39,16 @@ export interface WalletSessionPayload {
   iat: number;
 }
 
-// ponytail: ephemeral fallback key per process when SESSION_SECRET is unset in local dev; set SESSION_SECRET in prod.
+// ponytail: ephemeral fallback key per process when SESSION_SECRET is unset in local dev; throws in Vercel production.
 const FALLBACK_SECRET = randomBytes(32).toString("hex");
 
 function getSigningSecret(): string {
-  return process.env.SESSION_SECRET?.trim() || FALLBACK_SECRET;
+  const configured = process.env.SESSION_SECRET?.trim();
+  if (configured) return configured;
+  if (process.env.VERCEL_ENV === "production") {
+    throw new Error("SESSION_SECRET must be configured in Vercel Production.");
+  }
+  return FALLBACK_SECRET;
 }
 
 function signGeneric(payload: object): string {
@@ -89,6 +101,15 @@ export function signFundingRfqCookie(payload: FundingRfqCookiePayload): string {
 export function verifyFundingRfqCookie(raw: string | undefined): FundingRfqCookiePayload | null {
   const parsed = verifyGeneric<FundingRfqCookiePayload>(raw, 5 * 60 * 1000);
   return parsed?.rfqId && parsed?.claimToken && parsed?.wallet ? parsed : null;
+}
+
+export function signAuthChallengeCookie(payload: AuthChallengePayload): string {
+  return signGeneric({ ...payload, wallet: payload.wallet.toLowerCase() });
+}
+
+export function verifyAuthChallengeCookie(raw: string | undefined): AuthChallengePayload | null {
+  const parsed = verifyGeneric<AuthChallengePayload>(raw, 5 * 60 * 1000);
+  return parsed?.nonce && parsed?.wallet ? parsed : null;
 }
 
 interface PrivyJwk {
@@ -202,21 +223,24 @@ export function buildIdentityBindMessage(params: {
   walletAddress: string;
   provider: "github" | "x" | "signed_proof";
   handle: string;
+  nonce: string;
 }): string {
   return [
     "Vire Contributor Identity Binding (Celo Mainnet 42220)",
     `Wallet: ${params.walletAddress.toLowerCase()}`,
     `Provider: ${params.provider}`,
     `Handle: ${params.handle.trim()}`,
+    `Nonce: ${params.nonce}`,
     "Purpose: Bind external identity for non-team proof-of-work settlement on Vire.",
   ].join("\n");
 }
 
 /** Deterministic EIP-191 message campaign owners / contributors sign to authenticate a wallet session. */
-export function buildWalletAuthMessage(walletAddress: string): string {
+export function buildWalletAuthMessage(walletAddress: string, nonce: string): string {
   return [
     "Vire Wallet Session Authentication (Celo Mainnet 42220)",
     `Wallet: ${walletAddress.toLowerCase()}`,
+    `Nonce: ${nonce}`,
     "Purpose: Verify wallet ownership to launch or manage Vire campaigns and view submissions.",
   ].join("\n");
 }

@@ -118,11 +118,27 @@ export interface CorridorLiveStatus {
 
 export const EthAddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid EVM address");
 
+export function isSafeHttpUrl(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  try {
+    const u = new URL(raw.trim());
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+export const HttpUrlSchema = z
+  .string()
+  .url()
+  .max(2048)
+  .refine((val) => isSafeHttpUrl(val), "Only http:// and https:// URLs are allowed");
+
 export const CreateSubmissionRequestSchema = z.object({
   campaignSlug: z.string().min(2).max(120),
   stageIndex: z.number().int().min(1).max(10).default(1),
   contributorWallet: EthAddressSchema,
-  deliverableUrl: z.string().url().max(2048),
+  deliverableUrl: HttpUrlSchema,
   deliverableNotes: z.string().max(2000).default(""),
   referralCode: z.string().max(128).optional(),
   inviteCode: z.string().max(64).optional(),
@@ -156,7 +172,7 @@ export const PublishCampaignRequestSchema = z.object({
 export type PublishCampaignRequest = z.infer<typeof PublishCampaignRequestSchema>;
 
 export const X402VerifyRequestSchema = z.object({
-  deliverableUrl: z.string().url().max(2048),
+  deliverableUrl: HttpUrlSchema,
   deliverableType: DeliverableTypeSchema,
   criteria: z.string().min(10).max(1500),
   corridor: CorridorSymbolSchema,

@@ -55,13 +55,14 @@ export async function GET(req: NextRequest) {
 
   const completedRows = filteredSettlements.map((s) => {
     const camp = campaignById.get(s.campaignId);
+    const isPrivate = camp?.visibility === "unlisted";
     const buyRow = buyBySubmission.get(s.submissionId);
     const corridor = s.corridor as CorridorSymbol;
     return {
       id: s.id,
       submissionId: s.submissionId,
-      campaignTitle: camp?.title ?? s.campaignId,
-      partnerName: camp?.partnerName ?? "Vire",
+      campaignTitle: isPrivate ? "Private Campaign" : (camp?.title ?? s.campaignId),
+      partnerName: isPrivate ? "Private Host" : (camp?.partnerName ?? "Vire"),
       recipientWallet: s.recipientWallet,
       corridor,
       localAmountAtomic: s.localAmountAtomic,
@@ -93,18 +94,19 @@ export async function GET(req: NextRequest) {
     })
     .map((sub) => {
       const camp = campaignById.get(sub.campaignId);
+      const isPrivate = camp?.visibility === "unlisted";
       const buyRow = buyBySubmission.get(sub.id);
       return {
         id: sub.id,
-        campaignTitle: camp?.title ?? sub.campaignId,
+        campaignTitle: isPrivate ? "Private Campaign" : (camp?.title ?? sub.campaignId),
         corridor: camp?.corridor ?? "unknown",
         contributorWallet: sub.contributorWallet,
-        deliverableUrl: sub.deliverableUrl,
+        deliverableUrl: isPrivate ? null : sub.deliverableUrl,
         failedPolicyRule: sub.failedPolicyRule,
         aiVerdict: sub.aiVerdict,
         aiScore: sub.aiScore,
-        aiReason: sub.aiReason,
-        policyDetails: sub.policyDetailsJson ? JSON.parse(sub.policyDetailsJson) : [],
+        aiReason: isPrivate ? "Blocked (private campaign details redacted)." : sub.aiReason,
+        policyDetails: isPrivate ? [] : (sub.policyDetailsJson ? JSON.parse(sub.policyDetailsJson) : []),
         buyPaymentTxHash: buyRow?.paymentTxHash ?? null,
         createdAt: sub.createdAt,
       };

@@ -26,10 +26,17 @@ export interface FetchedArtifact {
   reachable: boolean;
 }
 
-/** Check whether an IPv4 or IPv6 literal is loopback, link-local, or RFC1918 private. */
+/** Check whether an IPv4 or IPv6 literal is loopback, link-local, multicast, reserved, or RFC1918 private. */
 export function isPrivateOrReservedIp(ip: string): boolean {
   const clean = ip.replace(/^\[|\]$/g, "").toLowerCase();
-  if (clean === "::1" || clean === "::" || clean.startsWith("fe80:") || clean.startsWith("fc") || clean.startsWith("fd")) {
+  if (
+    clean === "::1" ||
+    clean === "::" ||
+    /^fe[89ab][0-9a-f]:/.test(clean) || // IPv6 link-local fe80::/10
+    clean.startsWith("fc") ||
+    clean.startsWith("fd") || // IPv6 ULA fc00::/7
+    clean.startsWith("ff") // IPv6 multicast ff00::/8
+  ) {
     return true;
   }
   const v4Mapped = clean.startsWith("::ffff:") ? clean.slice(7) : clean;
@@ -37,12 +44,17 @@ export function isPrivateOrReservedIp(ip: string): boolean {
   if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) {
     return clean.includes(":"); // block unknown non-global IPv6 patterns conservatively
   }
-  const [a = 0, b = 0] = parts;
+  const [a = 0, b = 0, c = 0] = parts;
   if (a === 0 || a === 10 || a === 127) return true;
   if (a === 169 && b === 254) return true; // cloud metadata & link-local
   if (a === 172 && b >= 16 && b <= 31) return true;
   if (a === 192 && b === 168) return true;
   if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  if (a === 192 && b === 0 && (c === 0 || c === 2)) return true; // IETF protocol / TEST-NET-1
+  if (a === 198 && (b === 18 || b === 19)) return true; // benchmark 198.18.0.0/15
+  if (a === 198 && b === 51 && c === 100) return true; // TEST-NET-2
+  if (a === 203 && b === 0 && c === 113) return true; // TEST-NET-3
+  if (a >= 224) return true; // multicast (224.0.0.0/4) & reserved/broadcast (240.0.0.0/4)
   return false;
 }
 
@@ -198,6 +210,35 @@ function stripHtmlToExcerpt(html: string, maxChars = 4_000): { title: string; ex
   return { title, excerpt: stripped.slice(0, maxChars) };
 }
 
+const GITHUB_IDENT_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?$/;
+
+async function readBoundedText(res: Response, maxBytes = 65_536): Promise<string> {
+  if (!res.body) {
+    return (await res.text()).slice(0, maxBytes);
+  }
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (total < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      const remaining = maxBytes - total;
+      if (value.byteLength > remaining) {
+        chunks.push(value.subarray(0, remaining));
+        total += remaining;
+        break;
+      }
+      chunks.push(value);
+      total += value.byteLength;
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+  return Buffer.concat(chunks.map((c) => Buffer.from(c.buffer, c.byteOffset, c.byteLength))).toString("utf8");
+}
+
 /**
  * Fetch off-chain deliverable evidence (GitHub PR/Issue via API or public promo webpage) safely.
  */
@@ -214,6 +255,16 @@ export async function fetchDeliverableArtifact(params: {
   const ghMatch = safeUrl.pathname.match(/^\/([^/]+)\/([^/]+)\/(pull|issues)\/(\d+)\/?$/);
   if (safeUrl.hostname.toLowerCase() === "github.com" && ghMatch) {
     const [, owner, repo, kind, num] = ghMatch;
+    if (
+      !owner ||
+      !repo ||
+      !GITHUB_IDENT_RE.test(owner) ||
+      !GITHUB_IDENT_RE.test(repo) ||
+      owner.includes("..") ||
+      repo.includes("..")
+    ) {
+      throw new Error("Invalid GitHub repository owner or name in deliverable URL");
+    }
     const apiPath = kind === "pull" ? `pulls/${num}` : `issues/${num}`;
     const headers: Record<string, string> = {
       Accept: "application/vnd.github+json",
@@ -223,11 +274,14 @@ export async function fetchDeliverableArtifact(params: {
       headers.Authorization = `Bearer ${params.githubApiToken}`;
     }
 
-    const res = await fetchFn(`https://api.github.com/repos/${owner}/${repo}/${apiPath}`, {
-      headers,
-      redirect: "error",
-      signal: AbortSignal.timeout(10_000),
-    });
+    const res = await fetchFn(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${apiPath}`,
+      {
+        headers,
+        redirect: "error",
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
 
     if (!res.ok) {
       return {
@@ -286,6 +340,7 @@ export async function fetchDeliverableArtifact(params: {
         `https://api.fxtwitter.com/${encodeURIComponent(xStatus.handle)}/status/${xStatus.tweetId}`,
         {
           headers: { Accept: "application/json", "User-Agent": "Vire-Settlement-Agent/1.0" },
+          redirect: "error",
           signal: AbortSignal.timeout(10_000),
         }
       );
@@ -361,6 +416,7 @@ export async function fetchDeliverableArtifact(params: {
       const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(`https://twitter.com/${xStatus.handle}/status/${xStatus.tweetId}`)}&omit_script=true`;
       const oeRes = await fetchFn(oembedUrl, {
         headers: { Accept: "application/json", "User-Agent": "Vire-Settlement-Agent/1.0" },
+        redirect: "error",
         signal: AbortSignal.timeout(10_000),
       });
       if (oeRes.ok) {
@@ -413,9 +469,19 @@ export async function fetchDeliverableArtifact(params: {
       const redirected = new URL(loc, safeUrl).toString();
       await assertSafePublicUrl(redirected);
     }
+    await res.body?.cancel().catch(() => {});
+    return {
+      normalizedUrl,
+      sourceKind: "web_post",
+      title: safeUrl.hostname,
+      authorHandle: null,
+      excerpt: `Redirect response (HTTP ${res.status}) — please submit the direct final URL.`,
+      httpStatus: res.status,
+      reachable: false,
+    };
   }
 
-  const rawText = (await res.text()).slice(0, 32_768);
+  const rawText = (await readBoundedText(res, 65_536)).slice(0, 32_768);
   const { title, excerpt } = stripHtmlToExcerpt(rawText);
 
   return {
@@ -425,6 +491,6 @@ export async function fetchDeliverableArtifact(params: {
     authorHandle: null,
     excerpt: excerpt || `HTTP ${res.status} response from ${safeUrl.hostname}`,
     httpStatus: res.status,
-    reachable: res.status >= 200 && res.status < 400,
+    reachable: res.status >= 200 && res.status < 300,
   };
 }

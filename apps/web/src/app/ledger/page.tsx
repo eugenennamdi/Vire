@@ -54,7 +54,7 @@ interface LedgerData {
     campaignTitle: string;
     corridor: string;
     contributorWallet: string;
-    deliverableUrl: string;
+    deliverableUrl: string | null;
     failedPolicyRule: string | null;
     aiVerdict: string | null;
     aiScore: number | null;

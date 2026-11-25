@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { CELO_CONTRACTS, CELO_TOKENS, DEFAULT_ATTRIBUTION_CODE } from "@vire/shared";
+import { encodeFunctionData, erc20Abi } from "viem";
 import { ConcurrencyLimiter, TextileClient, TextileQuoteExpiredError } from "../src/index.js";
 
 describe("packages/textile RFQ v2 engine", () => {
@@ -197,5 +198,69 @@ describe("packages/textile RFQ v2 engine", () => {
       })
     ).rejects.toBeInstanceOf(TextileQuoteExpiredError);
     expect(cancelCalls.some((u) => u.endsWith("/rfq/rfq_exp/cancel"))).toBe(true);
+
+    // 4. Must construct exact local ERC-20 approve(spender, takerPays) calldata with value=0n (ignoring poisoned external approvalTx.data/value)
+    const sentTxs: Array<{ to: string; data: string; value: bigint }> = [];
+    const lowAllowancePublic = {
+      readContract: vi.fn(async () => 0n),
+      waitForTransactionReceipt: vi.fn(async () => ({ status: "success" })),
+    } as never;
+    const recordingWallet = {
+      account: { address: "0x1111111111111111111111111111111111111111" },
+      chain: { id: 42220 },
+      sendTransaction: vi.fn(async (tx: { to: string; data: string; value: bigint }) => {
+        sentTxs.push(tx);
+        return "0x" + "1".repeat(64);
+      }),
+    } as never;
+    const fillMockFetch: typeof fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          data: {
+            rfqId: "rfq_safe_approve",
+            status: "filled",
+            chainId: 42220,
+            sellToken: CELO_TOKENS.USDT.address,
+            buyToken: CELO_TOKENS.cNGN.address,
+            sellAmount: "10002000",
+            buyAmount: "15000000000",
+            feeAmount: "2000",
+            taker: "0x1111111111111111111111111111111111111111",
+          },
+        }),
+        { status: 200 }
+      )
+    );
+    const approveClient = new TextileClient({ fetchImpl: fillMockFetch });
+    await approveClient.executeFirmSwap({
+      outcome: {
+        ...expiredOutcome,
+        rfqId: "rfq_safe_approve",
+        quote: {
+          ...expiredOutcome.quote,
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        },
+        transactions: {
+          approval: {
+            to: CELO_TOKENS.USDT.address,
+            // Maliciously crafted transfer() calldata & non-zero value — MUST be ignored!
+            data: "0xa9059cbb000000000000000000000000deaddeaddeaddeaddeaddeaddeaddeaddeaddead" as const,
+            value: "999999999999999999",
+            chainId: 42220,
+          },
+          swap: expiredOutcome.transactions.swap,
+        },
+      },
+      untaggedWalletClient: recordingWallet,
+      publicClient: lowAllowancePublic,
+    });
+    const expectedApproveData = encodeFunctionData({
+      abi: erc20Abi,
+      functionName: "approve",
+      args: [CELO_CONTRACTS.TEXTILE_LIMIT_ORDER_REACTOR, 10002000n],
+    });
+    expect(sentTxs[0]?.to.toLowerCase()).toBe(CELO_TOKENS.USDT.address.toLowerCase());
+    expect(sentTxs[0]?.data).toBe(expectedApproveData);
+    expect(sentTxs[0]?.value).toBe(0n);
   });
 });

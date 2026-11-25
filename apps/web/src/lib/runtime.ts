@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { SettlementOrchestrator, type OrchestratorPersistenceAdapter } from "@vire/agent";
 import {
   CeloBuyClient,
@@ -33,8 +33,24 @@ export function getMinCampaignBudgetUsdtAtomic(): bigint {
   return BigInt(Math.round(usd * 1_000_000));
 }
 
-export function hashInviteCode(code: string): string {
-  return createHash("sha256").update(code.trim().toLowerCase()).digest("hex");
+export function hashInviteCode(code: string, campaignId = ""): string {
+  const secret = process.env.SESSION_SECRET?.trim() || "vire-invite-dev-key";
+  return createHmac("sha256", secret)
+    .update(`${campaignId.toLowerCase()}:${code.trim().toLowerCase()}`)
+    .digest("hex");
+}
+
+export function verifyInviteCodeHash(provided: string, storedHash: string, campaignId: string): boolean {
+  const keyed = hashInviteCode(provided, campaignId);
+  const legacy = createHash("sha256").update(provided.trim().toLowerCase()).digest("hex");
+  const target = Buffer.from(storedHash, "utf8");
+  for (const candidate of [keyed, legacy]) {
+    const buf = Buffer.from(candidate, "utf8");
+    if (buf.length === target.length && timingSafeEqual(buf, target)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function getAttributionCode(): string {

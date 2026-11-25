@@ -483,6 +483,7 @@ function PrivyAccountControl() {
         void exportWallet();
       }}
       onSignOut={async () => {
+        await fetch("/api/auth/wallet", { method: "DELETE" }).catch(() => {});
         if (authenticated) await logout();
         disconnect();
       }}
@@ -514,7 +515,10 @@ function FallbackWalletControl({ isMiniPay = false }: { isMiniPay?: boolean }) {
         identityLabel={isMiniPay ? "MiniPay Wallet" : truncateMiddle(address, 6, 4)}
         shortPillLabel={truncateMiddle(address, 6, 4)}
         isMiniPay={isMiniPay}
-        onSignOut={() => disconnect()}
+        onSignOut={async () => {
+          await fetch("/api/auth/wallet", { method: "DELETE" }).catch(() => {});
+          disconnect();
+        }}
       />
     );
   }

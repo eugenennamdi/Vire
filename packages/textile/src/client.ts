@@ -7,6 +7,7 @@ import {
   validateAttributionCode,
 } from "@vire/shared";
 import {
+  encodeFunctionData,
   erc20Abi,
   type Account,
   type Address,
@@ -437,12 +438,18 @@ export class TextileClient {
           `Blocked approval targeting unexpected contract ${approvalTx.to} (expected ${sellToken})`
         );
       }
+      // Security: construct exact ERC-20 approve(spender, takerPays) locally rather than blind-signing external approvalTx.data
+      const localApproveData = encodeFunctionData({
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [quote.spender, requiredAllowance],
+      });
       approvalTxHash = await untaggedWalletClient.sendTransaction({
         account: untaggedWalletClient.account,
         chain: untaggedWalletClient.chain,
-        to: approvalTx.to,
-        data: approvalTx.data,
-        value: BigInt(approvalTx.value),
+        to: sellToken,
+        data: localApproveData,
+        value: 0n,
       });
       if (params.onApprovalBroadcast) {
         await params.onApprovalBroadcast(approvalTxHash);

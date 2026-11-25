@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { CeloBuyClient } from "@vire/celo-infra";
-import { CELO_CONTRACTS, CELO_TOKENS, parseTokenAmount } from "@vire/shared";
+import {
+  CELO_CONTRACTS,
+  CELO_TOKENS,
+  CreateSubmissionRequestSchema,
+  isSafeHttpUrl,
+  parseTokenAmount,
+} from "@vire/shared";
 import { TextileClient } from "@vire/textile";
 import {
   assertSafePublicUrl,
@@ -145,12 +151,79 @@ describe("SSRF & prompt-injection fail-closed guards", () => {
     expect(isPrivateOrReservedIp("127.0.0.1")).toBe(true);
     expect(isPrivateOrReservedIp("169.254.169.254")).toBe(true);
     expect(isPrivateOrReservedIp("10.0.0.5")).toBe(true);
+    expect(isPrivateOrReservedIp("224.0.0.1")).toBe(true);
+    expect(isPrivateOrReservedIp("198.18.0.1")).toBe(true);
     expect(isPrivateOrReservedIp("::1")).toBe(true);
+    expect(isPrivateOrReservedIp("fe90::1")).toBe(true);
     expect(isPrivateOrReservedIp("8.8.8.8")).toBe(false);
 
     await expect(assertSafePublicUrl("http://127.0.0.1:3000/secret")).rejects.toThrow();
     await expect(assertSafePublicUrl("http://169.254.169.254/latest/meta-data")).rejects.toThrow();
     await expect(assertSafePublicUrl("file:///etc/passwd")).rejects.toThrow();
+
+    // Reject javascript: / data: schemes in submission schema & UI guard
+    expect(isSafeHttpUrl("javascript:alert(1)")).toBe(false);
+    expect(isSafeHttpUrl("data:text/html,hi")).toBe(false);
+    expect(isSafeHttpUrl("https://x.com/user/status/123")).toBe(true);
+    expect(
+      CreateSubmissionRequestSchema.safeParse({
+        campaignSlug: "test-camp",
+        contributorWallet: "0x3333333333333333333333333333333333333333",
+        deliverableUrl: "javascript:alert(1)",
+      }).success
+    ).toBe(false);
+
+    // Block GitHub path traversal / query injection before sending GITHUB_API_TOKEN
+    const ghSpy = vi.fn(async () => new Response("{}", { status: 200 }));
+    await expect(
+      fetchDeliverableArtifact({
+        deliverableUrl: "https://github.com/..%2f..%2fuser/repo/issues/1",
+        githubApiToken: "ghp_secret_should_not_leak",
+        fetchImpl: ghSpy,
+      })
+    ).rejects.toThrow(/Invalid GitHub repository/i);
+    expect(ghSpy).not.toHaveBeenCalled();
+
+    // Fail-CLOSED when FxTwitter is down and oEmbed omits rich anti-Sybil X metadata
+    const oembedOnlyFetch: typeof fetch = vi.fn(async (url) => {
+      if (String(url).startsWith("https://api.fxtwitter.com/")) {
+        return new Response("rate limited", { status: 429 });
+      }
+      if (String(url).startsWith("https://publish.twitter.com/oembed")) {
+        return new Response(
+          JSON.stringify({
+            author_url: "https://twitter.com/burner0",
+            html: "<blockquote><p>Check @swotgadgets #SWOTBlackFriday https://swotgadgets.com today! Amazing deals for everyone.</p></blockquote>",
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response("not found", { status: 404 });
+    });
+    const buyClientOembed = new CeloBuyClient({ dryRun: true });
+    const oembedSpy = vi.spyOn(buyClientOembed, "fetchTweetDetail");
+    const degradedRes = await verifyDeliverableWithBuy(buyClientOembed, {
+      deliverableUrl: "https://x.com/burner0/status/999999999",
+      deliverableType: "promo_post",
+      campaignTitle: "SWOT Promo",
+      criteria: "Post tagging @swotgadgets #SWOTBlackFriday swotgadgets.com",
+      contributorHandle: "burner0",
+      identityOAuthVerified: true,
+      minAuthorFollowers: 10,
+      minAccountAgeDays: 30,
+      fetchImpl: oembedOnlyFetch,
+    });
+    expect(degradedRes.verdict.verdict).toBe("reject");
+    expect(degradedRes.modelUsed).toBe("pre-llm-x-metadata-guard");
+    expect(oembedSpy).not.toHaveBeenCalled();
+
+    // Unfollowed 3xx redirects MUST NOT be marked reachable
+    const redirArtifact = await fetchDeliverableArtifact({
+      deliverableUrl: "https://example.com/old",
+      fetchImpl: async () =>
+        new Response("", { status: 302, headers: { location: "https://example.com/new" } }),
+    });
+    expect(redirArtifact.reachable).toBe(false);
   });
 
   it("fails closed to reject when verification model emits malformed output", () => {

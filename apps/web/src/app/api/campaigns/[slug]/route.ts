@@ -35,7 +35,7 @@ export async function GET(
     .limit(1);
 
   const rawRow = rows[0];
-  if (!rawRow) {
+  if (!rawRow || rawRow.hidden) {
     return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
   }
 
@@ -187,7 +187,7 @@ export async function PATCH(
     .limit(1);
 
   const row = rows[0];
-  if (!row) {
+  if (!row || row.hidden) {
     return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
   }
 
@@ -215,7 +215,7 @@ export async function PATCH(
   if (parsed.data.visibility !== undefined) patch.visibility = parsed.data.visibility;
   if (parsed.data.endsAt !== undefined) patch.endsAt = parsed.data.endsAt;
   if (parsed.data.inviteCode !== undefined) {
-    patch.inviteCodeHash = parsed.data.inviteCode ? hashInviteCode(parsed.data.inviteCode) : null;
+    patch.inviteCodeHash = parsed.data.inviteCode ? hashInviteCode(parsed.data.inviteCode, row.id) : null;
   }
 
   await db

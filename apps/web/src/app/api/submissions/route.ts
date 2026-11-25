@@ -26,8 +26,8 @@ import {
   getTextileClient,
   getVaultAddress,
   getVaultSnapshot,
-  hashInviteCode,
   mergeCampaignWithOnchain,
+  verifyInviteCodeHash,
 } from "@/lib/runtime";
 
 export const dynamic = "force-dynamic";
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     .limit(1);
 
   const campaignRow = campaignRows[0];
-  if (!campaignRow) {
+  if (!campaignRow || campaignRow.hidden) {
     return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
   }
 
@@ -88,10 +88,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Enforce optional invite code for link-only private campaigns
+  // Enforce optional invite code for link-only private campaigns (constant-time keyed HMAC verification)
   if (campaignRow.inviteCodeHash) {
     const provided = parsed.data.inviteCode?.trim();
-    if (!provided || hashInviteCode(provided) !== campaignRow.inviteCodeHash) {
+    if (!provided || !verifyInviteCodeHash(provided, campaignRow.inviteCodeHash, campaignRow.id)) {
       return NextResponse.json(
         {
           status: "REJECTED",
@@ -186,27 +186,53 @@ export async function POST(req: NextRequest) {
 
   // Check if a submission row already exists with this exact deliverable hash
   const existingSub = await db
-    .select({ id: schema.submissions.id, status: schema.submissions.status })
+    .select({
+      id: schema.submissions.id,
+      status: schema.submissions.status,
+      contributorWallet: schema.submissions.contributorWallet,
+      reviewedByWallet: schema.submissions.reviewedByWallet,
+    })
     .from(schema.submissions)
     .where(eq(schema.submissions.deliverableHash, deliverableHash))
     .limit(1);
 
-  if (
-    existingSub[0] &&
-    ["PENDING_REVIEW", "AUTHORIZED", "SWAPPING", "PAYING", "COMPLETED"].includes(existingSub[0].status)
-  ) {
-    return NextResponse.json(
-      {
-        status: "REJECTED",
-        failedRule: "UNIQUE_DELIVERABLE_HASH",
-        error:
-          existingSub[0].status === "PENDING_REVIEW"
-            ? "This link is already in the campaign owner's review queue."
-            : "Deliverable proof hash was already claimed or settled.",
-        deliverableHash,
-      },
-      { status: 409 }
-    );
+  if (existingSub[0]) {
+    if (["PENDING_REVIEW", "AUTHORIZED", "SWAPPING", "PAYING", "COMPLETED"].includes(existingSub[0].status)) {
+      return NextResponse.json(
+        {
+          status: "REJECTED",
+          failedRule: "UNIQUE_DELIVERABLE_HASH",
+          error:
+            existingSub[0].status === "PENDING_REVIEW"
+              ? "This link is already in the campaign owner's review queue."
+              : "Deliverable proof hash was already claimed or settled.",
+          deliverableHash,
+        },
+        { status: 409 }
+      );
+    }
+    if (existingSub[0].status === "REJECTED" && existingSub[0].reviewedByWallet) {
+      return NextResponse.json(
+        {
+          status: "REJECTED",
+          failedRule: "UNIQUE_DELIVERABLE_HASH",
+          error: "This deliverable link was already reviewed and rejected by the campaign owner.",
+          deliverableHash,
+        },
+        { status: 409 }
+      );
+    }
+    if (existingSub[0].contributorWallet.toLowerCase() !== walletLower) {
+      return NextResponse.json(
+        {
+          status: "REJECTED",
+          failedRule: "UNIQUE_DELIVERABLE_HASH",
+          error: "This deliverable link was already submitted by another wallet.",
+          deliverableHash,
+        },
+        { status: 409 }
+      );
+    }
   }
 
   // MANUAL REVIEW MODE: free anti-spam + 1-claim-per-person lock + queue cap → PENDING_REVIEW
@@ -438,6 +464,7 @@ export async function POST(req: NextRequest) {
         status: result.status === "COMPLETED" ? 200 : result.status === "REJECTED" ? 422 : 502,
       });
     } catch (err) {
+      console.error("[submissions] settlement pipeline failed:", err);
       await db
         .update(schema.submissions)
         .set({ status: "FAILED", updatedAt: Date.now() })
@@ -447,7 +474,7 @@ export async function POST(req: NextRequest) {
         {
           submissionId,
           status: "FAILED",
-          error: err instanceof Error ? err.message : "Settlement pipeline failed",
+          error: "Settlement pipeline encountered a temporary error. Please try again in a moment.",
         },
         { status: 500 }
       );

@@ -1,5 +1,5 @@
 import { type CampaignStage, type CorridorSymbol, type DeliverableType } from "@vire/shared";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { getAddress, type Address, type Hex } from "viem";
 import { z } from "zod";
@@ -87,7 +87,7 @@ export async function POST(
 
   if (parsed.data.decision === "reject") {
     const note = parsed.data.note?.trim() || "Did not meet campaign requirements.";
-    await db
+    const rejected = await db
       .update(schema.submissions)
       .set({
         status: "REJECTED",
@@ -97,7 +97,15 @@ export async function POST(
         aiReason: note,
         updatedAt: now,
       })
-      .where(eq(schema.submissions.id, sub.id));
+      .where(and(eq(schema.submissions.id, sub.id), eq(schema.submissions.status, "PENDING_REVIEW")))
+      .returning({ id: schema.submissions.id });
+
+    if (rejected.length === 0) {
+      return NextResponse.json(
+        { error: "Submission is already being processed or has already been reviewed." },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json({
       submissionId: sub.id,
@@ -124,15 +132,25 @@ export async function POST(
   const onchainState = onchainMap.get(campRow.id.toLowerCase());
   const canSettleOnchain = Boolean(onchainState?.exists && onchainState.active);
 
-  await db
+  // Atomic claim lock: only ONE concurrent review request can transition PENDING_REVIEW -> VERIFYING
+  const claimed = await db
     .update(schema.submissions)
     .set({
+      status: "VERIFYING",
       reviewedByWallet: reviewerWallet.toLowerCase(),
       reviewNote: parsed.data.note?.trim() || "Approved by campaign owner.",
       reviewedAt: now,
       updatedAt: now,
     })
-    .where(eq(schema.submissions.id, sub.id));
+    .where(and(eq(schema.submissions.id, sub.id), eq(schema.submissions.status, "PENDING_REVIEW")))
+    .returning({ id: schema.submissions.id });
+
+  if (claimed.length === 0) {
+    return NextResponse.json(
+      { error: "Submission is already being settled or has already been reviewed." },
+      { status: 409 }
+    );
+  }
 
   try {
     const orchestrator = await createLiveOrchestrator();
@@ -171,6 +189,7 @@ export async function POST(
       status: result.status === "COMPLETED" ? 200 : result.status === "REJECTED" ? 422 : 502,
     });
   } catch (err) {
+    console.error("[review] manual approval settlement failed:", err);
     // Roll back to PENDING_REVIEW if infrastructure threw before settlement finalized (only if still VERIFYING)
     const latest = await db
       .select({ status: schema.submissions.status })
@@ -188,7 +207,7 @@ export async function POST(
       {
         submissionId: sub.id,
         status: "FAILED",
-        error: err instanceof Error ? err.message : "Approval settlement failed",
+        error: "Approval settlement encountered a temporary error. Please try again in a moment.",
       },
       { status: 500 }
     );

@@ -7,8 +7,10 @@ import {
   buildIdentityBindMessage,
   GITHUB_SESSION_COOKIE,
   signWalletSession,
+  verifyAuthChallengeCookie,
   verifyPrivyOAuthOwnership,
   verifySessionCookie,
+  WALLET_CHALLENGE_COOKIE,
   WALLET_SESSION_COOKIE,
 } from "@/lib/session";
 
@@ -67,11 +69,21 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // Require fresh server-issued challenge nonce to prevent EIP-191 signature replay
+  const challenge = verifyAuthChallengeCookie(req.cookies.get(WALLET_CHALLENGE_COOKIE)?.value);
+  if (!challenge || challenge.wallet !== wallet.toLowerCase()) {
+    return NextResponse.json(
+      { error: "Wallet sign-in challenge expired or missing. Please click Link & Sign again." },
+      { status: 401 }
+    );
+  }
+
   // Cryptographically verify EIP-191 signature from the contributor's wallet
   const expectedMessage = buildIdentityBindMessage({
     walletAddress: wallet,
     provider,
     handle: parsed.data.handle.trim(),
+    nonce: challenge.nonce,
   });
 
   const valid = await verifyMessage({
@@ -96,7 +108,7 @@ export async function POST(req: NextRequest) {
       identityProvider: provider,
       identityHandle: cleanHandle,
       identityProfileUrl: profileUrl,
-      eip191Signature: signature,
+      eip191Signature: null,
       oauthVerified,
       verifiedAt: now,
     })
@@ -106,7 +118,7 @@ export async function POST(req: NextRequest) {
         identityProvider: provider,
         identityHandle: cleanHandle,
         identityProfileUrl: profileUrl,
-        eip191Signature: signature,
+        eip191Signature: null,
         oauthVerified,
         verifiedAt: now,
       },
@@ -129,6 +141,7 @@ export async function POST(req: NextRequest) {
     verifiedAt: now,
   });
 
+  res.cookies.delete(WALLET_CHALLENGE_COOKIE);
   res.cookies.set(WALLET_SESSION_COOKIE, sessionCookie, {
     httpOnly: true,
     sameSite: "lax",

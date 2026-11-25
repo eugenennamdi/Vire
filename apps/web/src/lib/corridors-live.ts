@@ -22,10 +22,12 @@ const SAMPLE_BUY_HUMAN: Record<CorridorSymbol, string> = {
 interface CachedCorridors {
   asOf: string;
   corridors: CorridorLiveStatus[];
+  fetchedAtMs: number;
   expiresAtMs: number;
 }
 
 let _cache: CachedCorridors | null = null;
+const MIN_FORCE_REFRESH_INTERVAL_MS = 5_000;
 
 /**
  * Fetch live Textile FX v2 corridor quotes & liquidity ladders across Celo Mainnet (42220).
@@ -36,7 +38,8 @@ export async function getLiveCorridors(forceRefresh = false): Promise<{
   asOf: string;
   corridors: CorridorLiveStatus[];
 }> {
-  if (!forceRefresh && _cache && Date.now() < _cache.expiresAtMs) {
+  const now = Date.now();
+  if (_cache && ((!forceRefresh && now < _cache.expiresAtMs) || now - _cache.fetchedAtMs < MIN_FORCE_REFRESH_INTERVAL_MS)) {
     return { asOf: _cache.asOf, corridors: _cache.corridors };
   }
 
@@ -153,6 +156,7 @@ export async function getLiveCorridors(forceRefresh = false): Promise<{
   });
 
   const asOf = levelsData?.asOf ?? nowIso;
-  _cache = { asOf, corridors, expiresAtMs: Date.now() + 10_000 };
+  const fetchedAtMs = Date.now();
+  _cache = { asOf, corridors, fetchedAtMs, expiresAtMs: fetchedAtMs + 10_000 };
   return { asOf, corridors };
 }

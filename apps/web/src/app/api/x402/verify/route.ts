@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         const account = privateKeyToAccount(pk as Hex);
         signerAddress = account.address;
         signature = await account.signMessage({
-          message: JSON.stringify(attestationPayload),
+          message: `Vire-Attestation-v1:\n${JSON.stringify(attestationPayload)}`,
         });
       }
 

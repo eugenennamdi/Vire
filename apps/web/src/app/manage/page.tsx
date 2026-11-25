@@ -17,7 +17,7 @@ import {
 } from "@phosphor-icons/react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useQuery } from "@tanstack/react-query";
-import { CELO_TOKENS, celoscanTxUrl, VIRE_VAULT_ABI } from "@vire/shared";
+import { CELO_TOKENS, celoscanTxUrl, isSafeHttpUrl, VIRE_VAULT_ABI } from "@vire/shared";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -38,7 +38,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TokenIcon } from "@/components/ui/token-icon";
-import { buildWalletAuthMessage } from "@/lib/session-client";
+import { buildWalletAuthMessage, requestAuthNonce } from "@/lib/session-client";
 import { truncateMiddle } from "@/lib/utils";
 
 const PRIVY_ENABLED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim());
@@ -242,8 +242,9 @@ export default function ManagePage() {
     if (!connectedWallet) return;
     setIsAuthenticating(true);
     try {
+      const nonce = await requestAuthNonce(connectedWallet);
       const signature = await signMessageAsync({
-        message: buildWalletAuthMessage(connectedWallet),
+        message: buildWalletAuthMessage(connectedWallet, nonce),
       });
       const res = await fetch("/api/auth/wallet", {
         method: "POST",
@@ -807,15 +808,21 @@ export default function ManagePage() {
                                     {new Date(sub.createdAt).toLocaleString()}
                                   </span>
                                 </div>
-                                <a
-                                  href={sub.deliverableUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex max-w-full items-center gap-1 break-all font-mono text-[12.5px] text-[#0A0A0C] underline underline-offset-2"
-                                >
-                                  {sub.deliverableUrl}
-                                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
-                                </a>
+                                {isSafeHttpUrl(sub.deliverableUrl) ? (
+                                  <a
+                                    href={sub.deliverableUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex max-w-full items-center gap-1 break-all font-mono text-[12.5px] text-[#0A0A0C] underline underline-offset-2"
+                                  >
+                                    {sub.deliverableUrl}
+                                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+                                  </a>
+                                ) : (
+                                  <span className="break-all font-mono text-[12px] text-[#71717A]">
+                                    {sub.deliverableUrl}
+                                  </span>
+                                )}
                                 {sub.deliverableNotes && (
                                   <p className="text-[12.5px] text-[#52525B]">{sub.deliverableNotes}</p>
                                 )}
@@ -892,14 +899,20 @@ export default function ManagePage() {
                               <span className="font-mono text-[#0A0A0C]">
                                 {sub.identityHandle ? `@${sub.identityHandle}` : truncateMiddle(sub.contributorWallet, 6, 4)}
                               </span>
-                              <a
-                                href={sub.deliverableUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="truncate font-mono text-[11.5px] text-[#71717A] underline underline-offset-2"
-                              >
-                                {truncateMiddle(sub.deliverableUrl, 28, 12)}
-                              </a>
+                              {isSafeHttpUrl(sub.deliverableUrl) ? (
+                                <a
+                                  href={sub.deliverableUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="truncate font-mono text-[11.5px] text-[#71717A] underline underline-offset-2"
+                                >
+                                  {truncateMiddle(sub.deliverableUrl, 28, 12)}
+                                </a>
+                              ) : (
+                                <span className="truncate font-mono text-[11.5px] text-[#A1A1AA]">
+                                  {truncateMiddle(sub.deliverableUrl, 28, 12)}
+                                </span>
+                              )}
                             </div>
                             {sub.settlement ? (
                               <a

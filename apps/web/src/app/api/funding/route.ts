@@ -1,11 +1,12 @@
 import {
+  CELO_MAINNET_CHAIN_ID,
   CELO_TOKENS,
   FUNDING_TOKENS,
   isAllowedTextileTarget,
   type FundingTokenSymbol,
 } from "@vire/shared";
 import { NextRequest, NextResponse } from "next/server";
-import { formatUnits, getAddress, type Hash } from "viem";
+import { encodeFunctionData, erc20Abi, formatUnits, getAddress, type Hash } from "viem";
 import { z } from "zod";
 import { getTextileClient } from "@/lib/runtime";
 import {
@@ -18,6 +19,26 @@ import {
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const MAX_FUNDING_SWAP_USDT_ATOMIC = 100_000_000_000n; // $100,000 USDT sanity cap
+const FUNDING_RATE_WINDOW_MS = 10 * 60 * 1000;
+const FUNDING_MAX_REQUESTS_PER_WINDOW = 5;
+// ponytail: per-instance in-memory funding RFQ limiter (5 req / 10m per wallet); move to Redis/Turso if scaled across many hot lambdas.
+const fundingRequestHistory = new Map<string, number[]>();
+
+function checkFundingRateLimit(walletLower: string): boolean {
+  const now = Date.now();
+  const prev = (fundingRequestHistory.get(walletLower) ?? []).filter(
+    (ts) => now - ts < FUNDING_RATE_WINDOW_MS
+  );
+  if (prev.length >= FUNDING_MAX_REQUESTS_PER_WINDOW) {
+    fundingRequestHistory.set(walletLower, prev);
+    return false;
+  }
+  prev.push(now);
+  fundingRequestHistory.set(walletLower, prev);
+  return true;
+}
 
 const FundingSymbolSchema = z.enum(["USDT", "USDC", "CELO", "cNGN", "wARS", "wBRL", "wMXN", "IDRX"]);
 
@@ -44,9 +65,9 @@ export async function GET(req: NextRequest) {
 
   const sym = symParsed.data as FundingTokenSymbol;
   const buyUsdtAtomic = BigInt(buyUsdtParam);
-  if (buyUsdtAtomic < 1_000_000n) {
+  if (buyUsdtAtomic < 1_000_000n || buyUsdtAtomic > MAX_FUNDING_SWAP_USDT_ATOMIC) {
     return NextResponse.json(
-      { error: "Minimum swap size is $1.00 USDT (1000000 atomic)." },
+      { error: "Swap size must be between $1.00 and $100,000 USDT." },
       { status: 400 }
     );
   }
@@ -150,8 +171,25 @@ export async function POST(req: NextRequest) {
     }
 
     const buyAmount = BigInt(data.buyUsdtAtomic);
-    if (buyAmount < 1_000_000n) {
-      return NextResponse.json({ error: "Minimum swap output is $1.00 USDT." }, { status: 400 });
+    if (buyAmount < 1_000_000n || buyAmount > MAX_FUNDING_SWAP_USDT_ATOMIC) {
+      return NextResponse.json(
+        { error: "Swap output must be between $1.00 and $100,000 USDT." },
+        { status: 400 }
+      );
+    }
+
+    const walletLower = session.wallet.toLowerCase();
+    if (!checkFundingRateLimit(walletLower)) {
+      return NextResponse.json(
+        { error: "Too many funding quote requests in the last 10 minutes. Please wait a moment and try again." },
+        { status: 429 }
+      );
+    }
+
+    // Release any previous open funding RFQ from this wallet before requesting a new one (protects 4-slot cap)
+    const priorCookie = verifyFundingRfqCookie(req.cookies.get(FUNDING_RFQ_COOKIE)?.value);
+    if (priorCookie && priorCookie.wallet === walletLower) {
+      await textile.cancelQuote(priorCookie.rfqId, priorCookie.claimToken).catch(() => {});
     }
 
     const token = FUNDING_TOKENS[data.sellToken as FundingTokenSymbol];
@@ -177,7 +215,6 @@ export async function POST(req: NextRequest) {
 
       const { quote, transactions } = outcome;
       const swapTx = transactions.swap;
-      const approvalTx = transactions.approval;
       if (!swapTx) {
         return NextResponse.json(
           { error: "Textile FX quote did not include swap calldata." },
@@ -185,25 +222,34 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Strict security allowlist validation BEFORE sending unsigned tx calldata to the user's wallet
-      if (!isAllowedTextileTarget(quote.spender) || !isAllowedTextileTarget(swapTx.to)) {
+      // Strict security allowlist & output-amount validation BEFORE sending unsigned tx calldata to the user's wallet
+      if (
+        !isAllowedTextileTarget(quote.spender) ||
+        !isAllowedTextileTarget(swapTx.to) ||
+        swapTx.chainId !== CELO_MAINNET_CHAIN_ID ||
+        swapTx.value !== "0" ||
+        BigInt(quote.buyAmount) !== buyAmount
+      ) {
         if (outcome.claimToken) {
           await textile.cancelQuote(outcome.rfqId, outcome.claimToken).catch(() => {});
         }
         return NextResponse.json(
-          { error: "Blocked non-allowlisted Textile settlement contract." },
+          { error: "Blocked unexpected Textile FX contract target, chainId, value, or output amount." },
           { status: 502 }
         );
       }
-      if (approvalTx.to.toLowerCase() !== token.address.toLowerCase() || swapTx.value !== "0") {
-        if (outcome.claimToken) {
-          await textile.cancelQuote(outcome.rfqId, outcome.claimToken).catch(() => {});
-        }
-        return NextResponse.json(
-          { error: "Unexpected approval target or native value on Textile FX funding quote." },
-          { status: 502 }
-        );
-      }
+
+      // Security: construct exact ERC-20 approve(quote.spender, takerPays) calldata locally instead of forwarding external approvalTx.data
+      const safeApprovalTx = {
+        to: token.address,
+        data: encodeFunctionData({
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [quote.spender, BigInt(quote.takerPays)],
+        }),
+        value: "0",
+        chainId: CELO_MAINNET_CHAIN_ID,
+      };
 
       const res = NextResponse.json({
         rfqId: outcome.rfqId,
@@ -217,7 +263,7 @@ export async function POST(req: NextRequest) {
         expiresAt: quote.expiresAt,
         spender: quote.spender,
         transactions: {
-          approval: approvalTx,
+          approval: safeApprovalTx,
           swap: swapTx,
         },
       });

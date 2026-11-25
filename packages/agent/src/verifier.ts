@@ -402,6 +402,40 @@ export async function verifyDeliverableWithBuy(
   let contentHash: Hex | null = null;
   if (artifact.sourceKind === "x_post") {
     const rawTweetText = artifact.rawText ?? artifact.excerpt;
+    const minFollowers = input.minAuthorFollowers ?? 10;
+    const minAgeDays = input.minAccountAgeDays ?? 30;
+    const requiresRichXMetadata =
+      Boolean(input.isAuthorAlreadyClaimed) ||
+      minFollowers > 0 ||
+      minAgeDays > 0 ||
+      typeof input.campaignCreatedAtMs === "number";
+
+    // Fail-CLOSED when rich X metadata (FxTwitter) is unavailable (e.g. oEmbed fallback) so
+    // anti-Sybil, reply/repost, follower, account-age, and freshness checks can never silently bypass.
+    if (
+      requiresRichXMetadata &&
+      (artifact.isReply === undefined ||
+        artifact.isRepost === undefined ||
+        (input.isAuthorAlreadyClaimed && !artifact.authorId) ||
+        (minFollowers > 0 && typeof artifact.authorFollowers !== "number") ||
+        (minAgeDays > 0 && typeof artifact.authorJoinedAtMs !== "number") ||
+        (typeof input.campaignCreatedAtMs === "number" && typeof artifact.createdAtMs !== "number"))
+    ) {
+      return {
+        artifact,
+        verdict: {
+          verdict: "reject",
+          score: 0,
+          confidence: 1,
+          reason:
+            "X post verification metadata is temporarily unavailable. Please wait a moment and try submitting again.",
+          evidenceSummary:
+            "Fail-closed: degraded X metadata source lacked required anti-Sybil fields (authorId/followers/joinedAt/createdAt/reply flags).",
+        },
+        buyReceipts,
+        modelUsed: "pre-llm-x-metadata-guard",
+      };
+    }
 
     if (artifact.isReply) {
       return {
@@ -433,7 +467,6 @@ export async function verifyDeliverableWithBuy(
       };
     }
 
-    const minFollowers = input.minAuthorFollowers ?? 10;
     if (
       typeof artifact.authorFollowers === "number" &&
       minFollowers > 0 &&
@@ -453,7 +486,6 @@ export async function verifyDeliverableWithBuy(
       };
     }
 
-    const minAgeDays = input.minAccountAgeDays ?? 30;
     if (typeof artifact.authorJoinedAtMs === "number" && minAgeDays > 0) {
       const ageDays = Math.floor((Date.now() - artifact.authorJoinedAtMs) / (24 * 60 * 60 * 1000));
       if (ageDays < minAgeDays) {

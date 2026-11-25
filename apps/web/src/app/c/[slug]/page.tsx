@@ -27,7 +27,7 @@ async function loadCampaignForMeta(slug: string) {
     .where(eq(schema.campaigns.slug, slug))
     .limit(1);
   const rawRow = rows[0];
-  if (!rawRow) return null;
+  if (!rawRow || rawRow.hidden) return null;
 
   const [onchainMap, liveCorridors] = await Promise.all([
     getOnchainCampaignStates([rawRow.id as Hex]),
@@ -99,12 +99,12 @@ export default async function ShortCampaignPage({
   await ensureDefaultCampaignsSeeded();
   const db = getDb();
   const exists = await db
-    .select({ id: schema.campaigns.id })
+    .select({ id: schema.campaigns.id, hidden: schema.campaigns.hidden })
     .from(schema.campaigns)
     .where(eq(schema.campaigns.slug, slug))
     .limit(1);
 
-  if (!exists[0]) {
+  if (!exists[0] || exists[0].hidden) {
     notFound();
   }
 

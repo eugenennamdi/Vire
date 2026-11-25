@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
     const payoutRows = await db
       .select({
         slug: schema.campaigns.slug,
+        visibility: schema.campaigns.visibility,
         settledAt: schema.settlements.settledAt,
       })
       .from(schema.settlements)
@@ -60,6 +61,8 @@ export async function GET(req: NextRequest) {
       .orderBy(desc(schema.settlements.settledAt));
 
     for (const p of payoutRows) {
+      // Never leak private (unlisted) campaign slugs to unauthenticated callers querying a wallet
+      if (p.visibility === "unlisted" && !hasWalletSession) continue;
       const existing = completedBySlug[p.slug];
       if (!existing) {
         completedBySlug[p.slug] = { count: 1, lastPayoutAtMs: p.settledAt };

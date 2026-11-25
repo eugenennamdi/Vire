@@ -45,7 +45,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TokenIcon } from "@/components/ui/token-icon";
-import { buildIdentityBindMessage } from "@/lib/session-client";
+import { buildIdentityBindMessage, requestAuthNonce } from "@/lib/session-client";
 import { cn, truncateMiddle } from "@/lib/utils";
 
 const ERC8004_GIVE_FEEDBACK_ABI = [
@@ -353,10 +353,12 @@ function ClaimFlowInner({
     setIsBinding(true);
     setBindError(null);
     try {
+      const nonce = await requestAuthNonce(address);
       const message = buildIdentityBindMessage({
         walletAddress: address,
         provider,
         handle: cleanHandle,
+        nonce,
       });
       const signature = wagmiConnected
         ? await signMessageAsync({ message })
