@@ -198,8 +198,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Authoritative check: read live campaign custody & funding directly from VireVault v2 on Celo Mainnet
-  const onchainMap = await getOnchainCampaignStates([campaignId]);
-  const onchain = onchainMap.get(campaignId);
+  // Retry briefly to ride out Celo RPC load-balancer node sync lag (~1-3s right after createCampaign mines)
+  let onchain = (await getOnchainCampaignStates([campaignId])).get(campaignId);
+  for (let attempt = 0; attempt < 4 && (!onchain || !onchain.exists); attempt++) {
+    await new Promise((r) => setTimeout(r, 1500));
+    onchain = (await getOnchainCampaignStates([campaignId])).get(campaignId);
+  }
   if (!onchain || !onchain.exists) {
     return NextResponse.json(
       {
