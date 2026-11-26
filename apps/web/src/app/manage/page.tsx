@@ -16,7 +16,7 @@ import {
   UserSwitch,
   X,
 } from "@phosphor-icons/react";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useSignMessage as usePrivySignMessage } from "@privy-io/react-auth";
 import { useQuery } from "@tanstack/react-query";
 import { CELO_TOKENS, celoscanTxUrl, isSafeHttpUrl, VIRE_VAULT_ABI } from "@vire/shared";
 import Link from "next/link";
@@ -209,10 +209,14 @@ function SignInCta() {
 }
 
 function PrivyConnectCta() {
-  const { login } = usePrivy();
+  const { authenticated, login, connectWallet } = usePrivy();
   return (
-    <Button size="md" variant="primary" onClick={() => login()}>
-      Sign in to open workspace
+    <Button
+      size="md"
+      variant="primary"
+      onClick={() => (authenticated ? connectWallet() : login())}
+    >
+      {authenticated ? "Connect wallet to open workspace" : "Sign in to open workspace"}
     </Button>
   );
 }
@@ -234,8 +238,13 @@ function FallbackConnectCta() {
   );
 }
 
-export default function ManagePage() {
-  const { address: connectedWallet } = useAccount();
+interface ManagePageInnerProps {
+  privyWalletAddress?: Address;
+  privySignMessage?: (message: string) => Promise<string>;
+}
+
+function ManagePageInner({ privyWalletAddress, privySignMessage }: ManagePageInnerProps) {
+  const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount();
   const publicClient = usePublicClient({ chainId: celo.id });
   const { signMessageAsync } = useSignMessage();
   const { writeContractAsync } = useWriteContract();
@@ -306,12 +315,17 @@ export default function ManagePage() {
   }
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["manage-workspace", connectedWallet],
+    queryKey: ["manage-workspace", wagmiAddress ?? privyWalletAddress],
     queryFn: async () => {
       const r = await fetch("/api/manage");
       return (await r.json()) as ManageApiResponse;
     },
   });
+
+  const connectedWallet =
+    wagmiAddress ??
+    privyWalletAddress ??
+    (data?.authenticated && data.wallet ? data.wallet : undefined);
 
   const isMatchedSession = Boolean(
     data?.authenticated &&
@@ -324,9 +338,12 @@ export default function ManagePage() {
     setIsAuthenticating(true);
     try {
       const nonce = await requestAuthNonce(connectedWallet);
-      const signature = await signMessageAsync({
-        message: buildWalletAuthMessage(connectedWallet, nonce),
-      });
+      const message = buildWalletAuthMessage(connectedWallet, nonce);
+      const signature = wagmiConnected
+        ? await signMessageAsync({ message })
+        : privySignMessage
+          ? await privySignMessage(message)
+          : await signMessageAsync({ message });
       const res = await fetch("/api/auth/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1282,4 +1299,23 @@ export default function ManagePage() {
       )}
     </div>
   );
+}
+
+function ManagePageWithPrivy() {
+  const { user } = usePrivy();
+  const { signMessage } = usePrivySignMessage();
+  return (
+    <ManagePageInner
+      privyWalletAddress={user?.wallet?.address as Address | undefined}
+      privySignMessage={async (message) => {
+        const res = await signMessage({ message });
+        return res.signature;
+      }}
+    />
+  );
+}
+
+export default function ManagePage() {
+  const isMiniPay = useIsMiniPay();
+  return PRIVY_ENABLED && !isMiniPay ? <ManagePageWithPrivy /> : <ManagePageInner />;
 }

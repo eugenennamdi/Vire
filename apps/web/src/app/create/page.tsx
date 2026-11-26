@@ -135,10 +135,16 @@ function SignInTriggerButton({ label }: { label: string }) {
 }
 
 function PrivySignInButton({ label }: { label: string }) {
-  const { login } = usePrivy();
+  const { authenticated, login, connectWallet } = usePrivy();
   return (
-    <Button type="button" size="lg" variant="primary" className="w-full" onClick={() => login()}>
-      {label}
+    <Button
+      type="button"
+      size="lg"
+      variant="primary"
+      className="w-full"
+      onClick={() => (authenticated ? connectWallet() : login())}
+    >
+      {authenticated ? "Connect wallet" : label}
     </Button>
   );
 }
