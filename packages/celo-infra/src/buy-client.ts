@@ -102,6 +102,7 @@ export class CeloBuyClient {
   private readonly paymentToken: BuyPaymentToken;
   private readonly maxAmountUsd: string;
   private readonly dryRun: boolean;
+  private readonly fetchImpl?: typeof fetch;
   private readonly paidFetch: typeof fetch | null;
 
   constructor(config: BuyClientConfig = {}) {
@@ -111,6 +112,7 @@ export class CeloBuyClient {
     const cleanedMax = (config.maxAmountUsd ?? "0.05").replace(/^\$/, "");
     this.maxAmountUsd = `$${cleanedMax}`;
     this.dryRun = Boolean(config.dryRun);
+    this.fetchImpl = config.fetchImpl;
 
     if (!this.dryRun && config.agentPrivateKey) {
       const account = privateKeyToAccount(config.agentPrivateKey);
@@ -270,16 +272,18 @@ export class CeloBuyClient {
     const endpointUrl = `${this.gatewayUrl}/chainstack/celo`;
 
     if (this.dryRun) {
-      // Fallback to read-only Forno RPC in dry-run mode while clearly marking dryRun=true.
-      const res = await fetch(this.rpcUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(rpcBody),
-        signal: AbortSignal.timeout(15_000),
-      });
-      const json = (await res.json()) as T;
+      let result: T = { jsonrpc: "2.0", id: 1, result: "0x0" } as T;
+      if (this.fetchImpl) {
+        const res = await this.fetchImpl(this.rpcUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(rpcBody),
+          signal: AbortSignal.timeout(15_000),
+        });
+        result = (await res.json()) as T;
+      }
       return {
-        result: json,
+        result,
         receipt: {
           capabilityId: "chainstack.celo",
           endpointUrl,

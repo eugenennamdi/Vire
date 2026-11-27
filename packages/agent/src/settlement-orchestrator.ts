@@ -122,6 +122,8 @@ export interface OrchestratorDeps {
   useUsdtFeeAbstraction?: boolean;
   useChainstackRpc?: boolean;
   githubApiToken?: string;
+  /** Optional fetch implementation for deliverable verification (defaults to global fetch). */
+  fetchImpl?: typeof fetch;
   /** Optional explicit reference rate fetcher; defaults to Textile live levels top-of-book. */
   getReferenceRate?: (corridor: CorridorSymbol) => Promise<number | undefined>;
   /**
@@ -304,6 +306,7 @@ export class SettlementOrchestrator {
           referralCode: params.referralCode,
           githubApiToken: this.deps.githubApiToken,
           useChainstackRpc: this.deps.useChainstackRpc,
+          fetchImpl: this.deps.fetchImpl,
         })
       : {
           artifact: {

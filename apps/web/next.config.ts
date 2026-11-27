@@ -4,6 +4,14 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@vire/shared", "@vire/celo-infra", "@vire/textile", "@vire/agent"],
   serverExternalPackages: ["@libsql/client"],
   poweredByHeader: false,
+  async rewrites() {
+    return [
+      {
+        source: "/.well-known/agent-card.json",
+        destination: "/api/agent-card.json",
+      },
+    ];
+  },
   async headers() {
     return [
       {

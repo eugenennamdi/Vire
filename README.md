@@ -105,7 +105,7 @@ All contracts and token decimals are read from `@vire/shared` and verified live 
 | `/claim` | Full contributor & voucher claim flow (MiniPay / Privy sign-in, EIP-191 binding, live 5-step Textile FX settlement, 1-click `cNGN → USD₮` swap, bank off-ramps, and ERC-8004 feedback) |
 | `/ledger` | Public real-time settlement & audit ledger (completed payouts, rejected claims, `buy` verification receipts, and x402 inflows with Celoscan links) |
 | `/console` | Live `VireVault v2` state inspector and interactive `POST /api/x402/verify` HTTP `402` playground |
-| `/api/agent-card.json` | Machine-readable ERC-8004 Agent `#10116` manifest |
+| `/api/agent-card.json` & `/.well-known/agent-card.json` | Public, unauthenticated ERC-8004 Agent `#10116` manifest (`GET`, `CORS: *`) |
 | `/api/x402/verify` & `/api/x402/campaigns` | HTTP `402` machine-payable verification and campaign discovery endpoints backed by `https://api.x402.celo.org` |
 
 ---
@@ -130,9 +130,16 @@ vire/
 
 **Production App**: https://usevire.xyz  
 **Public Settlement Ledger**: https://usevire.xyz/ledger  
-**ERC-8004 Agent `#10116`**: [Manifest JSON](https://usevire.xyz/api/agent-card.json) · [Onchain Registration](https://celoscan.io/tx/0x27bbf093c2ce4348e2322088b73ecc9fcd8bcae69ddfeecb3f7c7ccfbc7da704)
+**ERC-8004 Agent `#10116`**: [Manifest JSON (`/api/agent-card.json`)](https://usevire.xyz/api/agent-card.json) · [`/.well-known/agent-card.json`](https://usevire.xyz/.well-known/agent-card.json) · [Onchain Registration](https://celoscan.io/tx/0x27bbf093c2ce4348e2322088b73ecc9fcd8bcae69ddfeecb3f7c7ccfbc7da704)
 
-### 1. Install, Build & Run Automated Test Suites
+> **Public Agent Discovery**: `/api/agent-card.json`, `/.well-known/agent-card.json`, `/api/ledger`, and `/api/campaigns` are publicly readable (`GET`, `CORS: *`, no API key or auth header required):
+> ```bash
+> curl -sS https://usevire.xyz/api/agent-card.json
+> ```
+
+### 1. Install, Build & Run Automated Test Suites (100% Offline)
+
+All TypeScript (`Vitest`) and Solidity (`Foundry`) test suites run completely offline with zero `.env` secrets or network access required:
 
 ```bash
 pnpm install

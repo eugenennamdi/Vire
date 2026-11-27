@@ -1,4 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("node:dns/promises", () => ({
+  lookup: vi.fn(async (hostname: string) => {
+    const h = hostname.toLowerCase();
+    if (h === "rebind.test") {
+      return [{ address: "10.0.0.1", family: 4 }];
+    }
+    return [{ address: "93.184.216.34", family: 4 }];
+  }),
+}));
+
 import { CeloBuyClient } from "@vire/celo-infra";
 import {
   CELO_CONTRACTS,
@@ -159,6 +170,7 @@ describe("SSRF & prompt-injection fail-closed guards", () => {
 
     await expect(assertSafePublicUrl("http://127.0.0.1:3000/secret")).rejects.toThrow();
     await expect(assertSafePublicUrl("http://169.254.169.254/latest/meta-data")).rejects.toThrow();
+    await expect(assertSafePublicUrl("https://rebind.test/secret")).rejects.toThrow(/Blocked private DNS target/);
     await expect(assertSafePublicUrl("file:///etc/passwd")).rejects.toThrow();
 
     // Reject javascript: / data: schemes in submission schema & UI guard
@@ -589,6 +601,14 @@ describe("SettlementOrchestrator atomic flow & quote-expiry refund recovery", ()
       sendTransaction: vi.fn(async () => nextHash()),
     } as never;
 
+    const mockDeliverableFetch: typeof fetch = vi.fn(
+      async () =>
+        new Response("<html><title>Promo</title><body>Authentic SWOT Gadgets promo post!</body></html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        })
+    );
+
     const orchestrator = new SettlementOrchestrator({
       publicClient,
       taggedWalletClient,
@@ -600,9 +620,9 @@ describe("SettlementOrchestrator atomic flow & quote-expiry refund recovery", ()
       vaultOwnerAddress: "0x1111111111111111111111111111111111111111",
       teamBlocklist: new Set(),
       getReferenceRate: async () => 1450,
+      fetchImpl: mockDeliverableFetch,
     });
 
-    // Use a real public resolvable domain (example.com) or mock? Let's test via verifiable https://example.com
     const result = await orchestrator.processSubmission({
       submissionId: "sub_1",
       campaign: sampleCampaign,
@@ -680,6 +700,11 @@ describe("SettlementOrchestrator atomic flow & quote-expiry refund recovery", ()
       vaultOwnerAddress: "0x1111111111111111111111111111111111111111",
       teamBlocklist: new Set(),
       getReferenceRate: async () => 1450,
+      fetchImpl: async () =>
+        new Response("<html><title>Promo</title><body>Authentic promo post!</body></html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
     });
 
     const result = await orchestrator.processSubmission({
