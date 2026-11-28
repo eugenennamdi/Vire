@@ -328,4 +328,63 @@ describe("packages/textile RFQ v2 engine", () => {
     });
     expect(capturedBodies[1]?.buyAmount).toBeUndefined();
   });
+
+  it("retries firm RFQ when Textile reports transient insufficient balance right after an onchain transfer", async () => {
+    let attempts = 0;
+    const mockFetch: typeof fetch = vi.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "INSUFFICIENT_FUNDS",
+              message: "Your wallet does not hold enough of the sell token to settle this trade",
+              details: { reason: "insufficient_funds" },
+            },
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          data: {
+            rfqId: "rfq_RETRY_OK",
+            claimToken: "rfqc_retry_ok",
+            status: "quoted",
+            quote: {
+              sellAmount: "6933526",
+              buyAmount: "10000000000",
+              feeAmount: "1386",
+              takerPays: "6933526",
+              rateRay: "693214000000000000000000",
+              expiresAt: new Date(Date.now() + 60_000).toISOString(),
+              orderDeadline: new Date(Date.now() + 90_000).toISOString(),
+              latestOrderDeadline: new Date(Date.now() + 90_000).toISOString(),
+              reactor: CELO_CONTRACTS.TEXTILE_LIMIT_ORDER_REACTOR,
+              spender: CELO_CONTRACTS.TEXTILE_LIMIT_ORDER_REACTOR,
+              taker: "0x8ba43426D57E55C51c4fe7C4F8a68Df3bf008089",
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = new TextileClient({
+      apiKey: "tx_live_dummy_test",
+      builderCodes: [DEFAULT_ATTRIBUTION_CODE],
+      insufficientFundsRetryDelaysMs: [0, 0],
+      fetchImpl: mockFetch,
+    });
+
+    const outcome = await client.requestFirmExactOutput({
+      buyToken: CELO_TOKENS.cNGN.address,
+      buyAmountAtomic: "10000000000",
+      taker: "0x8ba43426D57E55C51c4fe7C4F8a68Df3bf008089",
+    });
+
+    expect(attempts).toBe(2);
+    expect(outcome.rfqId).toBe("rfq_RETRY_OK");
+    expect(outcome.status).toBe("quoted");
+  });
 });

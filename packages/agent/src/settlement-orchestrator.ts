@@ -124,6 +124,8 @@ export interface OrchestratorDeps {
   githubApiToken?: string;
   /** Optional fetch implementation for deliverable verification (defaults to global fetch). */
   fetchImpl?: typeof fetch;
+  /** Brief delay (ms) after VireVault.releaseForSettlement() mines so Textile's RPC node indexes the new agent USD₮ balance (default 1500ms). */
+  postReleaseSettleDelayMs?: number;
   /** Optional explicit reference rate fetcher; defaults to Textile live levels top-of-book. */
   getReferenceRate?: (corridor: CorridorSymbol) => Promise<number | undefined>;
   /**
@@ -540,6 +542,12 @@ export class SettlementOrchestrator {
       aiReason: verdict.reason,
       aiEvidenceSummary: verdict.evidenceSummary,
     });
+
+    // Give Textile's backend RPC node a beat to index the freshly mined releaseForSettlement() USD₮ transfer
+    const postReleaseDelayMs = this.deps.postReleaseSettleDelayMs ?? 1_500;
+    if (postReleaseDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, postReleaseDelayMs));
+    }
 
     // Helper to cleanly refund 100% of released USD₮ back to VireVault if Textile swap cannot execute
     const abortAndRefundVault = async (reason: string, rfqToCancel?: { rfqId: string; claimToken?: string }) => {

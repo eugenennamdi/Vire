@@ -621,6 +621,7 @@ describe("SettlementOrchestrator atomic flow & quote-expiry refund recovery", ()
       teamBlocklist: new Set(),
       getReferenceRate: async () => 1450,
       fetchImpl: mockDeliverableFetch,
+      postReleaseSettleDelayMs: 0,
     });
 
     const result = await orchestrator.processSubmission({
@@ -700,6 +701,7 @@ describe("SettlementOrchestrator atomic flow & quote-expiry refund recovery", ()
       vaultOwnerAddress: "0x1111111111111111111111111111111111111111",
       teamBlocklist: new Set(),
       getReferenceRate: async () => 1450,
+      postReleaseSettleDelayMs: 0,
       fetchImpl: async () =>
         new Response("<html><title>Promo</title><body>Authentic promo post!</body></html>", {
           status: 200,

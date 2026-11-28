@@ -60,6 +60,18 @@ export class TextileQuoteExpiredError extends Error {
   }
 }
 
+const DEFAULT_INSUFFICIENT_FUNDS_RETRY_DELAYS_MS = [1_200, 2_000, 3_000] as const;
+
+function isTransientInsufficientFundsError(err: unknown): boolean {
+  if (!(err instanceof TextileApiError)) return false;
+  if (err.details?.reason === "insufficient_funds") return true;
+  return /does not hold enough|insufficient.*(funds|balance)/i.test(err.message);
+}
+
+function sleep(ms: number): Promise<void> {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+}
+
 export interface TextileClientConfig {
   baseUrl?: string;
   apiKey?: string;
@@ -68,6 +80,8 @@ export interface TextileClientConfig {
   /** Client HTTP timeout for POST /v2/rfq/request. Enforced >= 75,000ms per Textile v2 spec. */
   firmRequestTimeoutMs?: number;
   maxConcurrentRfqs?: number;
+  /** Retry backoff schedule when Textile's RPC node briefly lags behind a newly mined funding transfer. */
+  insufficientFundsRetryDelaysMs?: readonly number[];
   fetchImpl?: typeof fetch;
 }
 
@@ -89,6 +103,7 @@ export class TextileClient {
   private readonly chainId: number;
   private readonly builderCodes: string[];
   private readonly firmRequestTimeoutMs: number;
+  private readonly insufficientFundsRetryDelaysMs: readonly number[];
   private readonly limiter: ConcurrencyLimiter;
   private readonly takerProofs: TakerProofManager;
   private readonly fetchFn: typeof fetch;
@@ -110,6 +125,8 @@ export class TextileClient {
       );
     }
     this.firmRequestTimeoutMs = requestedTimeout;
+    this.insufficientFundsRetryDelaysMs =
+      config.insufficientFundsRetryDelaysMs ?? DEFAULT_INSUFFICIENT_FUNDS_RETRY_DELAYS_MS;
     this.limiter = new ConcurrencyLimiter(Math.min(config.maxConcurrentRfqs ?? 4, 4));
     this.takerProofs = new TakerProofManager();
     this.fetchFn = config.fetchImpl ?? fetch;
@@ -267,34 +284,48 @@ export class TextileClient {
         });
       }
 
-      let envelope: RfqOutcomeEnvelope;
-      try {
-        envelope = await this.requestJson<RfqOutcomeEnvelope>("/rfq/request", {
-          method: "POST",
-          body,
-          timeoutMs: this.firmRequestTimeoutMs,
-        });
-      } catch (err) {
-        // If keyless takerProof was stale/replayed, refresh once and retry cleanly.
-        if (
-          !this.apiKey &&
-          params.takerAccount &&
-          err instanceof TextileApiError &&
-          err.statusCode === 401 &&
-          err.details?.reason?.startsWith("proof_of_control_")
-        ) {
-          this.takerProofs.invalidate(params.taker, params.chainId);
-          body.takerProof = await this.takerProofs.getOrCreateProof({
-            account: params.takerAccount as Account & { signTypedData?: (args: unknown) => Promise<Hex> },
-            chainId: params.chainId,
-            forceFresh: true,
-          });
+      let envelope!: RfqOutcomeEnvelope;
+      let proofRefreshed = false;
+      let insufficientAttempt = 0;
+
+      while (true) {
+        try {
           envelope = await this.requestJson<RfqOutcomeEnvelope>("/rfq/request", {
             method: "POST",
             body,
             timeoutMs: this.firmRequestTimeoutMs,
           });
-        } else {
+          break;
+        } catch (err) {
+          // If keyless takerProof was stale/replayed, refresh once and retry cleanly.
+          if (
+            !proofRefreshed &&
+            !this.apiKey &&
+            params.takerAccount &&
+            err instanceof TextileApiError &&
+            err.statusCode === 401 &&
+            err.details?.reason?.startsWith("proof_of_control_")
+          ) {
+            proofRefreshed = true;
+            this.takerProofs.invalidate(params.taker, params.chainId);
+            body.takerProof = await this.takerProofs.getOrCreateProof({
+              account: params.takerAccount as Account & { signTypedData?: (args: unknown) => Promise<Hex> },
+              chainId: params.chainId,
+              forceFresh: true,
+            });
+            continue;
+          }
+
+          // Handle transient post-transfer RPC lag where Textile's node hasn't indexed the newly mined balance yet.
+          if (
+            isTransientInsufficientFundsError(err) &&
+            insufficientAttempt < this.insufficientFundsRetryDelaysMs.length
+          ) {
+            const delayMs = this.insufficientFundsRetryDelaysMs[insufficientAttempt++] ?? 1_500;
+            await sleep(delayMs);
+            continue;
+          }
+
           throw err;
         }
       }
